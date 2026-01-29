@@ -1,0 +1,42 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "CUEBEX",
+        "description": "\n    CUEBEX\n    ",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000"
+        }
+    ],
+    "paths": {
+        "/health": {
+            "get": {
+                "summary": "Health Check",
+                "description": "Health check endpoint to verify if the API is running.",
+                "operationId": "health_check_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
