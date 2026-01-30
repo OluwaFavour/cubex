@@ -109,9 +109,9 @@ class RedisService:
             return False
 
         try:
-            result = await cls._client.ping()
+            result = await cls._client.ping()  # type: ignore[misc]
             redis_logger.debug("Redis ping successful")
-            return result
+            return bool(result)
         except Exception as e:
             redis_logger.error(f"Redis ping failed: {str(e)}")
             return False

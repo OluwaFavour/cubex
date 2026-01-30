@@ -42,7 +42,7 @@ Example usage:
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Type
+from typing import Literal, Type
 from uuid import UUID
 
 import bcrypt
@@ -91,7 +91,7 @@ class TokenPair:
 
     access_token: str
     refresh_token: str
-    token_type: str = "bearer"
+    token_type: Literal["bearer"] = "bearer"
     expires_in: int = 900  # 15 minutes in seconds
 
 
@@ -274,7 +274,7 @@ class AuthService:
 
         # Generate new OTP
         otp_code = cls.generate_otp()
-        code_hash = hmac_hash_otp(otp_code)
+        code_hash = hmac_hash_otp(otp_code, settings.OTP_HMAC_SECRET)
         expires_at = datetime.now(timezone.utc) + timedelta(
             minutes=settings.OTP_EXPIRY_MINUTES
         )
@@ -346,7 +346,7 @@ class AuthService:
             True
         """
         # Hash the provided OTP
-        code_hash = hmac_hash_otp(otp_code)
+        code_hash = hmac_hash_otp(otp_code, settings.OTP_HMAC_SECRET)
 
         # Find valid token
         token = await otp_token_db.get_valid_token_by_hash(
@@ -594,7 +594,7 @@ class AuthService:
                 await user_db.update(
                     session=session,
                     id=user.id,
-                    data=updates,
+                    updates=updates,
                     commit_self=commit_self,
                 )
 
@@ -634,7 +634,7 @@ class AuthService:
                 await user_db.update(
                     session=session,
                     id=existing_user.id,
-                    data=updates,
+                    updates=updates,
                     commit_self=False,
                 )
 
@@ -729,7 +729,7 @@ class AuthService:
         await user_db.update(
             session=session,
             id=user.id,
-            data={"password_hash": password_hash},
+            updates={"password_hash": password_hash},
             commit_self=commit_self,
         )
 
@@ -1090,7 +1090,7 @@ class AuthService:
         await user_db.update(
             session=session,
             id=user.id,
-            data={"password_hash": new_password_hash},
+            updates={"password_hash": new_password_hash},
             commit_self=False,
         )
 

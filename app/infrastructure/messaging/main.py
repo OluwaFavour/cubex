@@ -86,11 +86,11 @@ async def start_consumers(keep_alive: bool) -> aio_pika.RobustConnection | None:
             await channel.declare_queue(dead, durable=True)
 
         # Register consumer
-        await queue.consume(
+        await queue.consume(  # type: ignore[arg-type]
             partial(
                 process_message,
                 handler=q.handler,
-                channel=channel,
+                channel=channel,  # type: ignore[arg-type]
                 retry_queue=q.retry_queue,
                 retry_queues=(
                     [retry_queue.model_dump() for retry_queue in q.retry_queues]

@@ -191,8 +191,9 @@ class BaseOAuthProvider(ABC):
 
     provider_name: str
 
+    @classmethod
     @abstractmethod
-    def get_authorization_url(self, redirect_uri: str, state: str) -> str:
+    def get_authorization_url(cls, redirect_uri: str, state: str) -> str:
         """
         Generate the OAuth authorization URL.
 
@@ -208,9 +209,10 @@ class BaseOAuthProvider(ABC):
         """
         pass
 
+    @classmethod
     @abstractmethod
     async def exchange_code_for_tokens(
-        self, code: str, redirect_uri: str
+        cls, code: str, redirect_uri: str
     ) -> OAuthTokens:
         """
         Exchange an authorization code for access tokens.
@@ -230,8 +232,9 @@ class BaseOAuthProvider(ABC):
         """
         pass
 
+    @classmethod
     @abstractmethod
-    async def get_user_info(self, access_token: str) -> OAuthUserInfo:
+    async def get_user_info(cls, access_token: str) -> OAuthUserInfo:
         """
         Retrieve user information using an access token.
 

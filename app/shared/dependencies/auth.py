@@ -115,8 +115,9 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Fetch user from database
-    user = await user_db.get_by_id(session=session, id=user_id)
+    # Fetch user from database (use transaction to avoid leaving implicit transaction open)
+    async with session.begin():
+        user = await user_db.get_by_id(session=session, id=user_id)
 
     if user is None:
         auth_logger.warning(f"Authentication failed: user not found {user_id}")
@@ -261,8 +262,9 @@ async def get_optional_user(
     except ValueError:
         return None
 
-    # Fetch user from database
-    user = await user_db.get_by_id(session=session, id=user_id)
+    # Fetch user from database (use transaction to avoid leaving implicit transaction open)
+    async with session.begin():
+        user = await user_db.get_by_id(session=session, id=user_id)
 
     if user is None or user.is_deleted or not user.is_active:
         return None

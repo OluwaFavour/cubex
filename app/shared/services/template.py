@@ -2,7 +2,7 @@ from jinja2 import Environment, FileSystemLoader
 
 
 class Renderer:
-    _env: Environment = Environment
+    _env: Environment | None = None
 
     @classmethod
     def initialize(cls, template_dir: str) -> None:
@@ -34,6 +34,9 @@ class Renderer:
         Raises:
             TemplateNotFound: If the specified template cannot be found.
             TemplateError: If an error occurs during template rendering.
+            RuntimeError: If the renderer has not been initialized.
         """
+        if cls._env is None:
+            raise RuntimeError("Renderer not initialized. Call initialize() first.")
         template = cls._env.get_template(template_name)
         return await template.render_async(**context)
