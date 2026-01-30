@@ -3,7 +3,7 @@
 ## Test Suite Structure
 
 ```bash
-📁 app/tests/ (266 tests total)
+📁 app/tests/ (283 tests total)
 ├── 📄 __init__.py                                # Package initialization
 ├── 📄 conftest.py                                # Shared fixtures & config
 ├── 📄 README.md                                  # How to run tests
@@ -27,7 +27,8 @@
 │   └── 📁 scheduler/
 │       └── 📄 test_main.py                      # Scheduler (4 tests)
 └── 📁 shared/
-    ├── 📁 db/
+    ├── � test_logger.py                        # Logger (17 tests)
+    ├── �📁 db/
     │   └── 📄 test_config.py                    # DB config (7 tests)
     └── 📁 exceptions/
         ├── 📄 test_types.py                     # Exceptions (8 tests)
@@ -41,7 +42,7 @@
 ## Quick Commands
 
 ```bash
-# Run all tests (266 tests)
+# Run all tests (283 tests)
 pytest app/tests/ -v
 
 # Run with coverage (100% coverage)
@@ -94,13 +95,14 @@ pytest app/tests/ -q
 | **Infrastructure** | 53 | 100% | 6 |
 | ├─ Messaging | 49 | 100% | 5 |
 | └─ Scheduler | 4 | 100% | 1 |
-| **Shared** | 20 | 100% | 3 |
+| **Shared** | 37 | 100% | 4 |
 | ├─ Database | 7 | 100% | 1 |
+| ├─ Logger | 17 | 100% | 1 |
 | └─ Exceptions | 13 | 100% | 2 |
-| **TOTAL** | **266** | **100%** | **15** |
+| **TOTAL** | **283** | **100%** | **16** |
 
 ## Coverage: 100% 🎉
 
-✅ All 266 tests passing  
-✅ 648/648 statements covered  
+✅ All 283 tests passing  
+✅ 676/676 statements covered  
 ✅ 0 missing lines

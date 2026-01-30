@@ -93,6 +93,7 @@ pytest -vv
 - `shared/db/test_config.py` - Database configuration (7 tests)
 - `shared/exceptions/test_types.py` - Exception types (8 tests)
 - `shared/exceptions/test_handlers.py` - Exception handlers (5 tests)
+- `shared/test_logger.py` - Logger and Sentry integration (17 tests)
 
 ### Configuration
 
@@ -154,7 +155,7 @@ def test_with_fixture(sample_user):
 
 ## Coverage
 
-**Current Coverage: 100%** (648/648 statements)
+**Current Coverage: 100%** (676/676 statements)
 
 The project maintains 100% test coverage across all modules. Check coverage with:
 
@@ -169,7 +170,7 @@ pytest --cov=app --cov-report=term-missing
 - Utils: 100% (132 statements)
 - Services: 100% (207 statements)
 - Infrastructure: 100% (110 statements)
-- Shared: 100% (115 statements)
+- Shared: 100% (143 statements)
 
 ## Continuous Integration
 
