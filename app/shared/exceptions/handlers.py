@@ -5,7 +5,10 @@ from app.shared.config import request_logger
 from app.shared.exceptions.types import (
     AppException,
     AuthenticationException,
+    BadRequestException,
+    ConflictException,
     DatabaseException,
+    NotFoundException,
     OAuthException,
     OTPExpiredException,
     OTPInvalidException,
@@ -169,7 +172,85 @@ async def rate_limit_exception_handler(
     )
 
 
+async def not_found_exception_handler(request: Request, exc: NotFoundException):
+    """
+    Handles not found exceptions by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (NotFoundException): The not found exception instance.
+
+    Returns:
+        JSONResponse: A response containing the error message and status code 404.
+    """
+    request_logger.warning(f"NotFoundException: {exc}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": str(exc)},
+    )
+
+
+async def conflict_exception_handler(request: Request, exc: ConflictException):
+    """
+    Handles conflict exceptions by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (ConflictException): The conflict exception instance.
+
+    Returns:
+        JSONResponse: A response containing the error message and status code 409.
+    """
+    request_logger.warning(f"ConflictException: {exc}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": str(exc)},
+    )
+
+
+async def bad_request_exception_handler(request: Request, exc: BadRequestException):
+    """
+    Handles bad request exceptions by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (BadRequestException): The bad request exception instance.
+
+    Returns:
+        JSONResponse: A response containing the error message and status code 400.
+    """
+    request_logger.warning(f"BadRequestException: {exc}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": str(exc)},
+    )
+
+
 exception_schema = {
+    status.HTTP_400_BAD_REQUEST: {
+        "description": "Bad Request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Bad request error message"},
+            }
+        },
+    },
+    status.HTTP_404_NOT_FOUND: {
+        "description": "Not Found",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Resource not found."},
+            }
+        },
+    },
+    status.HTTP_409_CONFLICT: {
+        "description": "Conflict",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Resource conflict."},
+            }
+        },
+    },
     status.HTTP_500_INTERNAL_SERVER_ERROR: {
         "description": "Internal Server Error",
         "content": {
@@ -206,5 +287,8 @@ __all__ = [
     "otp_invalid_exception_handler",
     "too_many_attempts_exception_handler",
     "rate_limit_exception_handler",
+    "not_found_exception_handler",
+    "conflict_exception_handler",
+    "bad_request_exception_handler",
     "exception_schema",
 ]

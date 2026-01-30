@@ -11,16 +11,38 @@ from app.core.dependencies import get_async_session
 from app.shared.config import settings, app_logger
 from app.shared.db import init_db, dispose_db
 from app.shared.exceptions.handlers import (
-    exception_schema,
-)
-from app.shared.exceptions.handlers import (
+    authentication_exception_handler,
+    bad_request_exception_handler,
+    conflict_exception_handler,
     database_exception_handler,
+    exception_schema,
     general_exception_handler,
+    not_found_exception_handler,
+    oauth_exception_handler,
+    otp_expired_exception_handler,
+    otp_invalid_exception_handler,
+    rate_limit_exception_handler,
+    too_many_attempts_exception_handler,
 )
-from app.shared.exceptions.types import AppException, DatabaseException
+from app.shared.exceptions.types import (
+    AppException,
+    AuthenticationException,
+    BadRequestException,
+    ConflictException,
+    DatabaseException,
+    NotFoundException,
+    OAuthException,
+    OTPExpiredException,
+    OTPInvalidException,
+    RateLimitExceededException,
+    TooManyAttemptsException,
+)
 from app.infrastructure.messaging import start_consumers
 from app.infrastructure.scheduler import scheduler
 from app.shared.services import BrevoService, CloudinaryService, Renderer, RedisService
+from app.shared.services.auth import AuthService
+from app.shared.services.oauth import GoogleOAuthService, GitHubOAuthService
+from app.shared.routers import auth_router
 from app.shared.utils import generate_openapi_json, write_to_file_async
 
 
@@ -38,6 +60,23 @@ async def lifespan(app: FastAPI):
     app_logger.info("Initializing Redis service...")
     await RedisService.init(settings.REDIS_URL)
     app_logger.info("Redis service initialized successfully.")
+
+    # Initialize Auth service
+    app_logger.info("Initializing Auth service...")
+    AuthService.init()
+    app_logger.info("Auth service initialized successfully.")
+
+    # Initialize OAuth services
+    app_logger.info("Initializing OAuth services...")
+    await GoogleOAuthService.init(
+        client_id=settings.GOOGLE_CLIENT_ID,
+        client_secret=settings.GOOGLE_CLIENT_SECRET,
+    )
+    await GitHubOAuthService.init(
+        client_id=settings.GITHUB_CLIENT_ID,
+        client_secret=settings.GITHUB_CLIENT_SECRET,
+    )
+    app_logger.info("OAuth services initialized successfully.")
 
     # Start the scheduler (only if enabled)
     if settings.ENABLE_SCHEDULER:
@@ -101,6 +140,12 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown()
         app_logger.info("Scheduler stopped successfully.")
 
+    # Close OAuth services
+    app_logger.info("Closing OAuth services...")
+    await GoogleOAuthService.aclose()
+    await GitHubOAuthService.aclose()
+    app_logger.info("OAuth services closed successfully.")
+
     # Close Redis service
     app_logger.info("Closing Redis service...")
     await RedisService.aclose()
@@ -130,7 +175,16 @@ app = FastAPI(
     ],
 )
 
-# Register exception handlers
+# Register exception handlers (order matters - more specific first)
+app.add_exception_handler(OTPExpiredException, otp_expired_exception_handler)
+app.add_exception_handler(OTPInvalidException, otp_invalid_exception_handler)
+app.add_exception_handler(TooManyAttemptsException, too_many_attempts_exception_handler)
+app.add_exception_handler(RateLimitExceededException, rate_limit_exception_handler)
+app.add_exception_handler(OAuthException, oauth_exception_handler)
+app.add_exception_handler(AuthenticationException, authentication_exception_handler)
+app.add_exception_handler(NotFoundException, not_found_exception_handler)
+app.add_exception_handler(ConflictException, conflict_exception_handler)
+app.add_exception_handler(BadRequestException, bad_request_exception_handler)
 app.add_exception_handler(DatabaseException, database_exception_handler)
 app.add_exception_handler(AppException, general_exception_handler)
 
@@ -153,18 +207,19 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 
 
 @app.get("/", include_in_schema=False)
 async def root(request: Request):
     base_url = request.base_url._url.rstrip("/")
     return {
-        "message": "Welcome to Wander API",
+        "message": "Welcome to CUEBEX API",
         "documentations": {
             "swagger": f"{base_url}/docs",
             "redoc": f"{base_url}/redoc",
         },
-        "version": "1.0.0",
+        "version": settings.APP_VERSION,
     }
 
 
@@ -180,7 +235,7 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
     """
     health_status = {
         "status": "ok",
-        "message": "Wander API is running.",
+        "message": "CUEBEX API is running.",
         "checks": {
             "database": "ok",
             "redis": "ok",

@@ -189,12 +189,16 @@ class TestGetQueueConfigs:
 
         assert isinstance(configs, list)
 
-    def test_get_queue_configs_returns_empty_by_default(self):
-        """Test that get_queue_configs returns empty list when no queues configured."""
-        # Since QUEUE_CONFIG is empty by default
+    def test_get_queue_configs_returns_configured_queues(self):
+        """Test that get_queue_configs returns configured queues."""
         configs = get_queue_configs()
 
-        assert len(configs) == 0
+        # We have at least the otp_emails queue configured
+        assert len(configs) >= 1
+
+        # Check the otp_emails queue is present
+        queue_names = [config.name for config in configs]
+        assert "otp_emails" in queue_names
 
     def test_get_queue_configs_cached(self):
         """Test that get_queue_configs uses lru_cache."""

@@ -124,7 +124,10 @@ class GoogleOAuthService(BaseOAuthProvider):
             cls._client_secret = client_secret
 
         await cls.aclose()
-        cls._client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
+        cls._client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+        )
         auth_logger.info("GoogleOAuthService initialized")
 
     @classmethod
@@ -288,37 +291,53 @@ class GoogleOAuthService(BaseOAuthProvider):
 
         headers = {"Authorization": f"Bearer {access_token}"}
 
-        try:
-            response = await cls._client.get(cls._USERINFO_URL, headers=headers)
+        # Retry logic for transient network errors
+        max_retries = 2
+        last_error = None
 
-            if response.status_code != 200:
-                auth_logger.error(
-                    f"Google user info retrieval failed: status={response.status_code}"
+        for attempt in range(max_retries + 1):
+            try:
+                response = await cls._client.get(cls._USERINFO_URL, headers=headers)
+
+                if response.status_code != 200:
+                    auth_logger.error(
+                        f"Google user info retrieval failed: status={response.status_code}"
+                    )
+                    raise OAuthException(
+                        message=f"Failed to retrieve Google user info: {response.text}"
+                    )
+
+                user_data = response.json()
+
+                auth_logger.info(
+                    f"Google user info retrieved: user_id={user_data.get('sub')}"
                 )
-                raise OAuthException(
-                    message=f"Failed to retrieve Google user info: {response.text}"
+
+                return OAuthUserInfo(
+                    provider=cls.provider_name,
+                    provider_user_id=user_data["sub"],
+                    email=user_data.get("email", ""),
+                    email_verified=user_data.get("email_verified", False),
+                    name=user_data.get("name"),
+                    given_name=user_data.get("given_name"),
+                    family_name=user_data.get("family_name"),
+                    picture=user_data.get("picture"),
+                    raw_data=user_data,
                 )
 
-            user_data = response.json()
+            except httpx.RequestError as e:
+                last_error = e
+                auth_logger.warning(
+                    f"Google user info network error (attempt {attempt + 1}/{max_retries + 1}): {type(e).__name__}: {e}"
+                )
+                if attempt < max_retries:
+                    # Small delay before retry
+                    import asyncio
 
-            auth_logger.info(
-                f"Google user info retrieved: user_id={user_data.get('sub')}"
-            )
+                    await asyncio.sleep(0.5)
+                    continue
 
-            return OAuthUserInfo(
-                provider=cls.provider_name,
-                provider_user_id=user_data["sub"],
-                email=user_data.get("email", ""),
-                email_verified=user_data.get("email_verified", False),
-                name=user_data.get("name"),
-                given_name=user_data.get("given_name"),
-                family_name=user_data.get("family_name"),
-                picture=user_data.get("picture"),
-                raw_data=user_data,
-            )
-
-        except httpx.RequestError as e:
-            auth_logger.error(f"Google user info network error: {e}")
-            raise OAuthException(
-                message="Failed to retrieve Google user info: network error"
-            ) from e
+        auth_logger.error(f"Google user info network error after retries: {last_error}")
+        raise OAuthException(
+            message="Failed to retrieve Google user info: network error"
+        ) from last_error

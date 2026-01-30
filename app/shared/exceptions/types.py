@@ -77,6 +77,48 @@ class RateLimitExceededException(AppException):
         self.retry_after = retry_after
 
 
+class NotFoundException(AppException):
+    """Exception raised when a resource is not found."""
+
+    def __init__(self, message: str = "Resource not found."):
+        super().__init__(message, status.HTTP_404_NOT_FOUND)
+
+
+class UserNotFoundException(NotFoundException):
+    """Exception raised when a user is not found."""
+
+    def __init__(self, message: str = "User not found."):
+        super().__init__(message)
+
+
+class ConflictException(AppException):
+    """Exception raised when there's a conflict with existing resources."""
+
+    def __init__(self, message: str = "Resource conflict."):
+        super().__init__(message, status.HTTP_409_CONFLICT)
+
+
+class UserAlreadyExistsException(ConflictException):
+    """Exception raised when a user already exists."""
+
+    def __init__(self, message: str = "User with this email already exists."):
+        super().__init__(message)
+
+
+class BadRequestException(AppException):
+    """Exception raised for bad request errors."""
+
+    def __init__(self, message: str = "Bad request."):
+        super().__init__(message, status.HTTP_400_BAD_REQUEST)
+
+
+class InvalidStateException(BadRequestException):
+    """Exception raised when OAuth state parameter is invalid."""
+
+    def __init__(self, message: str = "Invalid state parameter."):
+        super().__init__(message)
+
+
 __all__ = [
     "AppException",
     "DatabaseException",
@@ -87,4 +129,10 @@ __all__ = [
     "OTPInvalidException",
     "TooManyAttemptsException",
     "RateLimitExceededException",
+    "NotFoundException",
+    "UserNotFoundException",
+    "ConflictException",
+    "UserAlreadyExistsException",
+    "BadRequestException",
+    "InvalidStateException",
 ]

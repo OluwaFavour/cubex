@@ -52,7 +52,7 @@ def setup_test_database():
             ["alembic", "upgrade", "head"],
             capture_output=True,
             text=True,
-            cwd=Path(__file__).parent.parent.parent,
+            cwd=Path(__file__).parent.parent,  # Project root where alembic.ini is
         )
 
         if result.returncode != 0:
@@ -76,7 +76,7 @@ def setup_test_database():
         subprocess.run(
             ["alembic", "downgrade", "base"],
             capture_output=True,
-            cwd=Path(__file__).parent.parent.parent,
+            cwd=Path(__file__).parent.parent,  # Project root where alembic.ini is
         )
     finally:
         if original_db_url:

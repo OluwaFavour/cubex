@@ -24,12 +24,19 @@ import secrets
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlparse
+
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+
+from app.shared.config import settings
 
 
 __all__ = [
     "BaseOAuthProvider",
     "OAuthTokens",
     "OAuthUserInfo",
+    "OAuthStateData",
+    "OAuthStateManager",
     "generate_state",
 ]
 
@@ -238,3 +245,120 @@ class BaseOAuthProvider(ABC):
             OAuthException: If user info retrieval fails.
         """
         pass
+
+
+# State serializer for encoding callback URL and other data
+_state_serializer = URLSafeTimedSerializer(
+    secret_key=settings.SESSION_SECRET_KEY,
+    salt="oauth-state",
+)
+
+
+@dataclass
+class OAuthStateData:
+    """Data encoded in OAuth state parameter."""
+
+    callback_url: str | None = None
+    remember_me: bool = False
+    nonce: str = field(default_factory=lambda: secrets.token_hex(16))
+
+
+class OAuthStateManager:
+    """
+    Manager for encoding/decoding OAuth state parameters.
+
+    Uses itsdangerous to sign and serialize state data, ensuring
+    it hasn't been tampered with and hasn't expired.
+    """
+
+    # State expires after 10 minutes
+    STATE_MAX_AGE_SECONDS: int = 600
+
+    @classmethod
+    def encode_state(
+        cls,
+        callback_url: str | None = None,
+        remember_me: bool = False,
+    ) -> str:
+        """
+        Encode OAuth state data into a signed, URL-safe string.
+
+        Args:
+            callback_url: Frontend callback URL to redirect after OAuth.
+            remember_me: Whether to extend session duration.
+
+        Returns:
+            str: Signed, URL-safe state string.
+        """
+        data = {
+            "callback_url": callback_url,
+            "remember_me": remember_me,
+            "nonce": secrets.token_hex(16),
+        }
+        return _state_serializer.dumps(data)
+
+    @classmethod
+    def decode_state(cls, state: str) -> OAuthStateData | None:
+        """
+        Decode and verify OAuth state parameter.
+
+        Args:
+            state: The signed state string from OAuth callback.
+
+        Returns:
+            OAuthStateData if valid, None if invalid or expired.
+        """
+        try:
+            data = _state_serializer.loads(state, max_age=cls.STATE_MAX_AGE_SECONDS)
+            return OAuthStateData(
+                callback_url=data.get("callback_url"),
+                remember_me=data.get("remember_me", False),
+                nonce=data.get("nonce", ""),
+            )
+        except (BadSignature, SignatureExpired):
+            return None
+
+    @classmethod
+    def validate_callback_url(cls, callback_url: str) -> bool:
+        """
+        Validate that callback URL is in allowed origins.
+
+        In production, also requires HTTPS.
+
+        Args:
+            callback_url: The callback URL to validate.
+
+        Returns:
+            bool: True if valid, False otherwise.
+        """
+        if not callback_url:
+            return False
+
+        try:
+            parsed = urlparse(callback_url)
+
+            # Must have scheme and netloc
+            if not parsed.scheme or not parsed.netloc:
+                return False
+
+            # In production, require HTTPS
+            if settings.ENVIRONMENT == "production" and parsed.scheme != "https":
+                return False
+
+            # Build origin from callback URL
+            callback_origin = f"{parsed.scheme}://{parsed.netloc}"
+
+            # Check against allowed CORS origins
+            for allowed_origin in settings.CORS_ALLOW_ORIGINS:
+                # Handle wildcard
+                if allowed_origin == "*":
+                    return True
+
+                # Exact match or match with/without trailing slash
+                if callback_origin.rstrip("/") == allowed_origin.rstrip("/"):
+                    return True
+
+            return False
+
+        except Exception:
+            return False

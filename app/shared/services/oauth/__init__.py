@@ -5,6 +5,7 @@ This package contains OAuth provider implementations for authentication:
 - BaseOAuthProvider: Abstract base class for OAuth providers
 - GoogleOAuthService: Google OAuth 2.0 implementation
 - GitHubOAuthService: GitHub OAuth implementation
+- OAuthStateManager: Manager for encoding/decoding OAuth state parameters
 
 Example usage:
     from app.shared.services.oauth import GoogleOAuthService, GitHubOAuthService
@@ -31,18 +32,22 @@ Example usage:
 
 from app.shared.services.oauth.base import (
     BaseOAuthProvider,
+    OAuthStateData,
+    OAuthStateManager,
     OAuthTokens,
     OAuthUserInfo,
     generate_state,
 )
-from app.shared.services.oauth.google import GoogleOAuthService
 from app.shared.services.oauth.github import GitHubOAuthService
+from app.shared.services.oauth.google import GoogleOAuthService
 
 
 __all__ = [
     "BaseOAuthProvider",
     "OAuthTokens",
     "OAuthUserInfo",
+    "OAuthStateData",
+    "OAuthStateManager",
     "generate_state",
     "GoogleOAuthService",
     "GitHubOAuthService",

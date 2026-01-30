@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
-    OAUTH_REDIRECT_BASE_URI: str = "http://localhost:8000/auth/callback"
+    OAUTH_REDIRECT_BASE_URI: str = "http://localhost:8000/auth"
 
     # Cloudinary settings
     CLOUDINARY_CLOUD_NAME: str = "your_cloudinary_cloud_name"
@@ -79,7 +79,6 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
     SENTRY_ENVIRONMENT: str = "development"
     SENTRY_TRACES_SAMPLE_RATE: float = 1.0
-    SENTRY_ENABLE_TRACING: bool = False
 
     model_config: SettingsConfigDict = SettingsConfigDict(  # type: ignore
         env_file=".env",
@@ -99,7 +98,6 @@ init_sentry(
     dsn=settings.SENTRY_DSN,
     environment=settings.SENTRY_ENVIRONMENT,
     traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-    enable_tracing=settings.SENTRY_ENABLE_TRACING,
 )
 
 # Configure loggers with component-specific Sentry tags for separation of concerns

@@ -570,3 +570,132 @@ class BaseDB(Generic[T]):
             raise DatabaseException(
                 f"Error checking existence of {self.model.__name__} with filters {filters}: {str(e)}"
             ) from e
+
+    async def soft_delete(
+        self, session: AsyncSession, id: UUID, commit_self: bool = True
+    ) -> T | None:
+        """
+        Asynchronously soft-deletes a record by setting is_deleted=True and deleted_at timestamp.
+
+        This method does not remove the record from the database; it marks it as deleted
+        by setting the `is_deleted` flag to True and recording the deletion timestamp.
+
+        Args:
+            session (AsyncSession): The SQLAlchemy asynchronous session to use for the operation.
+            id (UUID): The unique identifier of the record to soft-delete.
+            commit_self (bool, optional): If True, commits the transaction after the update;
+                if False, only flushes the session. Defaults to True.
+
+        Returns:
+            T | None: The soft-deleted record as an instance of the model, or None if no record
+                was found with the given ID.
+
+        Raises:
+            DatabaseException: If an error occurs while updating the record or committing the transaction.
+        """
+        from datetime import datetime, timezone
+
+        try:
+            now = datetime.now(timezone.utc)
+            stmt: Update = (
+                sa_update(self.model)
+                .where(self.model.id == id)
+                .values(is_deleted=True, deleted_at=now, updated_at=now)
+                .returning(self.model)
+            )
+            result = await session.execute(stmt)
+
+            if commit_self:
+                await session.commit()
+            else:
+                await session.flush()
+
+            return result.scalar_one_or_none()
+        except SQLAlchemyError as e:
+            raise DatabaseException(
+                f"Error soft-deleting {self.model.__name__} with ID {id}: {str(e)}"
+            ) from e
+
+    async def soft_delete_by_filters(
+        self, session: AsyncSession, filters: dict, commit_self: bool = True
+    ) -> int:
+        """
+        Asynchronously soft-deletes records that match the given filters.
+
+        Args:
+            session (AsyncSession): The SQLAlchemy asynchronous session to use for the operation.
+            filters (dict): A dictionary of filter conditions to identify the records to soft-delete.
+            commit_self (bool, optional): If True, commits the transaction after the update;
+                if False, only flushes the session. Defaults to True.
+
+        Returns:
+            int: The number of records soft-deleted.
+
+        Raises:
+            DatabaseException: If an error occurs while updating the records or committing the transaction.
+        """
+        from datetime import datetime, timezone
+
+        try:
+            now = datetime.now(timezone.utc)
+            stmt: Update = (
+                sa_update(self.model)
+                .where(and_(*[getattr(self.model, k) == v for k, v in filters.items()]))
+                .values(is_deleted=True, deleted_at=now, updated_at=now)
+            )
+            result = await session.execute(stmt)
+
+            if commit_self:
+                await session.commit()
+            else:
+                await session.flush()
+
+            return result.rowcount
+        except SQLAlchemyError as e:
+            raise DatabaseException(
+                f"Error soft-deleting {self.model.__name__} with filters {filters}: {str(e)}"
+            ) from e
+
+    async def soft_delete_by_conditions(
+        self,
+        session: AsyncSession,
+        conditions: list[SQLColumnExpression],
+        commit_self: bool = True,
+    ) -> int:
+        """
+        Asynchronously soft-deletes records that match the given conditions.
+
+        Args:
+            session (AsyncSession): The SQLAlchemy asynchronous session to use for the operation.
+            conditions (list[SQLColumnExpression]): A list of SQLAlchemy expressions to filter
+                the records to soft-delete.
+            commit_self (bool, optional): If True, commits the transaction after the update;
+                if False, only flushes the session. Defaults to True.
+
+        Returns:
+            int: The number of records soft-deleted.
+
+        Raises:
+            DatabaseException: If an error occurs while updating the records or committing the transaction.
+        """
+        from datetime import datetime, timezone
+
+        try:
+            now = datetime.now(timezone.utc)
+            stmt: Update = (
+                sa_update(self.model)
+                .where(and_(*conditions))
+                .values(is_deleted=True, deleted_at=now, updated_at=now)
+            )
+            result = await session.execute(stmt)
+
+            if commit_self:
+                await session.commit()
+            else:
+                await session.flush()
+
+            return result.rowcount
+        except SQLAlchemyError as e:
+            raise DatabaseException(
+                f"Error soft-deleting {self.model.__name__} with conditions {conditions}: {str(e)}"
+            ) from e

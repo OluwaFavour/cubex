@@ -125,7 +125,10 @@ class GitHubOAuthService(BaseOAuthProvider):
             cls._client_secret = client_secret
 
         await cls.aclose()
-        cls._client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
+        cls._client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+        )
         auth_logger.info("GitHubOAuthService initialized")
 
     @classmethod
@@ -348,46 +351,62 @@ class GitHubOAuthService(BaseOAuthProvider):
             "X-GitHub-Api-Version": "2022-11-28",
         }
 
-        try:
-            response = await cls._client.get(cls._USER_URL, headers=headers)
+        # Retry logic for transient network errors
+        max_retries = 2
+        last_error = None
 
-            if response.status_code != 200:
-                auth_logger.error(
-                    f"GitHub user info retrieval failed: status={response.status_code}"
+        for attempt in range(max_retries + 1):
+            try:
+                response = await cls._client.get(cls._USER_URL, headers=headers)
+
+                if response.status_code != 200:
+                    auth_logger.error(
+                        f"GitHub user info retrieval failed: status={response.status_code}"
+                    )
+                    raise OAuthException(
+                        message=f"Failed to retrieve GitHub user info: {response.text}"
+                    )
+
+                user_data = response.json()
+
+                # Get email - may need to fetch from /user/emails endpoint
+                email = user_data.get("email")
+                email_verified = False
+
+                if not email:
+                    # Fetch primary email from emails endpoint
+                    email, email_verified = await cls._get_primary_email(access_token)
+                else:
+                    # If email is in profile, check verification via emails endpoint
+                    _, email_verified = await cls._get_primary_email(access_token)
+
+                auth_logger.info(
+                    f"GitHub user info retrieved: user_id={user_data.get('id')}"
                 )
-                raise OAuthException(
-                    message=f"Failed to retrieve GitHub user info: {response.text}"
+
+                return OAuthUserInfo(
+                    provider=cls.provider_name,
+                    provider_user_id=str(user_data["id"]),
+                    email=email or "",
+                    email_verified=email_verified,
+                    name=user_data.get("name"),
+                    picture=user_data.get("avatar_url"),
+                    raw_data=user_data,
                 )
 
-            user_data = response.json()
+            except httpx.RequestError as e:
+                last_error = e
+                auth_logger.warning(
+                    f"GitHub user info network error (attempt {attempt + 1}/{max_retries + 1}): {type(e).__name__}: {e}"
+                )
+                if attempt < max_retries:
+                    # Small delay before retry
+                    import asyncio
 
-            # Get email - may need to fetch from /user/emails endpoint
-            email = user_data.get("email")
-            email_verified = False
+                    await asyncio.sleep(0.5)
+                    continue
 
-            if not email:
-                # Fetch primary email from emails endpoint
-                email, email_verified = await cls._get_primary_email(access_token)
-            else:
-                # If email is in profile, check verification via emails endpoint
-                _, email_verified = await cls._get_primary_email(access_token)
-
-            auth_logger.info(
-                f"GitHub user info retrieved: user_id={user_data.get('id')}"
-            )
-
-            return OAuthUserInfo(
-                provider=cls.provider_name,
-                provider_user_id=str(user_data["id"]),
-                email=email or "",
-                email_verified=email_verified,
-                name=user_data.get("name"),
-                picture=user_data.get("avatar_url"),
-                raw_data=user_data,
-            )
-
-        except httpx.RequestError as e:
-            auth_logger.error(f"GitHub user info network error: {e}")
-            raise OAuthException(
-                message="Failed to retrieve GitHub user info: network error"
-            ) from e
+        auth_logger.error(f"GitHub user info network error after retries: {last_error}")
+        raise OAuthException(
+            message="Failed to retrieve GitHub user info: network error"
+        ) from last_error

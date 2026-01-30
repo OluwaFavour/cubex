@@ -466,7 +466,7 @@ class TestRootEndpoint:
 
         assert response.status_code == 200
         assert "message" in response.json()
-        assert response.json()["message"] == "Welcome to Wander API"
+        assert response.json()["message"] == "Welcome to CUEBEX API"
 
     def test_root_endpoint_returns_documentation_links(self, client):
         """Test that root endpoint returns documentation links."""
@@ -554,7 +554,7 @@ class TestHealthCheckEndpoint:
                 assert response.status_code == 200
                 data = response.json()
                 assert data["status"] == "ok"
-                assert "Wander API is running" in data["message"]
+                assert "CUEBEX API is running" in data["message"]
                 assert data["checks"]["database"] == "ok"
                 assert data["checks"]["redis"] == "ok"
 

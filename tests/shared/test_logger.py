@@ -68,7 +68,6 @@ class TestInitSentry:
                 dsn="https://test@sentry.io/123",
                 environment="production",
                 traces_sample_rate=0.5,
-                enable_tracing=True,
             )
 
             # Verify initialization was successful
@@ -80,7 +79,6 @@ class TestInitSentry:
             assert call_kwargs["dsn"] == "https://test@sentry.io/123"
             assert call_kwargs["environment"] == "production"
             assert call_kwargs["traces_sample_rate"] == 0.5
-            assert call_kwargs["enable_tracing"] is True
 
     def test_init_sentry_already_initialized(self):
         """Test that Sentry initialization is skipped if already initialized."""

@@ -7,6 +7,8 @@ This module provides a centralized authentication service that handles:
 - OAuth authentication (Google, GitHub)
 - OTP generation, sending, and verification
 - Password reset flow
+- Token pair generation (access + refresh tokens)
+- Refresh token management and revocation
 
 Example usage:
     from app.shared.services.auth import AuthService
@@ -22,11 +24,12 @@ Example usage:
         full_name="John Doe",
     )
 
-    # Email signin
-    user = await AuthService.email_signin(
+    # Email signin with tokens
+    tokens = await AuthService.email_signin_with_tokens(
         session=db_session,
         email="user@example.com",
         password="SecurePassword123!",
+        remember_me=True,
     )
 
     # OAuth authentication
@@ -36,6 +39,7 @@ Example usage:
     )
 """
 
+import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Type
@@ -44,8 +48,12 @@ from uuid import UUID
 import bcrypt
 
 from app.shared.config import auth_logger, settings
-from app.shared.db.crud import OAuthAccountDB, UserDB
-from app.shared.db.crud.otp import OTPTokenDB
+from app.shared.db.crud import (
+    oauth_account_db,
+    otp_token_db,
+    refresh_token_db,
+    user_db,
+)
 from app.shared.enums import OAuthProviders, OTPPurpose
 from app.shared.exceptions.types import (
     AuthenticationException,
@@ -54,16 +62,37 @@ from app.shared.exceptions.types import (
     OTPInvalidException,
     TooManyAttemptsException,
 )
-from app.shared.services.email_manager import EmailManagerService
+from app.infrastructure.messaging import publish_event
 from app.shared.services.oauth import (
     GitHubOAuthService,
     GoogleOAuthService,
 )
 from app.shared.services.oauth.base import BaseOAuthProvider, OAuthUserInfo
-from app.shared.utils import hmac_hash_otp
+from app.shared.utils import create_jwt_token, hmac_hash_otp
 
 
-__all__ = ["AuthService"]
+__all__ = ["AuthService", "TokenPair"]
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class TokenPair:
+    """
+    Data class representing an access/refresh token pair.
+
+    Attributes:
+        access_token: Short-lived JWT access token.
+        refresh_token: Long-lived refresh token for obtaining new access tokens.
+        token_type: The type of token (always "bearer").
+        expires_in: Access token expiration time in seconds.
+    """
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int = 900  # 15 minutes in seconds
 
 
 class AuthService:
@@ -76,6 +105,9 @@ class AuthService:
 
     Attributes:
         _initialized: Flag indicating whether the service has been initialized.
+        ACCESS_TOKEN_EXPIRE_MINUTES: Access token expiration (15 minutes).
+        REFRESH_TOKEN_EXPIRE_DAYS: Normal refresh token expiration (7 days).
+        REFRESH_TOKEN_REMEMBER_DAYS: Extended refresh token expiration (30 days).
 
     Example:
         >>> AuthService.init()
@@ -87,6 +119,11 @@ class AuthService:
     """
 
     _initialized: bool = False
+
+    # Token expiration settings
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    REFRESH_TOKEN_REMEMBER_DAYS: int = 30
 
     # =========================================================================
     # Initialization
@@ -200,6 +237,7 @@ class AuthService:
         purpose: OTPPurpose,
         user_id: UUID | None = None,
         user_name: str | None = None,
+        commit_self: bool = True,
     ) -> bool:
         """
         Generate and send an OTP to the specified email.
@@ -213,6 +251,7 @@ class AuthService:
             purpose: The purpose of the OTP.
             user_id: Optional user ID to associate with the OTP.
             user_name: Optional user name for email personalization.
+            commit_self: If True, commits the transaction. Default False.
 
         Returns:
             bool: True if OTP was sent successfully.
@@ -225,10 +264,8 @@ class AuthService:
             ... )
             True
         """
-        otp_db = OTPTokenDB()
-
         # Invalidate previous tokens
-        await otp_db.invalidate_previous_tokens(
+        await otp_token_db.invalidate_previous_tokens(
             session=session,
             email=email,
             purpose=purpose,
@@ -243,7 +280,7 @@ class AuthService:
         )
 
         # Create OTP token
-        await otp_db.create(
+        await otp_token_db.create(
             session=session,
             data={
                 "user_id": user_id,
@@ -255,18 +292,22 @@ class AuthService:
             commit_self=False,
         )
 
-        await session.commit()
+        if commit_self:
+            await session.commit()
 
-        # Send OTP email
-        result = await EmailManagerService.send_otp_email(
-            email=email,
-            otp_code=otp_code,
-            purpose=purpose,
-            user_name=user_name,
+        # Publish OTP email event to the message queue
+        await publish_event(
+            queue_name="otp_emails",
+            event={
+                "email": email,
+                "otp_code": otp_code,
+                "purpose": purpose.value,
+                "user_name": user_name,
+            },
         )
 
-        auth_logger.info(f"OTP sent: email={email}, purpose={purpose.value}")
-        return result
+        auth_logger.info(f"OTP queued: email={email}, purpose={purpose.value}")
+        return True
 
     @classmethod
     async def verify_otp(
@@ -275,6 +316,7 @@ class AuthService:
         email: str,
         otp_code: str,
         purpose: OTPPurpose,
+        commit_self: bool = True,
     ) -> bool:
         """
         Verify an OTP code.
@@ -284,6 +326,7 @@ class AuthService:
             email: The email address the OTP was sent to.
             otp_code: The OTP code to verify.
             purpose: The purpose of the OTP.
+            commit_self: If True, commits the transaction. Default False.
 
         Returns:
             bool: True if OTP is valid.
@@ -302,13 +345,11 @@ class AuthService:
             ... )
             True
         """
-        otp_db = OTPTokenDB()
-
         # Hash the provided OTP
         code_hash = hmac_hash_otp(otp_code)
 
         # Find valid token
-        token = await otp_db.get_valid_token_by_hash(
+        token = await otp_token_db.get_valid_token_by_hash(
             session=session,
             code_hash=code_hash,
             email=email,
@@ -327,7 +368,9 @@ class AuthService:
             raise TooManyAttemptsException()
 
         # Mark as used
-        await otp_db.mark_as_used(session=session, token=token, commit_self=True)
+        await otp_token_db.mark_as_used(
+            session=session, token=token, commit_self=commit_self
+        )
 
         auth_logger.info(f"OTP verified: email={email}, purpose={purpose.value}")
         return True
@@ -343,6 +386,7 @@ class AuthService:
         email: str,
         password: str,
         full_name: str | None = None,
+        commit_self: bool = True,
     ):
         """
         Register a new user with email and password.
@@ -352,6 +396,7 @@ class AuthService:
             email: The user's email address.
             password: The user's password (will be hashed).
             full_name: Optional full name.
+            commit_self: If True, commits the transaction. Default False.
 
         Returns:
             The created User object.
@@ -367,8 +412,6 @@ class AuthService:
             ...     full_name="New User",
             ... )
         """
-        user_db = UserDB()
-
         # Check if user exists
         existing = await user_db.get_one_by_conditions(
             session=session,
@@ -393,7 +436,7 @@ class AuthService:
                 "full_name": full_name,
                 "email_verified": False,
             },
-            commit_self=True,
+            commit_self=commit_self,
         )
 
         auth_logger.info(f"User signup: email={email}")
@@ -428,8 +471,6 @@ class AuthService:
             ...     password="SecurePass123!",
             ... )
         """
-        user_db = UserDB()
-
         # Find user
         user = await user_db.get_one_by_conditions(
             session=session,
@@ -455,9 +496,7 @@ class AuthService:
         # Check if active
         if not user.is_active:
             auth_logger.warning(f"Signin failed: user deactivated {email}")
-            raise AuthenticationException(
-                message="This account has been deactivated"
-            )
+            raise AuthenticationException(message="This account has been deactivated")
 
         auth_logger.info(f"User signin: email={email}")
         return user
@@ -500,6 +539,7 @@ class AuthService:
         cls,
         session,
         user_info: OAuthUserInfo,
+        commit_self: bool = True,
     ):
         """
         Authenticate or create a user from OAuth provider info.
@@ -512,6 +552,7 @@ class AuthService:
         Args:
             session: The database session.
             user_info: User information from OAuth provider.
+            commit_self: If True, commits the transaction. Default False.
 
         Returns:
             The authenticated User object.
@@ -522,20 +563,18 @@ class AuthService:
             ...     user_info=oauth_user_info,
             ... )
         """
-        user_db = UserDB()
-        oauth_db = OAuthAccountDB()
-
         # Map provider string to enum
         provider_enum = OAuthProviders(user_info.provider)
 
         # Check if OAuth account exists
-        existing_oauth = await oauth_db.get_one_by_conditions(
+        existing_oauth = await oauth_account_db.get_one_by_conditions(
             session=session,
             conditions=[
-                oauth_db.model.provider == provider_enum,
-                oauth_db.model.provider_account_id == user_info.provider_user_id,
+                oauth_account_db.model.provider == provider_enum,
+                oauth_account_db.model.provider_account_id
+                == user_info.provider_user_id,
             ],
-            options=[oauth_db.user_loader],
+            options=[oauth_account_db.user_loader],
         )
 
         if existing_oauth:
@@ -556,7 +595,7 @@ class AuthService:
                     session=session,
                     id=user.id,
                     data=updates,
-                    commit_self=True,
+                    commit_self=commit_self,
                 )
 
             auth_logger.info(
@@ -572,7 +611,7 @@ class AuthService:
 
         if existing_user:
             # Link OAuth account to existing user
-            await oauth_db.create(
+            await oauth_account_db.create(
                 session=session,
                 data={
                     "user_id": existing_user.id,
@@ -599,7 +638,8 @@ class AuthService:
                     commit_self=False,
                 )
 
-            await session.commit()
+            if commit_self:
+                await session.commit()
 
             auth_logger.info(
                 f"OAuth linked: provider={user_info.provider}, email={existing_user.email}"
@@ -619,7 +659,7 @@ class AuthService:
         )
 
         # Create OAuth account
-        await oauth_db.create(
+        await oauth_account_db.create(
             session=session,
             data={
                 "user_id": new_user.id,
@@ -629,7 +669,8 @@ class AuthService:
             commit_self=False,
         )
 
-        await session.commit()
+        if commit_self:
+            await session.commit()
 
         auth_logger.info(
             f"OAuth signup: provider={user_info.provider}, email={user_info.email}"
@@ -646,6 +687,7 @@ class AuthService:
         session,
         email: str,
         new_password: str,
+        commit_self: bool = True,
     ) -> bool:
         """
         Reset a user's password.
@@ -654,6 +696,7 @@ class AuthService:
             session: The database session.
             email: The user's email address.
             new_password: The new password.
+            commit_self: If True, commits the transaction. Default False.
 
         Returns:
             bool: True if password was reset successfully.
@@ -669,8 +712,6 @@ class AuthService:
             ... )
             True
         """
-        user_db = UserDB()
-
         # Find user
         user = await user_db.get_one_by_conditions(
             session=session,
@@ -689,14 +730,380 @@ class AuthService:
             session=session,
             id=user.id,
             data={"password_hash": password_hash},
-            commit_self=True,
+            commit_self=commit_self,
         )
 
-        # Send confirmation email
-        await EmailManagerService.send_password_reset_confirmation_email(
-            email=email,
-            user_name=user.full_name,
+        # Publish password reset confirmation email event
+        await publish_event(
+            queue_name="password_reset_confirmation_emails",
+            event={
+                "email": email,
+                "user_name": user.full_name,
+            },
         )
 
         auth_logger.info(f"Password reset: email={email}")
+        return True
+
+    # =========================================================================
+    # Token Management
+    # =========================================================================
+
+    @classmethod
+    def hash_token(cls, token: str) -> str:
+        """
+        Hash a token using SHA256.
+
+        This is used to compare refresh tokens without storing them in plain text.
+
+        Args:
+            token: The plain token to hash.
+
+        Returns:
+            str: The SHA256 hash of the token (64 hex characters).
+        """
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def _hash_refresh_token(cls, token: str) -> str:
+        """
+        Hash a refresh token using SHA256.
+
+        Args:
+            token: The plain refresh token.
+
+        Returns:
+            str: The SHA256 hash of the token (64 hex characters).
+        """
+        return cls.hash_token(token)
+
+    @classmethod
+    def _generate_refresh_token(cls) -> str:
+        """
+        Generate a secure random refresh token.
+
+        Returns:
+            str: A 64-character URL-safe random token.
+        """
+        return secrets.token_urlsafe(48)
+
+    @classmethod
+    async def create_token_pair(
+        cls,
+        session,
+        user,
+        remember_me: bool = False,
+        device_info: str | None = None,
+        commit_self: bool = True,
+    ) -> TokenPair:
+        """
+        Create an access/refresh token pair for a user.
+
+        This method generates:
+        1. A short-lived JWT access token (15 minutes)
+        2. A long-lived refresh token stored in the database
+           (7 days normal, 30 days with remember_me)
+
+        Args:
+            session: The database session.
+            user: The User object to create tokens for.
+            remember_me: If True, extends refresh token to 30 days.
+            device_info: Optional device/client info (user agent, IP).
+            commit_self: If True, commits the transaction. Default False.
+
+        Returns:
+            TokenPair: Object containing access_token, refresh_token,
+                      token_type, and expires_in.
+
+        Example:
+            >>> tokens = await AuthService.create_token_pair(
+            ...     session=db_session,
+            ...     user=user,
+            ...     remember_me=True,
+            ...     device_info="Mozilla/5.0...",
+            ... )
+            >>> print(tokens.access_token)
+        """
+        # Generate access token
+        access_token_expires = timedelta(minutes=cls.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_jwt_token(
+            data={
+                "sub": str(user.id),
+                "email": user.email,
+                "type": "access",
+            },
+            expires_delta=access_token_expires,
+        )
+
+        # Generate refresh token
+        refresh_token = cls._generate_refresh_token()
+        refresh_token_hash = cls._hash_refresh_token(refresh_token)
+
+        # Calculate refresh token expiration
+        if remember_me:
+            refresh_expires_delta = timedelta(days=cls.REFRESH_TOKEN_REMEMBER_DAYS)
+        else:
+            refresh_expires_delta = timedelta(days=cls.REFRESH_TOKEN_EXPIRE_DAYS)
+
+        refresh_expires_at = datetime.now(timezone.utc) + refresh_expires_delta
+
+        # Store refresh token in database
+        await refresh_token_db.create(
+            session=session,
+            data={
+                "user_id": user.id,
+                "token_hash": refresh_token_hash,
+                "expires_at": refresh_expires_at,
+                "device_info": device_info,
+            },
+            commit_self=commit_self,
+        )
+
+        auth_logger.info(
+            f"Token pair created: user={user.email}, "
+            f"remember_me={remember_me}, "
+            f"expires_in={cls.ACCESS_TOKEN_EXPIRE_MINUTES * 60}s"
+        )
+
+        return TokenPair(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            expires_in=cls.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        )
+
+    @classmethod
+    async def refresh_access_token(
+        cls,
+        session,
+        refresh_token: str,
+    ) -> str:
+        """
+        Generate a new access token using a valid refresh token.
+
+        Args:
+            session: The database session.
+            refresh_token: The refresh token to validate.
+
+        Returns:
+            str: A new JWT access token.
+
+        Raises:
+            AuthenticationException: If refresh token is invalid, expired,
+                                    or revoked.
+
+        Example:
+            >>> new_access_token = await AuthService.refresh_access_token(
+            ...     session=db_session,
+            ...     refresh_token="abc123...",
+            ... )
+        """
+        # Hash the provided token
+        token_hash = cls._hash_refresh_token(refresh_token)
+
+        # Find valid token
+        token_record = await refresh_token_db.get_valid_token(
+            session=session,
+            token_hash=token_hash,
+        )
+
+        if token_record is None:
+            auth_logger.warning(
+                "Token refresh failed: invalid or expired refresh token"
+            )
+            raise AuthenticationException(message="Invalid or expired refresh token")
+
+        user = token_record.user
+
+        # Check if user is still active
+        if not user.is_active or user.is_deleted:
+            auth_logger.warning(f"Token refresh failed: user inactive {user.email}")
+            raise AuthenticationException(message="User account is not active")
+
+        # Generate new access token
+        access_token_expires = timedelta(minutes=cls.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_jwt_token(
+            data={
+                "sub": str(user.id),
+                "email": user.email,
+                "type": "access",
+            },
+            expires_delta=access_token_expires,
+        )
+
+        auth_logger.info(f"Access token refreshed: user={user.email}")
+        return access_token
+
+    @classmethod
+    async def revoke_refresh_token(
+        cls,
+        session,
+        refresh_token: str,
+        commit_self: bool = True,
+    ) -> bool:
+        """
+        Revoke a single refresh token (sign out from one device).
+
+        Args:
+            session: The database session.
+            refresh_token: The refresh token to revoke.
+            commit_self: If True, commits the transaction. Default False.
+
+        Returns:
+            bool: True if token was revoked, False if not found.
+
+        Example:
+            >>> await AuthService.revoke_refresh_token(
+            ...     session=db_session,
+            ...     refresh_token="abc123...",
+            ... )
+            True
+        """
+        token_hash = cls._hash_refresh_token(refresh_token)
+        revoked = await refresh_token_db.revoke(
+            session=session,
+            token_hash=token_hash,
+            commit_self=commit_self,
+        )
+
+        if revoked:
+            auth_logger.info("Refresh token revoked")
+        else:
+            auth_logger.warning("Refresh token revocation failed: token not found")
+
+        return revoked
+
+    @classmethod
+    async def revoke_all_user_tokens(
+        cls,
+        session,
+        user_id: UUID,
+        commit_self: bool = True,
+    ) -> int:
+        """
+        Revoke all refresh tokens for a user (sign out all devices).
+
+        Args:
+            session: The database session.
+            user_id: The ID of the user.
+            commit_self: If True, commits the transaction. Default False.
+
+        Returns:
+            int: The number of tokens revoked.
+
+        Example:
+            >>> count = await AuthService.revoke_all_user_tokens(
+            ...     session=db_session,
+            ...     user_id=user.id,
+            ... )
+            >>> print(f"Revoked {count} sessions")
+        """
+        count = await refresh_token_db.revoke_all_for_user(
+            session=session,
+            user_id=user_id,
+            commit_self=commit_self,
+        )
+
+        auth_logger.info(f"All tokens revoked: user_id={user_id}, count={count}")
+        return count
+
+    @classmethod
+    async def get_active_sessions(
+        cls,
+        session,
+        user_id: UUID,
+    ) -> list:
+        """
+        Get all active sessions for a user.
+
+        Args:
+            session: The database session.
+            user_id: The ID of the user.
+
+        Returns:
+            list: List of active RefreshToken records.
+
+        Example:
+            >>> sessions = await AuthService.get_active_sessions(
+            ...     session=db_session,
+            ...     user_id=user.id,
+            ... )
+        """
+        return await refresh_token_db.get_active_tokens_for_user(
+            session=session,
+            user_id=user_id,
+        )
+
+    @classmethod
+    async def change_password(
+        cls,
+        session,
+        user,
+        current_password: str,
+        new_password: str,
+        revoke_tokens: bool = True,
+        commit_self: bool = True,
+    ) -> bool:
+        """
+        Change a user's password.
+
+        Args:
+            session: The database session.
+            user: The User object.
+            current_password: The current password for verification.
+            new_password: The new password.
+            revoke_tokens: If True, revokes all refresh tokens after change.
+            commit_self: If True, commits the transaction. Default False.
+
+        Returns:
+            bool: True if password was changed successfully.
+
+        Raises:
+            InvalidCredentialsException: If current password is incorrect.
+            AuthenticationException: If user has no password set.
+
+        Example:
+            >>> await AuthService.change_password(
+            ...     session=db_session,
+            ...     user=user,
+            ...     current_password="OldPass123!",
+            ...     new_password="NewPass456!",
+            ... )
+            True
+        """
+        # Check if user has a password
+        if user.password_hash is None:
+            auth_logger.warning(f"Password change failed: no password set {user.email}")
+            raise AuthenticationException(
+                message="Cannot change password. Account uses OAuth login only."
+            )
+
+        # Verify current password
+        if not cls.verify_password(current_password, user.password_hash):
+            auth_logger.warning(
+                f"Password change failed: wrong current password {user.email}"
+            )
+            raise InvalidCredentialsException()
+
+        # Hash and update new password
+        new_password_hash = cls.hash_password(new_password)
+        await user_db.update(
+            session=session,
+            id=user.id,
+            data={"password_hash": new_password_hash},
+            commit_self=False,
+        )
+
+        # Optionally revoke all tokens for security
+        if revoke_tokens:
+            await cls.revoke_all_user_tokens(
+                session=session,
+                user_id=user.id,
+                commit_self=False,
+            )
+
+        if commit_self:
+            await session.commit()
+
+        auth_logger.info(f"Password changed: email={user.email}")
         return True
