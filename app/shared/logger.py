@@ -11,7 +11,6 @@ def init_sentry(
     dsn: str,
     environment: str = "development",
     traces_sample_rate: float = 1.0,
-    enable_tracing: bool = False,
 ) -> bool:
     """
     Initialize Sentry SDK globally (should be called once at application startup).
@@ -23,7 +22,7 @@ def init_sentry(
         dsn (str): Sentry DSN for error tracking.
         environment (str): Sentry environment name (development/production).
         traces_sample_rate (float): Performance monitoring sample rate (0.0 to 1.0).
-        enable_tracing (bool): Enable Sentry performance tracing.
+            When > 0, performance tracing is automatically enabled.
 
     Returns:
         bool: True if Sentry was initialized, False if already initialized or SDK not available.
@@ -51,7 +50,6 @@ def init_sentry(
             dsn=dsn,
             environment=environment,
             traces_sample_rate=traces_sample_rate,
-            enable_tracing=enable_tracing,
             integrations=[sentry_logging, AsyncioIntegration()],
         )
 

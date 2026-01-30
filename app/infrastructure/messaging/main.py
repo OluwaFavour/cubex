@@ -1,4 +1,19 @@
+"""
+Messaging Module for CubeX Application.
+
+This module provides the RabbitMQ-based message consumer for processing
+background jobs. It can be run standalone via Docker or integrated
+into the FastAPI lifespan.
+
+Standalone Usage:
+    python -m app.infrastructure.messaging.main
+
+Docker Usage:
+    docker compose --profile worker-only up -d
+"""
+
 import asyncio
+import signal
 from functools import partial
 
 import aio_pika
@@ -6,6 +21,9 @@ import aio_pika
 from app.infrastructure.messaging.connection import get_connection
 from app.infrastructure.messaging.consumer import process_message
 from app.infrastructure.messaging.queues import get_queue_configs
+from app.shared.config import rabbitmq_logger, settings
+from app.shared.db import init_db, dispose_db
+from app.shared.services import BrevoService, RedisService, Renderer
 
 
 async def start_consumers(keep_alive: bool) -> aio_pika.RobustConnection | None:
@@ -95,8 +113,85 @@ async def start_consumers(keep_alive: bool) -> aio_pika.RobustConnection | None:
         return conn
 
 
+async def main() -> None:
+    """
+    Main entry point for standalone message consumer execution.
+
+    Initializes required services (database, Redis, Brevo, templates),
+    starts the message consumers, and runs until interrupted.
+    """
+    # Track shutdown state
+    shutdown_event = asyncio.Event()
+    conn: aio_pika.RobustConnection | None = None
+
+    def handle_shutdown(signum, frame):
+        rabbitmq_logger.info(f"Received signal {signum}, initiating shutdown...")
+        shutdown_event.set()
+
+    # Register signal handlers
+    signal.signal(signal.SIGINT, handle_shutdown)
+    signal.signal(signal.SIGTERM, handle_shutdown)
+
+    rabbitmq_logger.info("Starting standalone message consumer...")
+
+    try:
+        # Initialize database
+        rabbitmq_logger.info("Initializing database...")
+        await init_db()
+        rabbitmq_logger.info("Database initialized successfully.")
+
+        # Initialize Redis service
+        rabbitmq_logger.info("Initializing Redis service...")
+        await RedisService.init(settings.REDIS_URL)
+        rabbitmq_logger.info("Redis service initialized successfully.")
+
+        # Initialize Brevo Service
+        rabbitmq_logger.info("Initializing Brevo service...")
+        await BrevoService.init(
+            api_key=settings.BREVO_API_KEY,
+            sender_email=settings.BREVO_SENDER_EMAIL,
+            sender_name=settings.BREVO_SENDER_NAME,
+        )
+        rabbitmq_logger.info("Brevo service initialized successfully.")
+
+        # Initialize template renderer
+        rabbitmq_logger.info("Initializing template renderer...")
+        Renderer.initialize("app/templates")
+        rabbitmq_logger.info("Template renderer initialized successfully.")
+
+        # Start consumers (don't keep_alive, we manage lifecycle here)
+        rabbitmq_logger.info("Starting message consumers...")
+        conn = await start_consumers(keep_alive=False)
+        rabbitmq_logger.info(
+            "Message consumers started successfully. Waiting for messages..."
+        )
+
+        # Wait for shutdown signal
+        await shutdown_event.wait()
+
+    except Exception as e:
+        rabbitmq_logger.exception(f"Messaging error: {e}")
+        raise
+
+    finally:
+        # Cleanup
+        rabbitmq_logger.info("Shutting down message consumer...")
+
+        if conn:
+            await conn.close()
+            rabbitmq_logger.info("RabbitMQ connection closed successfully.")
+
+        await RedisService.aclose()
+        rabbitmq_logger.info("Redis service closed successfully.")
+
+        await dispose_db()
+        rabbitmq_logger.info("Database disposed successfully.")
+
+        rabbitmq_logger.info("Message consumer shutdown complete.")
+
+
 # This code initializes message consumers for RabbitMQ queues defined in get_queue_configs().
 # It establishes a connection, declares the necessary queues, and sets up consumers
 # to process messages from those queues.
 if __name__ == "__main__":
-    asyncio.run(start_consumers(keep_alive=True))
+    asyncio.run(main())
