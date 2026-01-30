@@ -14,9 +14,11 @@ from app.shared.db import init_db, dispose_db
 from app.shared.exceptions.handlers import (
     exception_schema,
 )
-from app.shared.exceptions.types import (
-    AppException,
+from app.shared.exceptions.handlers import (
+    database_exception_handler,
+    general_exception_handler,
 )
+from app.shared.exceptions.types import AppException, DatabaseException
 from app.infrastructure.messaging import start_consumers
 from app.infrastructure.scheduler import scheduler
 from app.shared.services import BrevoService, CloudinaryService, Renderer
@@ -102,6 +104,9 @@ app = FastAPI(
     ],
 )
 
+# Register exception handlers
+app.add_exception_handler(DatabaseException, database_exception_handler)
+app.add_exception_handler(AppException, general_exception_handler)
 
 # CORS configuration
 app.add_middleware(
@@ -143,15 +148,19 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
     """
     Health check endpoint to verify if the API is running.
     """
-    async with session.begin():
-        try:
+    try:
+        async with session.begin():
             result = await session.execute(text("SELECT 1"))
-            if result.scalar() == 1:
-                pass
-        except Exception as e:
-            app_logger.error(f"Health check failed: {e}")
-            raise AppException(
-                "Wander API is not reachable.",
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
+            if result.scalar() != 1:
+                raise AppException(
+                    "Database health check failed.",
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+    except Exception as e:
+        app_logger.error(f"Health check failed: {e}")
+        raise AppException(
+            "Wander API is not reachable.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
     return {"status": "ok", "message": "Wander API is running."}
