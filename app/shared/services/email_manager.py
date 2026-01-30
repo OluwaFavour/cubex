@@ -30,7 +30,7 @@ from typing import Any
 
 from app.shared.config import email_manager_logger, settings
 from app.shared.enums import OTPPurpose
-from app.shared.services.brevo import BrevoService
+from app.shared.services.brevo import BrevoService, Contact, ListContact
 from app.shared.services.template import Renderer
 
 
@@ -169,16 +169,14 @@ class EmailManagerService:
                 )
 
             # Prepare recipient
-            recipient = {"email": email}
-            if recipient_name:
-                recipient["name"] = recipient_name
+            recipient = Contact(email=email, name=recipient_name)
 
             # Send via Brevo
             await BrevoService.send_transactional_email(
-                recipients=[recipient],
+                to=ListContact(to=[recipient]),
                 subject=subject,
-                html_content=html_content,
-                text_content=text_content,
+                htmlContent=html_content,
+                textContent=text_content,
             )
 
             email_manager_logger.info(

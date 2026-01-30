@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
@@ -17,7 +19,7 @@ from app.shared.exceptions.types import (
 )
 
 
-async def general_exception_handler(request: Request, exc: AppException):
+async def general_exception_handler(request: Request, exc: Exception):
     """
     Handles general exceptions by returning a JSON response with the error message.
 
@@ -28,14 +30,15 @@ async def general_exception_handler(request: Request, exc: AppException):
     Returns:
         JSONResponse: A response containing the error message and status code 500.
     """
+    app_exc = cast(AppException, exc)
     request_logger.error(f"GeneralException: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=app_exc.status_code,
         content={"detail": f"An unexpected error occurred.\n{str(exc)}"},
     )
 
 
-async def database_exception_handler(request: Request, exc: DatabaseException):
+async def database_exception_handler(request: Request, exc: Exception):
     """
     Handles database exceptions by returning a JSON response with the error message.
 
@@ -46,16 +49,15 @@ async def database_exception_handler(request: Request, exc: DatabaseException):
     Returns:
         JSONResponse: A response containing the error message and status code 500.
     """
+    db_exc = cast(DatabaseException, exc)
     request_logger.error(f"DatabaseException: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=db_exc.status_code,
         content={"detail": f"A database error occurred.\n{str(exc)}"},
     )
 
 
-async def authentication_exception_handler(
-    request: Request, exc: AuthenticationException
-):
+async def authentication_exception_handler(request: Request, exc: Exception):
     """
     Handles authentication exceptions by returning a JSON response.
 
@@ -66,15 +68,16 @@ async def authentication_exception_handler(
     Returns:
         JSONResponse: A response containing the error message and status code 401.
     """
+    auth_exc = cast(AuthenticationException, exc)
     request_logger.warning(f"AuthenticationException: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=auth_exc.status_code,
         content={"detail": str(exc)},
         headers={"WWW-Authenticate": "Bearer"},
     )
 
 
-async def oauth_exception_handler(request: Request, exc: OAuthException):
+async def oauth_exception_handler(request: Request, exc: Exception):
     """
     Handles OAuth exceptions by returning a JSON response.
 
@@ -85,14 +88,15 @@ async def oauth_exception_handler(request: Request, exc: OAuthException):
     Returns:
         JSONResponse: A response containing the error message and status code 400.
     """
+    oauth_exc = cast(OAuthException, exc)
     request_logger.warning(f"OAuthException: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=oauth_exc.status_code,
         content={"detail": str(exc)},
     )
 
 
-async def otp_expired_exception_handler(request: Request, exc: OTPExpiredException):
+async def otp_expired_exception_handler(request: Request, exc: Exception):
     """
     Handles OTP expired exceptions by returning a JSON response.
 
@@ -103,14 +107,15 @@ async def otp_expired_exception_handler(request: Request, exc: OTPExpiredExcepti
     Returns:
         JSONResponse: A response containing the error message and status code 400.
     """
+    otp_exc = cast(OTPExpiredException, exc)
     request_logger.warning(f"OTPExpiredException: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=otp_exc.status_code,
         content={"detail": str(exc)},
     )
 
 
-async def otp_invalid_exception_handler(request: Request, exc: OTPInvalidException):
+async def otp_invalid_exception_handler(request: Request, exc: Exception):
     """
     Handles OTP invalid exceptions by returning a JSON response.
 
@@ -121,16 +126,15 @@ async def otp_invalid_exception_handler(request: Request, exc: OTPInvalidExcepti
     Returns:
         JSONResponse: A response containing the error message and status code 400.
     """
+    otp_exc = cast(OTPInvalidException, exc)
     request_logger.warning(f"OTPInvalidException: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=otp_exc.status_code,
         content={"detail": str(exc)},
     )
 
 
-async def too_many_attempts_exception_handler(
-    request: Request, exc: TooManyAttemptsException
-):
+async def too_many_attempts_exception_handler(request: Request, exc: Exception):
     """
     Handles too many attempts exceptions by returning a JSON response.
 
@@ -141,16 +145,15 @@ async def too_many_attempts_exception_handler(
     Returns:
         JSONResponse: A response containing the error message and status code 429.
     """
+    tma_exc = cast(TooManyAttemptsException, exc)
     request_logger.warning(f"TooManyAttemptsException: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=tma_exc.status_code,
         content={"detail": str(exc)},
     )
 
 
-async def rate_limit_exception_handler(
-    request: Request, exc: RateLimitExceededException
-):
+async def rate_limit_exception_handler(request: Request, exc: Exception):
     """
     Handles rate limit exceeded exceptions by returning a JSON response.
 
@@ -161,18 +164,19 @@ async def rate_limit_exception_handler(
     Returns:
         JSONResponse: A response with status code 429 and optional Retry-After header.
     """
+    rate_exc = cast(RateLimitExceededException, exc)
     request_logger.warning(f"RateLimitExceededException: {exc}")
     headers = {}
-    if exc.retry_after:
-        headers["Retry-After"] = str(exc.retry_after)
+    if rate_exc.retry_after:
+        headers["Retry-After"] = str(rate_exc.retry_after)
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=rate_exc.status_code,
         content={"detail": str(exc)},
         headers=headers,
     )
 
 
-async def not_found_exception_handler(request: Request, exc: NotFoundException):
+async def not_found_exception_handler(request: Request, exc: Exception):
     """
     Handles not found exceptions by returning a JSON response.
 
@@ -183,14 +187,15 @@ async def not_found_exception_handler(request: Request, exc: NotFoundException):
     Returns:
         JSONResponse: A response containing the error message and status code 404.
     """
+    nf_exc = cast(NotFoundException, exc)
     request_logger.warning(f"NotFoundException: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=nf_exc.status_code,
         content={"detail": str(exc)},
     )
 
 
-async def conflict_exception_handler(request: Request, exc: ConflictException):
+async def conflict_exception_handler(request: Request, exc: Exception):
     """
     Handles conflict exceptions by returning a JSON response.
 
@@ -201,14 +206,15 @@ async def conflict_exception_handler(request: Request, exc: ConflictException):
     Returns:
         JSONResponse: A response containing the error message and status code 409.
     """
+    conf_exc = cast(ConflictException, exc)
     request_logger.warning(f"ConflictException: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=conf_exc.status_code,
         content={"detail": str(exc)},
     )
 
 
-async def bad_request_exception_handler(request: Request, exc: BadRequestException):
+async def bad_request_exception_handler(request: Request, exc: Exception):
     """
     Handles bad request exceptions by returning a JSON response.
 
@@ -219,14 +225,15 @@ async def bad_request_exception_handler(request: Request, exc: BadRequestExcepti
     Returns:
         JSONResponse: A response containing the error message and status code 400.
     """
+    br_exc = cast(BadRequestException, exc)
     request_logger.warning(f"BadRequestException: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=br_exc.status_code,
         content={"detail": str(exc)},
     )
 
 
-exception_schema = {
+exception_schema: dict[int | str, dict[str, Any]] = {
     status.HTTP_400_BAD_REQUEST: {
         "description": "Bad Request",
         "content": {

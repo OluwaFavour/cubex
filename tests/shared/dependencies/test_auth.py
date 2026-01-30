@@ -39,7 +39,9 @@ class TestGetCurrentUser:
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "valid_token"
 
-        mock_session = AsyncMock()
+        # Create mock session with proper begin() context manager
+        mock_session = MagicMock()
+        mock_session.begin = MagicMock(return_value=AsyncMock())
 
         with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
@@ -170,7 +172,9 @@ class TestGetCurrentUser:
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "valid_token"
 
-        mock_session = AsyncMock()
+        # Create mock session with proper begin() context manager
+        mock_session = MagicMock()
+        mock_session.begin = MagicMock(return_value=AsyncMock())
 
         with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
@@ -204,7 +208,9 @@ class TestGetCurrentUser:
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "valid_token"
 
-        mock_session = AsyncMock()
+        # Create mock session with proper begin() context manager
+        mock_session = MagicMock()
+        mock_session.begin = MagicMock(return_value=AsyncMock())
 
         with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
@@ -306,7 +312,9 @@ class TestGetOptionalUser:
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "valid_token"
 
-        mock_session = AsyncMock()
+        # Create mock session with proper begin() context manager
+        mock_session = MagicMock()
+        mock_session.begin = MagicMock(return_value=AsyncMock())
 
         with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
@@ -368,7 +376,9 @@ class TestGetOptionalUser:
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "valid_token"
 
-        mock_session = AsyncMock()
+        # Create mock session with proper begin() context manager
+        mock_session = MagicMock()
+        mock_session.begin = MagicMock(return_value=AsyncMock())
 
         with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {

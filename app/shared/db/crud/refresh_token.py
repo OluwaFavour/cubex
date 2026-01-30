@@ -144,7 +144,7 @@ class RefreshTokenDB(BaseDB):
         if commit_self:
             await session.commit()
 
-        return result.rowcount > 0
+        return result.rowcount > 0  # type: ignore[attr-defined]
 
     async def revoke_all_for_user(
         self,
@@ -185,7 +185,7 @@ class RefreshTokenDB(BaseDB):
         if commit_self:
             await session.commit()
 
-        return result.rowcount
+        return result.rowcount  # type: ignore[attr-defined]
 
     async def cleanup_expired(
         self,
@@ -230,7 +230,7 @@ class RefreshTokenDB(BaseDB):
         if commit_self:
             await session.commit()
 
-        return result.rowcount
+        return result.rowcount  # type: ignore[attr-defined]
 
     async def get_active_tokens_for_user(
         self,
@@ -262,7 +262,7 @@ class RefreshTokenDB(BaseDB):
             self.model.expires_at > now,
         ]
 
-        return await self.get_all_by_conditions(
+        return await self.get_by_conditions(  # type: ignore[return-value]
             session=session,
             conditions=conditions,
         )

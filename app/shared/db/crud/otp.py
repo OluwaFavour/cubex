@@ -98,11 +98,11 @@ class OTPTokenDB(BaseDB[OTPToken]):
         try:
             result = await self.get_all(
                 session=session,
-                filters={
-                    self.model.email: email,
-                    self.model.purpose: purpose,
-                    self.model.is_deleted: False,
-                },
+                filters=[
+                    self.model.email == email,
+                    self.model.purpose == purpose,
+                    self.model.is_deleted == False,  # noqa: E712
+                ],
                 order_by=[self.model.created_at.desc()],
                 limit=1,
             )
@@ -213,8 +213,8 @@ class OTPTokenDB(BaseDB[OTPToken]):
                     self.model.is_deleted.is_(False),
                 ],
                 updates={
-                    self.model.is_deleted: True,
-                    self.model.deleted_at: now,
+                    "is_deleted": True,
+                    "deleted_at": now,
                 },
                 commit_self=commit_self,
             )

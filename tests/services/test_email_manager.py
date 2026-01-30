@@ -315,9 +315,7 @@ class TestSendOtpEmail:
         """Test handling of template rendering failure."""
         from app.shared.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer:
+        with patch("app.shared.services.email_manager.Renderer") as mock_renderer:
             mock_renderer.render_template = AsyncMock(
                 side_effect=Exception("Template not found")
             )
@@ -578,9 +576,9 @@ class TestSendGenericEmail:
             )
 
             brevo_call = mock_brevo.send_transactional_email.call_args
-            recipients = brevo_call[1]["recipients"]
-            assert len(recipients) == 1
-            assert recipients[0]["email"] == "recipient@example.com"
+            to_list = brevo_call[1]["to"]
+            assert len(to_list.to) == 1
+            assert to_list.to[0].email == "recipient@example.com"
 
     @pytest.mark.asyncio
     async def test_send_email_with_recipient_name(self):
@@ -609,8 +607,8 @@ class TestSendGenericEmail:
             )
 
             brevo_call = mock_brevo.send_transactional_email.call_args
-            recipients = brevo_call[1]["recipients"]
-            assert recipients[0]["name"] == "John Doe"
+            to_list = brevo_call[1]["to"]
+            assert to_list.to[0].name == "John Doe"
 
     @pytest.mark.asyncio
     async def test_send_email_html_only(self):
@@ -622,7 +620,9 @@ class TestSendGenericEmail:
         ) as mock_renderer, patch(
             "app.shared.services.email_manager.BrevoService"
         ) as mock_brevo:
-            mock_renderer.render_template = AsyncMock(return_value="<html>HTML Only</html>")
+            mock_renderer.render_template = AsyncMock(
+                return_value="<html>HTML Only</html>"
+            )
             mock_brevo.send_transactional_email = AsyncMock(
                 return_value={"messageId": "html-only-123"}
             )
@@ -703,7 +703,9 @@ class TestPurposeMapping:
         """Test display text for email verification purpose."""
         from app.shared.services.email_manager import EmailManagerService
 
-        text = EmailManagerService._get_purpose_display_text(OTPPurpose.EMAIL_VERIFICATION)
+        text = EmailManagerService._get_purpose_display_text(
+            OTPPurpose.EMAIL_VERIFICATION
+        )
         assert text == "email verification"
 
     def test_get_purpose_display_text_password_reset(self):
@@ -717,9 +719,7 @@ class TestPurposeMapping:
         """Test email subject for email verification."""
         from app.shared.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.settings"
-        ) as mock_settings:
+        with patch("app.shared.services.email_manager.settings") as mock_settings:
             mock_settings.APP_NAME = "TestApp"
 
             subject = EmailManagerService._get_subject_for_purpose(
@@ -731,9 +731,7 @@ class TestPurposeMapping:
         """Test email subject for password reset."""
         from app.shared.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.settings"
-        ) as mock_settings:
+        with patch("app.shared.services.email_manager.settings") as mock_settings:
             mock_settings.APP_NAME = "TestApp"
 
             subject = EmailManagerService._get_subject_for_purpose(

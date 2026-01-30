@@ -16,7 +16,7 @@ All endpoints are prefixed with /auth when mounted in the main app.
 from typing import Annotated
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -189,7 +189,7 @@ async def verify_signup(
             await user_db.update(
                 session=session,
                 id=user.id,
-                data={"email_verified": True},
+                updates={"email_verified": True},
                 commit_self=False,
             )
 
@@ -231,21 +231,21 @@ async def resend_verification(
     """
     Resend the verification code to the user's email.
     """
-    user = await user_db.get_one_by_conditions(
-        session=session,
-        conditions=[user_db.model.email == request_data.email],
-    )
-
-    if user is None:
-        # Don't reveal if user exists
-        return MessageResponse(
-            message="If the email exists, a verification code has been sent"
+    async with session.begin():
+        user = await user_db.get_one_by_conditions(
+            session=session,
+            conditions=[user_db.model.email == request_data.email],
         )
 
-    if user.email_verified:
-        return MessageResponse(message="Email is already verified", success=False)
+        if user is None:
+            # Don't reveal if user exists
+            return MessageResponse(
+                message="If the email exists, a verification code has been sent"
+            )
 
-    async with session.begin():
+        if user.email_verified:
+            return MessageResponse(message="Email is already verified", success=False)
+
         await AuthService.send_otp(
             session=session,
             email=user.email,
@@ -281,23 +281,23 @@ async def signin(
     Returns access and refresh tokens on successful authentication.
     """
     try:
-        # Authenticate user
-        user = await AuthService.email_signin(
-            session=session,
-            email=request_data.email,
-            password=request_data.password,
-        )
-
-        # Load OAuth accounts for profile
-        user = await user_db.get_by_id(
-            session=session,
-            id=user.id,
-            options=[user_db.oauth_accounts_loader],
-        )
-
-        # Generate tokens
-        device_info = _get_device_info_from_request(request)
         async with session.begin():
+            # Authenticate user
+            user = await AuthService.email_signin(
+                session=session,
+                email=request_data.email,
+                password=request_data.password,
+            )
+
+            # Load OAuth accounts for profile
+            user = await user_db.get_by_id(
+                session=session,
+                id=user.id,
+                options=[user_db.oauth_accounts_loader],
+            )
+
+            # Generate tokens
+            device_info = _get_device_info_from_request(request)
             tokens = await AuthService.create_token_pair(
                 session=session,
                 user=user,
@@ -604,15 +604,15 @@ async def request_password_reset(
 
     For security, always returns success even if email doesn't exist.
     """
-    user = await user_db.get_one_by_conditions(
-        session=session,
-        conditions=[user_db.model.email == request_data.email],
-    )
+    async with session.begin():
+        user = await user_db.get_one_by_conditions(
+            session=session,
+            conditions=[user_db.model.email == request_data.email],
+        )
 
-    if user:
-        # Only send if user has a password (not OAuth-only)
-        if user.password_hash:
-            async with session.begin():
+        if user:
+            # Only send if user has a password (not OAuth-only)
+            if user.password_hash:
                 await AuthService.send_otp(
                     session=session,
                     email=user.email,
@@ -740,13 +740,15 @@ async def get_profile(
     Get the current user's profile.
     """
     # Reload user with OAuth accounts
-    user = await user_db.get_by_id(
+    reloaded_user = await user_db.get_by_id(
         session=session,
         id=user.id,
         options=[user_db.oauth_accounts_loader],
     )
+    if reloaded_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
 
-    return _build_profile_response(user)
+    return _build_profile_response(reloaded_user)
 
 
 @router.patch(
@@ -770,23 +772,25 @@ async def update_profile(
     if request_data.avatar_url is not None:
         update_data["avatar_url"] = request_data.avatar_url
 
-    if update_data:
-        async with session.begin():
+    async with session.begin():
+        if update_data:
             await user_db.update(
                 session=session,
                 id=user.id,
-                data=update_data,
+                updates=update_data,
                 commit_self=False,
             )
 
-    # Reload user with OAuth accounts
-    user = await user_db.get_by_id(
-        session=session,
-        id=user.id,
-        options=[user_db.oauth_accounts_loader],
-    )
+        # Reload user with OAuth accounts
+        reloaded_user = await user_db.get_by_id(
+            session=session,
+            id=user.id,
+            options=[user_db.oauth_accounts_loader],
+        )
+        if reloaded_user is None:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    return _build_profile_response(user)
+    return _build_profile_response(reloaded_user)
 
 
 @router.delete(

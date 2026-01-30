@@ -360,7 +360,7 @@ class BaseDB(Generic[T]):
         try:
             stmt: Update = (
                 sa_update(self.model)
-                .where(self.model.id == id)
+                .where(self.model.id == id)  # type: ignore[attr-defined]
                 .values(**updates)
                 .returning(self.model)
             )
@@ -409,7 +409,7 @@ class BaseDB(Generic[T]):
             else:
                 await session.flush()
 
-            return result.rowcount
+            return result.rowcount  # type: ignore[attr-defined]
         except SQLAlchemyError as e:
             raise DatabaseException(
                 f"Error updating {self.model.__name__} with filters {filters}: {str(e)}"
@@ -445,7 +445,7 @@ class BaseDB(Generic[T]):
             else:
                 await session.flush()
 
-            return result.rowcount
+            return result.rowcount  # type: ignore[attr-defined]
         except SQLAlchemyError as e:
             raise DatabaseException(
                 f"Error updating {self.model.__name__} with conditions {conditions}: {str(e)}"
@@ -467,7 +467,7 @@ class BaseDB(Generic[T]):
             DatabaseException: If an error occurs while deleting the record or committing the transaction.
         """
         try:
-            stmt: Delete = sa_delete(self.model).where(self.model.id == id)
+            stmt: Delete = sa_delete(self.model).where(self.model.id == id)  # type: ignore[attr-defined]
             await session.execute(stmt)
 
             if commit_self:
@@ -506,7 +506,7 @@ class BaseDB(Generic[T]):
             else:
                 await session.flush()
 
-            return result.rowcount
+            return result.rowcount  # type: ignore[attr-defined]
         except SQLAlchemyError as e:
             raise DatabaseException(
                 f"Error deleting {self.model.__name__} with filters {filters}: {str(e)}"
@@ -599,7 +599,7 @@ class BaseDB(Generic[T]):
             now = datetime.now(timezone.utc)
             stmt: Update = (
                 sa_update(self.model)
-                .where(self.model.id == id)
+                .where(self.model.id == id)  # type: ignore[attr-defined]
                 .values(is_deleted=True, deleted_at=now, updated_at=now)
                 .returning(self.model)
             )
@@ -650,7 +650,7 @@ class BaseDB(Generic[T]):
             else:
                 await session.flush()
 
-            return result.rowcount
+            return result.rowcount  # type: ignore[attr-defined]
         except SQLAlchemyError as e:
             raise DatabaseException(
                 f"Error soft-deleting {self.model.__name__} with filters {filters}: {str(e)}"
@@ -694,7 +694,7 @@ class BaseDB(Generic[T]):
             else:
                 await session.flush()
 
-            return result.rowcount
+            return result.rowcount  # type: ignore[attr-defined]
         except SQLAlchemyError as e:
             raise DatabaseException(
                 f"Error soft-deleting {self.model.__name__} with conditions {conditions}: {str(e)}"

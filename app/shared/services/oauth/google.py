@@ -214,6 +214,7 @@ class GoogleOAuthService(BaseOAuthProvider):
         """
         if cls._client is None:
             await cls.init()
+            assert cls._client is not None, "Client initialization failed"
 
         data = {
             "code": code,
@@ -288,6 +289,7 @@ class GoogleOAuthService(BaseOAuthProvider):
         """
         if cls._client is None:
             await cls.init()
+            assert cls._client is not None, "Client initialization failed"
 
         headers = {"Authorization": f"Bearer {access_token}"}
 

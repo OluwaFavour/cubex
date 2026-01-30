@@ -260,6 +260,7 @@ class BrevoService:
         """
         if cls._client is None:
             cls._init_client()
+        assert cls._client is not None
 
         attempts = max_attempts
         for attempt in range(1, attempts + 1):
@@ -332,6 +333,12 @@ class BrevoService:
                     message="Brevo network error after retries",
                     status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
                 ) from exc
+
+        # This should never be reached as all paths either return or raise
+        raise AppException(
+            message="Unexpected state: no response after all attempts",
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     @classmethod
     async def _handle_message_versions(

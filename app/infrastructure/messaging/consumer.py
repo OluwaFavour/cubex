@@ -42,18 +42,18 @@ async def process_message(
         except Exception as e:
             rabbitmq_logger.error(f"Error in handler: {e}")
             headers = dict(message.headers or {})
-            attempt = int(headers.get("x-retry-attempt", 0))
-            next_queue = None
+            attempt = int(headers.get("x-retry-attempt", 0))  # type: ignore[arg-type]
+            next_queue: str | None = None
 
             # Multiple retry queues logic
             if retry_queues:
                 if attempt < len(retry_queues):
-                    next_queue: str = retry_queues[attempt]["name"]
+                    next_queue = retry_queues[attempt]["name"]
                     rabbitmq_logger.info(f"Retrying message via {next_queue}")
             # Single retry queue logic
             elif retry_queue:
                 if not max_retries or attempt < max_retries:
-                    next_queue: str = retry_queue
+                    next_queue = retry_queue
                     rabbitmq_logger.info(f"Retrying message via {next_queue}")
 
             # Send to next queue if it exists
