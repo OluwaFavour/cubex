@@ -14,18 +14,14 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    dockerTarget: api
     plan: free
     region: oregon
 
-    # Auto-deploy on changes to app and migrations
+    # Docker command to run
+    dockerCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+    # Auto-deploy on push
     autoDeploy: true
-    includePaths:
-      - app/**
-      - migrations/**
-      - requirements.txt
-      - Dockerfile
-      - alembic.ini
 
     # Pre-deploy: install requirements and run migrations
     preDeployCommand: pip install -r requirements.txt && alembic upgrade head
