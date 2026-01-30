@@ -105,18 +105,100 @@ def _build_profile_response(user: User) -> ProfileResponse:
     response_model=SignupResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Sign up with email",
-    description="Create a new account with email and password. "
-    "A verification code will be sent to the email address.",
+    description="""
+## Create a New User Account
+
+Register a new user with email and password credentials. Upon successful
+registration, a **6-digit OTP verification code** is sent to the provided
+email address.
+
+### Authentication Flow
+
+1. **Submit signup request** with email, password, and optional full name
+2. **Receive OTP** via email (valid for 10 minutes)
+3. **Verify email** using `POST /auth/signup/verify` with the OTP
+4. **Receive tokens** upon successful verification
+
+### Password Requirements
+
+- Minimum **8 characters**
+- At least **one uppercase letter** (A-Z)
+- At least **one lowercase letter** (a-z)
+- At least **one digit** (0-9)
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ✅ | Valid email address |
+| `password` | string | ✅ | Password meeting complexity requirements |
+| `full_name` | string | ❌ | User's display name (1-255 chars) |
+
+### Success Response (201)
+
+Returns confirmation that verification code was sent:
+
+```json
+{
+  "message": "Verification code sent to your email",
+  "email": "user@example.com",
+  "requires_verification": true
+}
+```
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `409 Conflict` | Email already registered |
+| `422 Unprocessable Entity` | Invalid email format or password requirements not met |
+
+### Notes
+
+- The user account is created in an **unverified state**
+- Email verification is **required** before the user can sign in
+- If the email fails to send, the account is still created (retry with `/signup/resend`)
+""",
+    responses={
+        409: {
+            "description": "Email already registered",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "User with this email already exists."}
+                }
+            },
+        },
+    },
 )
 async def signup(
     request_data: SignupRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> SignupResponse:
     """
-    Sign up a new user with email and password.
+    Handle user signup and send email verification OTP.
+    This endpoint creates a new unverified user account and sends a verification
+    OTP to the provided email address. The entire operation is wrapped in a
+    database transaction to ensure atomicity.
 
-    After signup, an OTP verification code is sent to the email.
-    The user must verify their email using the /signup/verify endpoint.
+    Args:
+        request_data (SignupRequest): The signup request containing user details
+            including email, password, and full name.
+        session (AsyncSession): The async database session injected via dependency
+            injection.
+
+    Returns:
+        SignupResponse: A response object containing:
+            - message: Confirmation that verification code was sent
+            - email: The email address where OTP was sent
+            - requires_verification: Boolean flag indicating verification is needed
+
+    Raises:
+        ConflictException: If the email is already registered or if there's an
+            authentication-related error during user creation.
+
+    Note:
+        The user account will be created in an unverified state and will require
+        email verification before full access is granted.
     """
     try:
         async with session.begin():
@@ -153,7 +235,78 @@ async def signup(
     "/signup/verify",
     response_model=TokenResponse,
     summary="Verify email and complete signup",
-    description="Verify email with OTP code and receive authentication tokens.",
+    description="""
+## Complete Email Verification
+
+Verify the user's email address using the OTP code sent during signup.
+On successful verification, the user receives authentication tokens and
+can immediately access protected resources.
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ✅ | Email address the OTP was sent to |
+| `otp_code` | string | ✅ | 6-digit verification code |
+
+### Success Response (200)
+
+Returns JWT tokens for authentication:
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "dGhpcyBpcyBhIHJlZnJl...",
+  "token_type": "bearer",
+  "expires_in": 900
+}
+```
+
+### Token Details
+
+| Token | Lifetime | Purpose |
+|-------|----------|--------|
+| `access_token` | 15 minutes | Used in `Authorization: Bearer <token>` header |
+| `refresh_token` | 7 days | Used to obtain new access tokens |
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `400 Bad Request` | Invalid OTP code or expired |
+| `404 Not Found` | User with this email doesn't exist |
+| `422 Unprocessable Entity` | Invalid OTP format (must be 6 digits) |
+| `429 Too Many Requests` | Exceeded maximum verification attempts (5) |
+
+### Notes
+
+- OTP codes expire after **10 minutes**
+- Maximum **5 verification attempts** per OTP
+- After 5 failed attempts, request a new code via `/signup/resend`
+- Device info is captured from `User-Agent` header for session tracking
+""",
+    responses={
+        400: {
+            "description": "Invalid or expired OTP code",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid verification code"}}
+            },
+        },
+        404: {
+            "description": "User not found",
+            "content": {"application/json": {"example": {"detail": "User not found."}}},
+        },
+        429: {
+            "description": "Too many verification attempts",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Too many verification attempts. Please request a new code."
+                    }
+                }
+            },
+        },
+    },
 )
 async def verify_signup(
     request_data: OTPVerifyRequest,
@@ -161,9 +314,37 @@ async def verify_signup(
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> TokenResponse:
     """
-    Verify email with OTP and complete the signup process.
+    Verify user email with OTP code and return authentication tokens.
 
-    Returns access and refresh tokens on successful verification.
+    This endpoint completes the signup process by verifying the OTP sent to
+    the user's email. Upon successful verification, the user account is
+    activated and authentication tokens are issued.
+
+    Args:
+        request_data (OTPVerifyRequest): The verification request containing:
+            - email: The email address to verify
+            - otp_code: The 6-digit OTP code received via email
+        request (Request): The FastAPI request object used to extract
+            device information from User-Agent header.
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        TokenResponse: A response object containing:
+            - access_token: JWT for API authentication
+            - refresh_token: Token for obtaining new access tokens
+            - token_type: Always "bearer"
+            - expires_in: Access token lifetime in seconds
+
+    Raises:
+        OTPInvalidException: If the OTP code is incorrect or has expired.
+        TooManyAttemptsException: If the maximum OTP verification attempts
+            (5 attempts) have been exceeded.
+        UserNotFoundException: If no user exists with the provided email.
+
+    Note:
+        After 5 failed verification attempts, the user must request a new
+        OTP code via the resend verification endpoint.
     """
     try:
         async with session.begin():
@@ -222,14 +403,80 @@ async def verify_signup(
     "/signup/resend",
     response_model=MessageResponse,
     summary="Resend verification code",
-    description="Resend the OTP verification code to the email address.",
+    description="""
+## Resend Email Verification Code
+
+Request a new OTP verification code to be sent to the user's email.
+Use this when the original code has expired or wasn't received.
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ✅ | Email address to send OTP to |
+
+### Success Response (200)
+
+```json
+{
+  "message": "Verification code sent to your email",
+  "success": true
+}
+```
+
+### Security Behavior
+
+For security reasons, this endpoint **always returns success** even if:
+- The email doesn't exist in the system
+- The email is already verified
+
+This prevents email enumeration attacks.
+
+### Conditional Responses
+
+| Scenario | Response |
+|----------|----------|
+| Email exists & unverified | New OTP sent, `success: true` |
+| Email already verified | `success: false`, message indicates already verified |
+| Email not found | `success: true` (security measure) |
+
+### Notes
+
+- Previous OTP codes are **invalidated** when a new one is sent
+- Rate limiting may apply (check `429` responses)
+- New OTP is valid for **10 minutes**
+""",
 )
 async def resend_verification(
     request_data: ResendOTPRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> MessageResponse:
     """
-    Resend the verification code to the user's email.
+    Resend a new verification OTP code to the user's email.
+
+    This endpoint generates and sends a new OTP code for users who haven't
+    received or have lost their original verification code. It invalidates
+    any previous OTP codes for security.
+
+    Args:
+        request_data (ResendOTPRequest): The resend request containing:
+            - email: The email address to resend verification to
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        MessageResponse: A response object containing:
+            - message: Confirmation or status message
+            - success: Boolean flag indicating the operation result
+
+    Raises:
+        None explicitly - returns success:false for already verified emails
+            and always returns success:true for non-existent emails (security).
+
+    Note:
+        For security, this endpoint always returns a success-like response
+        even if the email doesn't exist, preventing email enumeration attacks.
+        Previous OTP codes are invalidated when a new one is generated.
     """
     async with session.begin():
         user = await user_db.get_one_by_conditions(
@@ -267,8 +514,89 @@ async def resend_verification(
     "/signin",
     response_model=TokenResponse,
     summary="Sign in with email",
-    description="Authenticate with email and password. "
-    "Set remember_me=true for extended session (30 days).",
+    description="""
+## Sign In with Email & Password
+
+Authenticate a user with their email and password credentials.
+Returns JWT tokens for accessing protected resources.
+
+### Request Body
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `email` | string | ✅ | - | User's registered email |
+| `password` | string | ✅ | - | User's password |
+| `remember_me` | boolean | ❌ | `false` | Extend session duration |
+
+### Session Duration
+
+| `remember_me` | Refresh Token Lifetime |
+|---------------|------------------------|
+| `false` | 7 days |
+| `true` | 30 days |
+
+### Success Response (200)
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "dGhpcyBpcyBhIHJlZnJl...",
+  "token_type": "bearer",
+  "expires_in": 900
+}
+```
+
+### Using the Tokens
+
+Include the access token in the `Authorization` header:
+
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+```
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `401 Unauthorized` | Invalid email/password, unverified email, or disabled account |
+| `422 Unprocessable Entity` | Invalid request format |
+
+### Prerequisites
+
+- User must have **verified their email** via OTP
+- Account must be **active** (not soft-deleted)
+
+### Notes
+
+- Device info captured from `User-Agent` for session management
+- Each sign-in creates a new session (viewable via `/auth/sessions`)
+- OAuth-only users (no password) cannot use this endpoint
+""",
+    responses={
+        401: {
+            "description": "Invalid credentials or unverified email",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_credentials": {
+                            "summary": "Invalid email or password",
+                            "value": {"detail": "Invalid email or password"},
+                        },
+                        "email_not_verified": {
+                            "summary": "Email not verified",
+                            "value": {
+                                "detail": "Email not verified. Please verify your email first."
+                            },
+                        },
+                        "account_disabled": {
+                            "summary": "Account disabled",
+                            "value": {"detail": "Account is disabled."},
+                        },
+                    }
+                }
+            },
+        },
+    },
 )
 async def signin(
     request_data: LoginRequest,
@@ -276,9 +604,38 @@ async def signin(
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> TokenResponse:
     """
-    Sign in with email and password.
+    Authenticate user with email and password credentials.
 
-    Returns access and refresh tokens on successful authentication.
+    This endpoint validates user credentials and issues JWT access and
+    refresh tokens upon successful authentication. Session device info
+    is captured from the request headers.
+
+    Args:
+        request_data (LoginRequest): The signin request containing:
+            - email: The user's registered email address
+            - password: The user's password
+            - remember_me: Optional flag for extended token lifetime (30 days)
+        request (Request): The FastAPI request object used to extract
+            device information from User-Agent header for session tracking.
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        TokenResponse: A response object containing:
+            - access_token: Short-lived JWT for API authentication
+            - refresh_token: Long-lived token for obtaining new access tokens
+            - token_type: Always "bearer"
+            - expires_in: Access token lifetime in seconds
+
+    Raises:
+        InvalidCredentialsException: If the email/password combination is
+            incorrect or the user account doesn't exist.
+        AuthenticationException: If the email is unverified, account is
+            disabled, or other authentication errors occur.
+
+    Note:
+        OAuth-only users (who registered via Google/GitHub) cannot use
+        this endpoint and must sign in through their OAuth provider.
     """
     try:
         async with session.begin():
@@ -328,14 +685,119 @@ async def signin(
     "/token/refresh",
     response_model=AccessTokenResponse,
     summary="Refresh access token",
-    description="Get a new access token using a valid refresh token.",
+    description="""
+## Refresh Access Token
+
+Exchange a valid refresh token for a new access token. Use this endpoint
+when the access token has expired to maintain the user's session without
+requiring re-authentication.
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `refresh_token` | string | ✅ | The refresh token from sign-in/signup |
+
+### Success Response (200)
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "expires_in": 900
+}
+```
+
+### Token Lifecycle
+
+```
+┌─────────────────┐     ┌─────────────────┐
+│  Access Token   │     │  Refresh Token  │
+│   (15 minutes)  │     │  (7-30 days)    │
+└────────┬────────┘     └────────┬────────┘
+         │                       │
+         ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐
+│    Expired?     │ Yes │ POST /token/    │
+│                 │────▶│    refresh      │
+└─────────────────┘     └────────┬────────┘
+                                 │
+                                 ▼
+                        ┌─────────────────┐
+                        │  New Access     │
+                        │    Token        │
+                        └─────────────────┘
+```
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `401 Unauthorized` | Token is invalid, expired, or revoked |
+| `422 Unprocessable Entity` | Missing refresh_token field |
+
+### Notes
+
+- The **refresh token itself is not rotated** (same token remains valid)
+- Refresh tokens can be revoked via `/signout` or `/signout/all`
+- If refresh token expires, user must sign in again
+- User account must still be active for refresh to succeed
+""",
+    responses={
+        401: {
+            "description": "Invalid, expired, or revoked refresh token",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_token": {
+                            "summary": "Invalid token",
+                            "value": {"detail": "Invalid refresh token."},
+                        },
+                        "expired_token": {
+                            "summary": "Token expired",
+                            "value": {"detail": "Refresh token has expired."},
+                        },
+                        "revoked_token": {
+                            "summary": "Token revoked",
+                            "value": {"detail": "Refresh token has been revoked."},
+                        },
+                    }
+                }
+            },
+        },
+    },
 )
 async def refresh_token(
     request_data: RefreshTokenRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> AccessTokenResponse:
     """
-    Refresh the access token using a valid refresh token.
+    Exchange a valid refresh token for a new access token.
+
+    This endpoint issues a new access token using a valid refresh token.
+    The refresh token itself is not rotated and remains valid until its
+    original expiration date or until explicitly revoked.
+
+    Args:
+        request_data (RefreshTokenRequest): The refresh request containing:
+            - refresh_token: The current valid refresh token
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        AccessTokenResponse: A response object containing:
+            - access_token: New short-lived JWT for API authentication
+            - token_type: Always "bearer"
+            - expires_in: Access token lifetime in seconds (900 = 15 min)
+
+    Raises:
+        AuthenticationException: If the refresh token is invalid, expired,
+            revoked, or the associated user account is deactivated.
+
+    Note:
+        Unlike token rotation schemes, this implementation keeps the same
+        refresh token valid. Store your refresh token securely as it grants
+        the ability to obtain new access tokens until it expires or is revoked.
     """
     try:
         new_access_token = await AuthService.refresh_access_token(
@@ -357,14 +819,84 @@ async def refresh_token(
     "/signout",
     response_model=MessageResponse,
     summary="Sign out",
-    description="Revoke the current refresh token (sign out from this device).",
+    description="""
+## Sign Out (Single Device)
+
+Revoke a specific refresh token, effectively signing out from one device/session.
+The associated access tokens will no longer be refreshable.
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `refresh_token` | string | ✅ | The refresh token to revoke |
+
+### Success Responses (200)
+
+**Token successfully revoked:**
+```json
+{
+  "message": "Successfully signed out",
+  "success": true
+}
+```
+
+**Token not found or already revoked:**
+```json
+{
+  "message": "Token not found or already revoked",
+  "success": false
+}
+```
+
+### Behavior
+
+| Scenario | Result |
+|----------|--------|
+| Valid token | Token revoked, `success: true` |
+| Already revoked | No change, `success: false` |
+| Invalid/unknown token | No change, `success: false` |
+
+### Notes
+
+- This endpoint **does not require authentication** (stateless signout)
+- Existing access tokens remain valid until they expire (15 min)
+- For immediate invalidation across all devices, use `/signout/all`
+- Does not affect other sessions/devices
+""",
 )
 async def signout(
     request_data: RefreshTokenRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> MessageResponse:
     """
-    Sign out by revoking the refresh token.
+    Revoke a specific refresh token to sign out from a single session.
+
+    This endpoint invalidates the provided refresh token, effectively
+    signing the user out from the device/session that token belongs to.
+    Other active sessions remain unaffected.
+
+    Args:
+        request_data (RefreshTokenRequest): The signout request containing:
+            - refresh_token: The refresh token to revoke
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        MessageResponse: A response object containing:
+            - message: Status message ("Successfully signed out" or
+              "Token not found or already revoked")
+            - success: Boolean indicating if a token was actually revoked
+
+    Raises:
+        None explicitly - this endpoint handles invalid tokens gracefully
+            by returning success:false instead of raising exceptions.
+
+    Note:
+        This endpoint does not require authentication headers, only the
+        refresh token in the request body. This allows signing out even
+        when the access token has expired. Existing access tokens remain
+        valid until they naturally expire (15 minutes).
     """
     async with session.begin():
         revoked = await AuthService.revoke_refresh_token(
@@ -382,14 +914,88 @@ async def signout(
     "/signout/all",
     response_model=MessageResponse,
     summary="Sign out all devices",
-    description="Revoke all refresh tokens (sign out from all devices).",
+    description="""
+## Sign Out (All Devices)
+
+Revoke **all** refresh tokens for the authenticated user, signing them out
+from every device and session. Useful for security incidents or when
+changing sensitive account settings.
+
+### Authentication Required
+
+```http
+Authorization: Bearer <access_token>
+```
+
+### Success Response (200)
+
+```json
+{
+  "message": "Signed out from 3 device(s)",
+  "success": true
+}
+```
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `401 Unauthorized` | Missing or invalid access token |
+
+### Use Cases
+
+- 🔒 **Security breach** - Suspect unauthorized access
+- 🔑 **Password change** - Automatically called after password change
+- 📱 **Lost device** - Revoke access from lost/stolen device
+- 🧹 **Session cleanup** - Clear all old sessions
+
+### Notes
+
+- Requires a valid **access token** (unlike single-device signout)
+- The current session is **also revoked**
+- Returns count of revoked sessions for confirmation
+- Access tokens remain valid until expiry (15 min max)
+""",
+    responses={
+        401: {
+            "description": "Not authenticated",
+            "content": {
+                "application/json": {"example": {"detail": "Not authenticated"}}
+            },
+        },
+    },
 )
 async def signout_all(
     user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> MessageResponse:
     """
-    Sign out from all devices by revoking all refresh tokens.
+    Revoke all refresh tokens to sign out from all devices.
+
+    This endpoint invalidates all active refresh tokens for the authenticated
+    user, effectively signing them out from every device and session. This
+    is useful for security emergencies or when the user suspects unauthorized
+    access.
+
+    Args:
+        user (CurrentActiveUser): The currently authenticated user, injected
+            via FastAPI dependency. Must have a valid access token.
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        MessageResponse: A response object containing:
+            - message: Confirmation with count ("Signed out from N device(s)")
+            - success: Boolean indicating operation success
+
+    Raises:
+        HTTPException (401): If the user is not authenticated or the
+            access token is invalid/expired.
+
+    Note:
+        The current access token remains valid until it expires (15 minutes),
+        but no new access tokens can be obtained since all refresh tokens
+        are revoked. The response includes the count of revoked sessions.
     """
     async with session.begin():
         count = await AuthService.revoke_all_user_tokens(
@@ -410,7 +1016,115 @@ async def signout_all(
     "/oauth/{provider}",
     response_model=OAuthInitResponse,
     summary="Initiate OAuth flow",
-    description="Get the authorization URL to redirect user for OAuth consent.",
+    description="""
+## Initiate OAuth Authentication
+
+Begin the OAuth 2.0 authorization flow with a supported provider.
+Returns an authorization URL to redirect the user to the provider's
+consent screen.
+
+### Supported Providers
+
+| Provider | Path Value | Scopes Requested |
+|----------|------------|------------------|
+| Google | `google` | `openid`, `email`, `profile` |
+| GitHub | `github` | `user:email`, `read:user` |
+
+### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `provider` | string | OAuth provider: `google` or `github` |
+
+### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `remember_me` | boolean | `false` | Extend session to 30 days |
+| `callback_url` | string | `null` | Frontend URL for redirect after OAuth |
+
+### Success Response (200)
+
+```json
+{
+  "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth?...",
+  "state": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+### OAuth Flow Diagram
+
+```
+┌──────────┐     ┌─────────────┐     ┌──────────────┐
+│  Client  │     │   Backend   │     │   Provider   │
+└────┬─────┘     └──────┬──────┘     └──────┬───────┘
+     │                  │                   │
+     │ GET /oauth/google│                   │
+     │─────────────────▶│                   │
+     │                  │                   │
+     │ authorization_url│                   │
+     │◀─────────────────│                   │
+     │                  │                   │
+     │ Redirect user to authorization_url  │
+     │─────────────────────────────────────▶│
+     │                  │                   │
+     │                  │  User consents    │
+     │                  │                   │
+     │ Redirect to callback with code       │
+     │◀─────────────────────────────────────│
+     │                  │                   │
+     │                  │                   │
+```
+
+### Callback URL Validation
+
+If `callback_url` is provided:
+- Must be in the configured **CORS origins** list
+- Must use **HTTPS** in production environments
+- Tokens will be returned as **URL fragment** parameters
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `400 Bad Request` | Invalid callback URL |
+| `422 Unprocessable Entity` | Invalid provider value |
+
+### Next Steps
+
+1. Redirect user to `authorization_url`
+2. User authenticates with provider
+3. Provider redirects to `/oauth/{provider}/callback`
+4. Tokens returned (JSON or URL fragment based on `callback_url`)
+""",
+    responses={
+        400: {
+            "description": "Invalid callback URL",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid callback URL. Must be in allowed origins and use HTTPS in production."
+                    }
+                }
+            },
+        },
+        422: {
+            "description": "Invalid provider",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": [
+                            {
+                                "type": "enum",
+                                "loc": ["path", "provider"],
+                                "msg": "Input should be 'google' or 'github'",
+                            }
+                        ]
+                    }
+                }
+            },
+        },
+    },
 )
 async def oauth_init(
     provider: OAuthProviders,
@@ -422,14 +1136,35 @@ async def oauth_init(
     ),
 ) -> OAuthInitResponse:
     """
-    Initiate OAuth flow by generating authorization URL.
+    Generate the OAuth authorization URL for the specified provider.
 
-    The state parameter is signed and includes:
-    - remember_me preference
-    - callback_url for frontend redirect
+    This endpoint initiates the OAuth flow by generating a provider-specific
+    authorization URL. The client should redirect the user to this URL to
+    begin the OAuth authentication process.
 
-    If callback_url is provided, it must be in the allowed CORS origins.
-    In production, HTTPS is required.
+    Args:
+        provider (OAuthProviders): The OAuth provider to authenticate with.
+            Currently supported: "google", "github".
+        request (Request): The FastAPI request object.
+        remember_me (bool): If True, extends the session duration to 30 days.
+            Defaults to False (7-day session).
+        callback_url (str | None): Optional frontend URL for redirect after
+            OAuth completion. Must be in allowed CORS origins. If provided,
+            tokens are returned as URL fragment parameters.
+
+    Returns:
+        OAuthInitResponse: A response object containing:
+            - authorization_url: The full OAuth authorization URL to redirect to
+            - state: Signed CSRF protection token (passed through OAuth flow)
+
+    Raises:
+        BadRequestException: If the callback_url is provided but not in the
+            allowed CORS origins or doesn't use HTTPS in production.
+
+    Note:
+        The state parameter is cryptographically signed and encodes the
+        callback_url and remember_me preferences. It expires after 10 minutes.
+        The callback_url must exactly match one registered in CORS settings.
     """
     # Validate callback URL if provided
     if callback_url and not OAuthStateManager.validate_callback_url(callback_url):
@@ -465,9 +1200,107 @@ async def oauth_init(
     "/oauth/{provider}/callback",
     response_model=TokenResponse,
     summary="OAuth callback",
-    description="Handle OAuth provider callback and exchange code for tokens.",
+    description="""
+## OAuth Callback Handler
+
+Handle the OAuth provider callback after user authorization. This endpoint:
+
+1. Validates the CSRF state parameter
+2. Exchanges the authorization code for provider tokens
+3. Retrieves user profile from the provider
+4. Creates or links user account
+5. Issues application tokens
+
+### Query Parameters
+
+| Parameter | Type | Source | Description |
+|-----------|------|--------|-------------|
+| `code` | string | Provider | Authorization code from OAuth provider |
+| `state` | string | Provider | CSRF state from `/oauth/{provider}` init |
+
+### Response Behavior
+
+The response depends on whether `callback_url` was provided during init:
+
+#### Without `callback_url` → JSON Response (200)
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "dGhpcyBpcyBhIHJlZnJl...",
+  "token_type": "bearer",
+  "expires_in": 900
+}
+```
+
+#### With `callback_url` → Redirect (307)
+
+Redirects to:
+```
+{callback_url}#access_token=...&refresh_token=...&token_type=bearer&expires_in=900
+```
+
+> ⚠️ **Note:** Tokens are in the **URL fragment** (`#`), not query params (`?`).
+> This prevents tokens from being logged in server access logs.
+
+### User Account Handling
+
+| Scenario | Behavior |
+|----------|----------|
+| New email | Create new user account |
+| Existing email (same provider) | Sign in to existing account |
+| Existing email (different provider) | Link OAuth to existing account |
+| Existing email (has password) | Link OAuth, preserve password |
+
+### Error Responses
+
+| Status | Scenario | Behavior |
+|--------|----------|----------|
+| `400` | Invalid/expired state | JSON error (can't redirect) |
+| `307` | OAuth error + callback_url | Redirect to `{callback_url}?error=...` |
+| `400` | OAuth error, no callback_url | JSON error response |
+
+### Error Redirect Format
+
+When `callback_url` is set and an error occurs:
+```
+{callback_url}?error=oauth_error
+```
+
+### Security Notes
+
+- State parameter expires after **10 minutes**
+- State is cryptographically signed to prevent tampering
+- Authorization codes are **single-use** (provider enforced)
+- Email from provider is automatically marked as **verified**
+""",
     responses={
-        307: {"description": "Redirect to frontend callback URL with tokens"},
+        307: {
+            "description": "Redirect to frontend callback URL with tokens in fragment",
+            "headers": {
+                "Location": {
+                    "description": "Redirect URL with tokens: `{callback_url}#access_token=...&refresh_token=...`",
+                    "schema": {"type": "string"},
+                }
+            },
+        },
+        400: {
+            "description": "OAuth error or invalid state",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_state": {
+                            "summary": "Invalid state parameter",
+                            "value": {"detail": "Invalid state parameter."},
+                        },
+                        "oauth_error": {
+                            "summary": "OAuth provider error",
+                            "value": {"detail": "OAuth authentication failed"},
+                        },
+                    }
+                }
+            },
+        },
     },
 )
 async def oauth_callback(
@@ -478,12 +1311,41 @@ async def oauth_callback(
     state: Annotated[str, Query(description="State parameter for CSRF validation")],
 ) -> TokenResponse | RedirectResponse:
     """
-    Handle OAuth callback from the provider.
+    Complete OAuth flow by exchanging authorization code for tokens.
 
-    Validates state, exchanges code for tokens, creates/links user,
-    and either:
-    - Returns TokenResponse if no callback_url was provided
-    - Redirects to callback_url with tokens in URL fragment
+    This endpoint handles the OAuth callback after user authorization.
+    It validates the state parameter, exchanges the authorization code
+    for provider tokens, retrieves user info, and either creates a new
+    user or links to an existing account.
+
+    Args:
+        provider (OAuthProviders): The OAuth provider that initiated the callback.
+            Must match the provider used in oauth_init.
+        request (Request): The FastAPI request object used to extract
+            device information from User-Agent header.
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+        code (str): The authorization code received from the OAuth provider
+            after user consent.
+        state (str): The signed CSRF protection token that was passed through
+            the OAuth flow. Contains encoded callback_url and remember_me.
+
+    Returns:
+        TokenResponse | RedirectResponse: Either:
+            - TokenResponse (JSON) if no callback_url was provided
+            - RedirectResponse (307) to callback_url with tokens in fragment
+
+    Raises:
+        InvalidStateException: If the state parameter is invalid, expired,
+            or has been tampered with (CSRF protection).
+        OAuthException: If the authorization code exchange fails or user
+            info retrieval fails from the provider.
+
+    Note:
+        If the OAuth email matches an existing user, the OAuth account is
+        linked to that user. Otherwise, a new verified user is created.
+        When callback_url is set, tokens are returned in URL fragment (#)
+        to prevent server-side logging of sensitive tokens.
     """
     # Decode and validate state
     state_data = OAuthStateManager.decode_state(state)
@@ -593,16 +1455,87 @@ async def oauth_callback(
     "/password/reset",
     response_model=MessageResponse,
     summary="Request password reset",
-    description="Send a password reset OTP to the user's email.",
+    description="""
+## Request Password Reset
+
+Initiate the password reset flow by sending a 6-digit OTP code
+to the user's registered email address.
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ✅ | Email address of the account |
+
+### Success Response (200)
+
+```json
+{
+  "message": "If the email exists and has a password, a reset code has been sent",
+  "success": true
+}
+```
+
+### Security Design
+
+This endpoint **always returns the same response** regardless of:
+- Whether the email exists
+- Whether the user has a password set
+- Whether the email was successfully sent
+
+This prevents **email enumeration attacks** where attackers could
+discover which emails are registered.
+
+### Conditions for OTP to be Sent
+
+| Condition | OTP Sent? |
+|-----------|----------|
+| Email exists + has password | ✅ Yes |
+| Email exists + OAuth-only (no password) | ❌ No |
+| Email doesn't exist | ❌ No |
+
+### Next Steps
+
+1. User receives OTP via email (valid for **10 minutes**)
+2. Submit OTP + new password to `/password/reset/confirm`
+
+### Notes
+
+- Previous reset OTPs are invalidated when requesting a new one
+- OAuth-only users should sign in with their OAuth provider
+- Rate limiting may apply to prevent abuse
+""",
 )
 async def request_password_reset(
     request_data: PasswordResetRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> MessageResponse:
     """
-    Request a password reset by sending OTP to email.
+    Request a password reset OTP to be sent to the user's email.
 
-    For security, always returns success even if email doesn't exist.
+    This endpoint initiates the password reset flow by generating and
+    sending an OTP code to the provided email address. The response is
+    intentionally vague to prevent email enumeration attacks.
+
+    Args:
+        request_data (PasswordResetRequest): The reset request containing:
+            - email: The email address associated with the account
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        MessageResponse: A response object containing:
+            - message: Generic confirmation message (always the same)
+            - success: Boolean indicating operation success (always True)
+
+    Raises:
+        None explicitly - this endpoint always returns success for security.
+
+    Note:
+        For security, this endpoint always returns the same response
+        regardless of whether the email exists or if the user has a password.
+        OTP is only sent if the email exists AND the user has a password
+        (not OAuth-only). The OTP is valid for 10 minutes.
     """
     async with session.begin():
         user = await user_db.get_one_by_conditions(
@@ -632,14 +1565,111 @@ async def request_password_reset(
     "/password/reset/confirm",
     response_model=MessageResponse,
     summary="Confirm password reset",
-    description="Reset password with OTP verification.",
+    description="""
+## Confirm Password Reset
+
+Complete the password reset process by verifying the OTP and setting
+a new password. All existing sessions are revoked for security.
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ✅ | Email address of the account |
+| `otp_code` | string | ✅ | 6-digit verification code |
+| `new_password` | string | ✅ | New password (see requirements) |
+
+### Password Requirements
+
+- Minimum **8 characters**
+- At least **one uppercase letter** (A-Z)
+- At least **one lowercase letter** (a-z)
+- At least **one digit** (0-9)
+
+### Success Response (200)
+
+```json
+{
+  "message": "Password has been reset successfully",
+  "success": true
+}
+```
+
+### Security Actions on Success
+
+1. ✅ Password updated
+2. ✅ OTP invalidated
+3. ✅ **All refresh tokens revoked** (signs out all devices)
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `400 Bad Request` | Invalid or expired OTP code |
+| `422 Unprocessable Entity` | Invalid OTP format or password requirements not met |
+| `429 Too Many Requests` | Exceeded 5 verification attempts |
+
+### Notes
+
+- OTP codes expire after **10 minutes**
+- Maximum **5 attempts** per OTP, then must request new code
+- User must sign in again after password reset
+- If OTP attempts exhausted, request new code via `/password/reset`
+""",
+    responses={
+        400: {
+            "description": "Invalid or expired OTP",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid verification code"}}
+            },
+        },
+        429: {
+            "description": "Too many verification attempts",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Too many verification attempts. Please request a new code."
+                    }
+                }
+            },
+        },
+    },
 )
 async def confirm_password_reset(
     request_data: PasswordResetConfirmRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> MessageResponse:
     """
-    Confirm password reset with OTP and set new password.
+    Verify OTP and set a new password, revoking all existing sessions.
+
+    This endpoint completes the password reset flow by validating the OTP
+    code, updating the user's password, and revoking all existing refresh
+    tokens for security.
+
+    Args:
+        request_data (PasswordResetConfirmRequest): The confirmation request
+            containing:
+            - email: The email address for the account
+            - otp_code: The 6-digit OTP code received via email
+            - new_password: The new password to set (must meet requirements)
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        MessageResponse: A response object containing:
+            - message: Confirmation that password was reset successfully
+            - success: Boolean indicating operation success
+
+    Raises:
+        OTPInvalidException: If the OTP code is incorrect or has expired.
+        TooManyAttemptsException: If the maximum OTP verification attempts
+            (5 attempts) have been exceeded.
+        AuthenticationException: If there's a general authentication error.
+
+    Note:
+        All existing sessions are revoked when the password is reset,
+        requiring the user to sign in again on all devices. This is a
+        security measure to protect against account compromise.
     """
     try:
         async with session.begin():
@@ -688,7 +1718,80 @@ async def confirm_password_reset(
     "/password/change",
     response_model=MessageResponse,
     summary="Change password",
-    description="Change password for authenticated user.",
+    description="""
+## Change Password
+
+Update the password for the currently authenticated user. Requires
+verification of the current password for security.
+
+### Authentication Required
+
+```http
+Authorization: Bearer <access_token>
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `current_password` | string | ✅ | User's current password |
+| `new_password` | string | ✅ | New password (see requirements) |
+
+### Password Requirements
+
+- Minimum **8 characters**
+- At least **one uppercase letter** (A-Z)
+- At least **one lowercase letter** (a-z)
+- At least **one digit** (0-9)
+
+### Success Response (200)
+
+```json
+{
+  "message": "Password changed successfully. You have been signed out from other devices.",
+  "success": true
+}
+```
+
+### Security Actions on Success
+
+1. ✅ Password updated
+2. ✅ **All other sessions revoked** (current session preserved)
+3. ✅ Event logged for audit trail
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `401 Unauthorized` | Not authenticated or current password incorrect |
+| `422 Unprocessable Entity` | Password requirements not met |
+
+### Notes
+
+- OAuth-only users must first set a password via different flow
+- Current session remains active after password change
+- All **other** devices/sessions are signed out
+- Consider using this when security is a concern
+""",
+    responses={
+        401: {
+            "description": "Not authenticated or current password incorrect",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "not_authenticated": {
+                            "summary": "Not authenticated",
+                            "value": {"detail": "Not authenticated"},
+                        },
+                        "wrong_password": {
+                            "summary": "Current password incorrect",
+                            "value": {"detail": "Current password is incorrect"},
+                        },
+                    }
+                }
+            },
+        },
+    },
 )
 async def change_password(
     request_data: ChangePasswordRequest,
@@ -698,7 +1801,33 @@ async def change_password(
     """
     Change password for the authenticated user.
 
-    Requires current password verification. Revokes all other sessions.
+    This endpoint allows authenticated users to update their password.
+    The current password must be verified before setting the new one.
+    For security, all other sessions are revoked after the password change.
+
+    Args:
+        request_data (ChangePasswordRequest): The change request containing:
+            - current_password: The user's current password for verification
+            - new_password: The new password to set (must meet requirements)
+        user (CurrentActiveUser): The currently authenticated user, injected
+            via FastAPI dependency.
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        MessageResponse: A response object containing:
+            - message: Confirmation that password was changed successfully
+            - success: Boolean indicating operation success
+
+    Raises:
+        InvalidCredentialsException: If the current password is incorrect.
+        HTTPException (401): If the user is not authenticated.
+        AuthenticationException: If there's a general authentication error.
+
+    Note:
+        After changing the password, all sessions except the current one
+        are revoked. The user remains signed in on the current device but
+        must sign in again on all other devices.
     """
     try:
         async with session.begin():
@@ -730,14 +1859,116 @@ async def change_password(
     "/me",
     response_model=ProfileResponse,
     summary="Get current user profile",
-    description="Get the profile of the currently authenticated user.",
+    description="""
+## Get Current User Profile
+
+Retrieve the complete profile information for the authenticated user,
+including account status, OAuth connections, and metadata.
+
+### Authentication Required
+
+```http
+Authorization: Bearer <access_token>
+```
+
+### Success Response (200)
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "user@example.com",
+  "email_verified": true,
+  "full_name": "John Doe",
+  "avatar_url": "https://example.com/avatar.jpg",
+  "is_active": true,
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-20T14:22:00Z",
+  "has_password": true,
+  "oauth_providers": ["google", "github"]
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Unique user identifier |
+| `email` | string | User's email address |
+| `email_verified` | boolean | Whether email is verified |
+| `full_name` | string | User's display name |
+| `avatar_url` | string | URL to profile picture |
+| `is_active` | boolean | Account active status |
+| `created_at` | datetime | Account creation timestamp |
+| `updated_at` | datetime | Last profile update timestamp |
+| `has_password` | boolean | `true` if user can sign in with password |
+| `oauth_providers` | array | List of linked OAuth providers |
+
+### Understanding `has_password`
+
+| Value | Meaning |
+|-------|--------|
+| `true` | User signed up with email/password OR has set a password |
+| `false` | OAuth-only user, cannot use password signin |
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `401 Unauthorized` | Missing or invalid access token |
+| `404 Not Found` | User deleted (edge case) |
+""",
+    responses={
+        401: {
+            "description": "Not authenticated",
+            "content": {
+                "application/json": {"example": {"detail": "Not authenticated"}}
+            },
+        },
+        404: {
+            "description": "User not found (rare edge case)",
+            "content": {"application/json": {"example": {"detail": "User not found"}}},
+        },
+    },
 )
 async def get_profile(
     user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> ProfileResponse:
     """
-    Get the current user's profile.
+    Retrieve the authenticated user's complete profile information.
+
+    This endpoint returns detailed profile data for the currently
+    authenticated user, including account status, OAuth provider
+    connections, and metadata timestamps.
+
+    Args:
+        user (CurrentActiveUser): The currently authenticated user, injected
+            via FastAPI dependency. Must have a valid access token.
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        ProfileResponse: A response object containing:
+            - id: Unique user identifier (UUID)
+            - email: User's email address
+            - email_verified: Whether email has been verified
+            - full_name: User's display name
+            - avatar_url: URL to profile picture (may be None)
+            - is_active: Account active status
+            - created_at: Account creation timestamp
+            - updated_at: Last profile modification timestamp
+            - has_password: Whether user can sign in with password
+            - oauth_providers: List of linked OAuth providers
+
+    Raises:
+        HTTPException (401): If the user is not authenticated or the
+            access token is invalid/expired.
+        HTTPException (404): If the user record was deleted (edge case).
+
+    Note:
+        The has_password field indicates whether the user registered with
+        email/password or has set a password. OAuth-only users will have
+        this set to False until they explicitly set a password.
     """
     # Reload user with OAuth accounts
     reloaded_user = await user_db.get_by_id(
@@ -755,7 +1986,80 @@ async def get_profile(
     "/me",
     response_model=ProfileResponse,
     summary="Update user profile",
-    description="Update the profile of the currently authenticated user.",
+    description="""
+## Update User Profile
+
+Partially update the authenticated user's profile. Only provided fields
+are updated; omitted fields remain unchanged.
+
+### Authentication Required
+
+```http
+Authorization: Bearer <access_token>
+```
+
+### Request Body (all fields optional)
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `full_name` | string | 1-255 chars | User's display name |
+| `avatar_url` | string | max 512 chars | URL to profile picture |
+
+### Example Request
+
+```json
+{
+  "full_name": "Jane Doe"
+}
+```
+
+Only `full_name` will be updated; `avatar_url` remains unchanged.
+
+### Success Response (200)
+
+Returns the complete updated profile:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "user@example.com",
+  "email_verified": true,
+  "full_name": "Jane Doe",
+  "avatar_url": "https://example.com/avatar.jpg",
+  "is_active": true,
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-21T09:15:00Z",
+  "has_password": true,
+  "oauth_providers": ["google"]
+}
+```
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `401 Unauthorized` | Missing or invalid access token |
+| `404 Not Found` | User deleted (edge case) |
+| `422 Unprocessable Entity` | Validation failed (e.g., name too long) |
+
+### Notes
+
+- **Email cannot be changed** via this endpoint (requires verification flow)
+- Empty request body (`{}`) is valid (no changes made)
+- `updated_at` timestamp is refreshed on any change
+""",
+    responses={
+        401: {
+            "description": "Not authenticated",
+            "content": {
+                "application/json": {"example": {"detail": "Not authenticated"}}
+            },
+        },
+        404: {
+            "description": "User not found (rare edge case)",
+            "content": {"application/json": {"example": {"detail": "User not found"}}},
+        },
+    },
 )
 async def update_profile(
     request_data: ProfileUpdateRequest,
@@ -763,7 +2067,36 @@ async def update_profile(
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> ProfileResponse:
     """
-    Update the current user's profile.
+    Partially update the authenticated user's profile.
+
+    This endpoint allows users to update specific profile fields without
+    affecting others. Only provided fields are updated; omitted fields
+    remain unchanged (PATCH semantics).
+
+    Args:
+        request_data (ProfileUpdateRequest): The update request containing
+            optional fields:
+            - full_name: New display name (1-255 characters)
+            - avatar_url: New profile picture URL (max 512 characters)
+        user (CurrentActiveUser): The currently authenticated user, injected
+            via FastAPI dependency.
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        ProfileResponse: The complete updated profile containing all fields
+            including id, email, full_name, avatar_url, oauth_providers, etc.
+
+    Raises:
+        HTTPException (401): If the user is not authenticated or the
+            access token is invalid/expired.
+        HTTPException (404): If the user record was deleted (edge case).
+        HTTPException (422): If validation fails (e.g., name too long).
+
+    Note:
+        Email cannot be changed via this endpoint as it requires a separate
+        verification flow. An empty request body is valid and results in
+        no changes. The updated_at timestamp is refreshed on any modification.
     """
     # Build update data (only include provided fields)
     update_data = {}
@@ -797,17 +2130,105 @@ async def update_profile(
     "/me",
     response_model=MessageResponse,
     summary="Delete account",
-    description="Soft delete the current user's account.",
+    description="""
+## Delete User Account
+
+Permanently delete (soft delete) the authenticated user's account.
+This action signs out all devices and marks the account as deleted.
+
+### Authentication Required
+
+```http
+Authorization: Bearer <access_token>
+```
+
+### Success Response (200)
+
+```json
+{
+  "message": "Account has been deleted",
+  "success": true
+}
+```
+
+### What Happens on Deletion
+
+1. ✅ Account marked as **soft deleted** (not permanently removed)
+2. ✅ All refresh tokens **revoked** (signed out everywhere)
+3. ✅ Email becomes **available** for new registration
+4. ✅ OAuth connections **preserved** (for potential recovery)
+5. ✅ Event **logged** for audit trail
+
+### Soft Delete vs Hard Delete
+
+| Aspect | Soft Delete (Current) |
+|--------|----------------------|
+| Data retained | ✅ Yes (configurable period) |
+| Can recover | ⚠️ Contact support |
+| Email reusable | ✅ Yes |
+| Tokens valid | ❌ No |
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `401 Unauthorized` | Missing or invalid access token |
+
+### ⚠️ Warning
+
+This action:
+- **Signs out** the user from all devices immediately
+- Cannot be easily undone by the user
+- May result in **data loss** after the retention period
+
+### Notes
+
+- Consider implementing a confirmation step in your UI
+- Account recovery may be possible within a grace period (contact support)
+- Associated data (posts, comments, etc.) handling depends on application policy
+""",
+    responses={
+        401: {
+            "description": "Not authenticated",
+            "content": {
+                "application/json": {"example": {"detail": "Not authenticated"}}
+            },
+        },
+    },
 )
 async def delete_account(
     user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> MessageResponse:
     """
-    Soft delete the current user's account.
+    Soft delete the authenticated user's account and revoke all tokens.
 
-    The account can potentially be recovered within a grace period.
-    All refresh tokens are revoked.
+    This endpoint permanently marks the user's account as deleted and
+    revokes all active sessions. The account data is retained for a
+    configurable period before permanent deletion.
+
+    Args:
+        user (CurrentActiveUser): The currently authenticated user, injected
+            via FastAPI dependency. Must have a valid access token.
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        MessageResponse: A response object containing:
+            - message: Confirmation that account was deleted
+            - success: Boolean indicating operation success
+
+    Raises:
+        HTTPException (401): If the user is not authenticated or the
+            access token is invalid/expired.
+        AuthenticationException: If there's a general authentication error.
+
+    Note:
+        This performs a soft delete, meaning the account data is retained
+        temporarily. All refresh tokens are immediately revoked, signing
+        the user out from all devices. The email address becomes available
+        for new registrations. Account recovery may be possible within
+        a grace period by contacting support.
     """
     async with session.begin():
         # Soft delete user
@@ -838,7 +2259,99 @@ async def delete_account(
     "/sessions",
     response_model=ActiveSessionsResponse,
     summary="Get active sessions",
-    description="List all active sessions for the current user.",
+    description="""
+## List Active Sessions
+
+Retrieve all active sessions (refresh tokens) for the authenticated user.
+Useful for session management UI where users can view and revoke sessions.
+
+### Authentication Required
+
+```http
+Authorization: Bearer <access_token>
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `refresh_token` | string | ✅ | Current session's refresh token (to identify current session) |
+
+### Why POST instead of GET?
+
+The current refresh token is needed to identify which session is the
+"current" one. Since tokens should not be passed in URLs (security),
+this endpoint uses POST with a request body.
+
+### Success Response (200)
+
+```json
+{
+  "sessions": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "device_info": "Chrome 120 on Windows",
+      "created_at": "2024-01-20T10:30:00Z",
+      "expires_at": "2024-01-27T10:30:00Z",
+      "is_current": true
+    },
+    {
+      "id": "660f9500-f30c-52e5-b827-557766551111",
+      "device_info": "Safari on iPhone",
+      "created_at": "2024-01-18T14:22:00Z",
+      "expires_at": "2024-02-17T14:22:00Z",
+      "is_current": false
+    }
+  ],
+  "total": 2
+}
+```
+
+### Session Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Session identifier |
+| `device_info` | string | Browser/device description (from User-Agent) |
+| `created_at` | datetime | When session was created (sign-in time) |
+| `expires_at` | datetime | When refresh token expires |
+| `is_current` | boolean | `true` if this is the requesting session |
+
+### Understanding `expires_at`
+
+| Sign-in Type | Expiration |
+|--------------|------------|
+| Normal (`remember_me: false`) | 7 days from sign-in |
+| Extended (`remember_me: true`) | 30 days from sign-in |
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `401 Unauthorized` | Missing or invalid access token |
+| `422 Unprocessable Entity` | Missing refresh_token in body |
+
+### Use Cases
+
+- 📱 **Session management UI** - Show users their active sessions
+- 🔒 **Security audit** - Check for unauthorized sessions
+- 🧹 **Cleanup** - Identify old sessions to revoke
+
+### Notes
+
+- Only **active** (non-expired, non-revoked) sessions are returned
+- `device_info` may be `null` if User-Agent was not available
+- Use `/signout` to revoke individual sessions
+- Use `/signout/all` to revoke all sessions at once
+""",
+    responses={
+        401: {
+            "description": "Not authenticated",
+            "content": {
+                "application/json": {"example": {"detail": "Not authenticated"}}
+            },
+        },
+    },
 )
 async def get_sessions(
     user: CurrentActiveUser,
@@ -846,9 +2359,40 @@ async def get_sessions(
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> ActiveSessionsResponse:
     """
-    Get all active sessions for the current user.
+    List all active sessions for the authenticated user.
 
-    Pass the current refresh token to identify which session is current.
+    This endpoint retrieves all non-expired, non-revoked sessions (refresh
+    tokens) for the current user. It identifies which session is the
+    "current" one by comparing the provided refresh token.
+
+    Args:
+        user (CurrentActiveUser): The currently authenticated user, injected
+            via FastAPI dependency.
+        request_data (RefreshTokenRequest): The request containing:
+            - refresh_token: Current session's refresh token to identify
+              which session is the "current" one in the response.
+        session (AsyncSession): The async database session injected via
+            dependency injection.
+
+    Returns:
+        ActiveSessionsResponse: A response object containing:
+            - sessions: List of active session objects, each with:
+                - id: Session identifier (UUID)
+                - device_info: Browser/device description from User-Agent
+                - created_at: When the session was created (sign-in time)
+                - expires_at: When the refresh token expires
+                - is_current: True if this is the requesting session
+            - total: Total count of active sessions
+
+    Raises:
+        HTTPException (401): If the user is not authenticated or the
+            access token is invalid/expired.
+        HTTPException (422): If the refresh_token is missing from body.
+
+    Note:
+        This endpoint uses POST instead of GET because the refresh token
+        should not be passed in URLs for security reasons. The device_info
+        may be null if the User-Agent header was not available during signin.
     """
     # Get current token hash for comparison
     current_token_hash = AuthService.hash_token(request_data.refresh_token)
