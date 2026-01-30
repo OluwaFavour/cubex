@@ -1,0 +1,35 @@
+{{ app_name }} - Verification Code
+=====================================
+
+Hello{% if user_name %} {{ user_name }}{% endif %},
+
+{% if purpose == "email_verification" %}
+Thank you for signing up! Please use the verification code below to confirm your email address.
+{% elif purpose == "password_reset" %}
+We received a request to reset your password. Use the code below to proceed with the password reset.
+{% else %}
+Here is your one-time verification code:
+{% endif %}
+
+Your Verification Code: {{ otp_code }}
+
+⏱️ This code expires in {{ expiry_minutes }} minutes.
+
+{% if purpose == "email_verification" %}
+Why am I receiving this?
+You recently created an account with us. This code verifies that you own this email address.
+{% elif purpose == "password_reset" %}
+Why am I receiving this?
+Someone (hopefully you) requested a password reset for your account.
+{% else %}
+Why am I receiving this?
+This code was requested for account verification purposes.
+{% endif %}
+
+SECURITY NOTICE: Never share this code with anyone. Our team will never ask for your verification code.
+
+-------------------------------------
+This is an automated message from {{ app_name }}.
+If you didn't request this code, you can safely ignore this email.
+
+© {{ year }} {{ app_name }}. All rights reserved.

@@ -1,0 +1,241 @@
+# ============================================================================
+# Docker Compose for CubeX Application
+# ============================================================================
+# Services:
+#   - api: FastAPI application server
+#   - scheduler: APScheduler background jobs
+#   - worker: RabbitMQ message consumer
+#   - postgres: PostgreSQL database
+#   - redis: Redis cache and rate limiting
+#   - rabbitmq: RabbitMQ message broker
+#
+# Profiles:
+#   - dev: All services for local development
+#   - api-only: Only API with external dependencies
+#   - scheduler-only: Only scheduler service
+#   - worker-only: Only worker service
+#
+# Usage:
+#   # Start all services for development
+#   docker compose --profile dev up -d
+#
+#   # Start only API service (assumes external Postgres, Redis, RabbitMQ)
+#   docker compose --profile api-only up -d
+#
+#   # Start only scheduler
+#   docker compose --profile scheduler-only up -d
+#
+#   # Start only worker
+#   docker compose --profile worker-only up -d
+#
+#   # Start specific services without profiles
+#   docker compose up -d api postgres redis rabbitmq
+#
+#   # Run database migrations
+#   docker compose run --rm api alembic upgrade head
+#
+#   # View logs
+#   docker compose logs -f api
+# ============================================================================
+
+services:
+  # ==========================================================================
+  # FastAPI Application Server
+  # ==========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: cubex-api
+    profiles:
+      - dev
+      - api-only
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://cubex:cubex@postgres:5432/cubex}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - BREVO_API_KEY=${BREVO_API_KEY:-}
+      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-noreply@example.com}
+      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-CubeX}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/auth/google/callback}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI:-http://localhost:8000/auth/github/callback}
+      - OTP_LENGTH=${OTP_LENGTH:-6}
+      - OTP_EXPIRY_MINUTES=${OTP_EXPIRY_MINUTES:-10}
+      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-100}
+      - RATE_LIMIT_WINDOW_SECONDS=${RATE_LIMIT_WINDOW_SECONDS:-60}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - cubex-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # APScheduler Background Jobs
+  # ==========================================================================
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: scheduler
+    container_name: cubex-scheduler
+    profiles:
+      - dev
+      - scheduler-only
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://cubex:cubex@postgres:5432/cubex}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - BREVO_API_KEY=${BREVO_API_KEY:-}
+      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-noreply@example.com}
+      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-CubeX}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cubex-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # RabbitMQ Message Consumer
+  # ==========================================================================
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: cubex-worker
+    profiles:
+      - dev
+      - worker-only
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://cubex:cubex@postgres:5432/cubex}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - BREVO_API_KEY=${BREVO_API_KEY:-}
+      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-noreply@example.com}
+      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-CubeX}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - cubex-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: cubex-postgres
+    profiles:
+      - dev
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-cubex}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-cubex}
+      - POSTGRES_DB=${POSTGRES_DB:-cubex}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cubex} -d ${POSTGRES_DB:-cubex}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - cubex-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Redis Cache and Rate Limiting
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: cubex-redis
+    profiles:
+      - dev
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - cubex-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # ==========================================================================
+  # RabbitMQ Message Broker
+  # ==========================================================================
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: cubex-rabbitmq
+    profiles:
+      - dev
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - cubex-network
+    restart: unless-stopped
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  cubex-network:
+    driver: bridge
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:

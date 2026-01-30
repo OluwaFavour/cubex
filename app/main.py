@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-import logging
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request, status
@@ -21,24 +20,33 @@ from app.shared.exceptions.handlers import (
 from app.shared.exceptions.types import AppException, DatabaseException
 from app.infrastructure.messaging import start_consumers
 from app.infrastructure.scheduler import scheduler
-from app.shared.services import BrevoService, CloudinaryService, Renderer
+from app.shared.services import BrevoService, CloudinaryService, Renderer, RedisService
 from app.shared.utils import generate_openapi_json, write_to_file_async
-
-logging.basicConfig(level=logging.INFO)
-logging.getLogger("apscheduler").setLevel(logging.DEBUG)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app_logger.info("Starting application...")
+    consumer_connection = None
+
     # Initialize the database
     app_logger.info("Initializing database...")
     await init_db()
     app_logger.info("Database initialized successfully.")
-    # Start the scheduler
-    app_logger.info("Starting scheduler...")
-    scheduler.start()
-    app_logger.info("Scheduler started successfully.")
+
+    # Initialize Redis service
+    app_logger.info("Initializing Redis service...")
+    await RedisService.init(settings.REDIS_URL)
+    app_logger.info("Redis service initialized successfully.")
+
+    # Start the scheduler (only if enabled)
+    if settings.ENABLE_SCHEDULER:
+        app_logger.info("Starting scheduler...")
+        scheduler.start()
+        app_logger.info("Scheduler started successfully.")
+    else:
+        app_logger.info("Scheduler disabled via ENABLE_SCHEDULER setting.")
+
     # Configure Cloudinary
     app_logger.info("Configuring Cloudinary...")
     CloudinaryService.init(
@@ -47,6 +55,7 @@ async def lifespan(app: FastAPI):
         api_secret=settings.CLOUDINARY_API_SECRET,
     )
     app_logger.info("Cloudinary configured successfully.")
+
     # Initialize Brevo Service
     app_logger.info("Initializing Brevo service...")
     await BrevoService.init(
@@ -55,31 +64,48 @@ async def lifespan(app: FastAPI):
         sender_name=settings.BREVO_SENDER_NAME,
     )
     app_logger.info("Brevo service initialized successfully.")
-    # Start message consumers
-    app_logger.info("Starting message consumers...")
-    consumer_connection = await start_consumers(keep_alive=False)
-    app_logger.info("Message consumers started successfully.")
+
+    # Start message consumers (only if enabled)
+    if settings.ENABLE_MESSAGING:
+        app_logger.info("Starting message consumers...")
+        consumer_connection = await start_consumers(keep_alive=False)
+        app_logger.info("Message consumers started successfully.")
+    else:
+        app_logger.info("Messaging disabled via ENABLE_MESSAGING setting.")
+
     # Initialize template renderer
     app_logger.info("Initializing template renderer...")
     Renderer.initialize("app/templates")
     app_logger.info("Template renderer initialized successfully.")
+
     # Generate and write OpenAPI schema to file
     app_logger.info("Generating OpenAPI schema...")
     openapi_schema = generate_openapi_json(app)
     await write_to_file_async("openapi.json", openapi_schema)
+
     # Yield control back to the application
     yield
+
     # Cleanup on shutdown
     app_logger.info("Shutting down application...")
+
     # Stop message consumers
     if consumer_connection:
         app_logger.info("Closing message consumer connection...")
         await consumer_connection.close()
         app_logger.info("Message consumer connection closed successfully.")
+
     # Stop the scheduler
-    app_logger.info("Stopping scheduler...")
-    scheduler.shutdown()
-    app_logger.info("Scheduler stopped successfully.")
+    if settings.ENABLE_SCHEDULER:
+        app_logger.info("Stopping scheduler...")
+        scheduler.shutdown()
+        app_logger.info("Scheduler stopped successfully.")
+
+    # Close Redis service
+    app_logger.info("Closing Redis service...")
+    await RedisService.aclose()
+    app_logger.info("Redis service closed successfully.")
+
     app_logger.info("Disposing database...")
     await dispose_db()
     app_logger.info("Database disposed successfully.")
@@ -147,20 +173,49 @@ async def root(request: Request):
 async def health_check(session: Annotated[AsyncSession, Depends(get_async_session)]):
     """
     Health check endpoint to verify if the API is running.
+
+    Checks:
+        - Database connectivity
+        - Redis connectivity
     """
+    health_status = {
+        "status": "ok",
+        "message": "Wander API is running.",
+        "checks": {
+            "database": "ok",
+            "redis": "ok",
+        },
+    }
+
+    # Check database connectivity
     try:
         async with session.begin():
             result = await session.execute(text("SELECT 1"))
             if result.scalar() != 1:
-                raise AppException(
-                    "Database health check failed.",
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                )
+                health_status["checks"]["database"] = "unhealthy"
+                health_status["status"] = "degraded"
     except Exception as e:
-        app_logger.error(f"Health check failed: {e}")
+        app_logger.error(f"Database health check failed: {e}")
+        health_status["checks"]["database"] = "unhealthy"
+        health_status["status"] = "degraded"
+
+    # Check Redis connectivity
+    try:
+        redis_ok = await RedisService.ping()
+        if not redis_ok:
+            health_status["checks"]["redis"] = "unhealthy"
+            health_status["status"] = "degraded"
+    except Exception as e:
+        app_logger.error(f"Redis health check failed: {e}")
+        health_status["checks"]["redis"] = "unhealthy"
+        health_status["status"] = "degraded"
+
+    # Return 503 if any check failed
+    if health_status["status"] != "ok":
         raise AppException(
-            "Wander API is not reachable.",
+            "One or more health checks failed.",
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            details=health_status,
         )
 
-    return {"status": "ok", "message": "Wander API is running."}
+    return health_status

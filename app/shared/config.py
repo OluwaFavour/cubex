@@ -36,6 +36,27 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     TEST_DATABASE_URL: str = "sqlite+aiosqlite:///:memory:"
 
+    # Redis settings
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    # Rate limiting settings
+    RATE_LIMIT_BACKEND: Literal["memory", "redis"] = "memory"
+    RATE_LIMIT_DEFAULT_REQUESTS: int = 100
+    RATE_LIMIT_DEFAULT_WINDOW: int = 60  # seconds
+
+    # OTP settings
+    OTP_LENGTH: int = 6
+    OTP_EXPIRY_MINUTES: int = 10
+    OTP_HMAC_SECRET: str = "otp_hmac_secret_key_change_in_production"
+    OTP_MAX_ATTEMPTS: int = 5
+
+    # OAuth settings
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+    OAUTH_REDIRECT_BASE_URI: str = "http://localhost:8000/auth/callback"
+
     # Cloudinary settings
     CLOUDINARY_CLOUD_NAME: str = "your_cloudinary_cloud_name"
     CLOUDINARY_API_KEY: str = "your_cloudinary_api_key"
@@ -49,6 +70,10 @@ class Settings(BaseSettings):
 
     # RabbitMQ settings
     RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672//"
+
+    # Infrastructure flags (for Docker separation)
+    ENABLE_SCHEDULER: bool = True
+    ENABLE_MESSAGING: bool = True
 
     # Sentry settings
     SENTRY_DSN: str = ""
@@ -127,6 +152,30 @@ utils_logger = setup_logger(
     level=logging.INFO,
     sentry_tag="utils",
 )
+auth_logger = setup_logger(
+    name="auth_logger",
+    log_file="logs/auth.log",
+    level=logging.INFO,
+    sentry_tag="auth",
+)
+redis_logger = setup_logger(
+    name="redis_logger",
+    log_file="logs/redis.log",
+    level=logging.INFO,
+    sentry_tag="redis",
+)
+rate_limit_logger = setup_logger(
+    name="rate_limit_logger",
+    log_file="logs/rate_limit.log",
+    level=logging.INFO,
+    sentry_tag="rate_limit",
+)
+email_manager_logger = setup_logger(
+    name="email_manager_logger",
+    log_file="logs/email_manager.log",
+    level=logging.INFO,
+    sentry_tag="email_manager",
+)
 
 __all__ = [
     "settings",
@@ -138,4 +187,8 @@ __all__ = [
     "rabbitmq_logger",
     "scheduler_logger",
     "utils_logger",
+    "auth_logger",
+    "redis_logger",
+    "rate_limit_logger",
+    "email_manager_logger",
 ]

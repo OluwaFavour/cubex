@@ -860,7 +860,6 @@ class TestGetDeviceInfoEdgeCases:
         # Should return the original user agent (< 100 chars)
         assert result == ua
 
-
 # ============================================================================
 # Tests for HMAC OTP Hashing
 # ============================================================================
@@ -1075,6 +1074,4 @@ class TestHmacVerifyOtp:
         # Times should be similar (within reasonable margin)
         # This is a soft test - timing attacks prevention
         ratio = max(correct_time, wrong_time) / min(correct_time, wrong_time)
-        assert (
-            ratio < 3.0
-        )  # Allow up to 3x difference (conservative for CI environments)
+        assert ratio < 3.0  # Allow up to 3x difference (conservative for CI environments)

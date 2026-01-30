@@ -1,0 +1,22 @@
+Welcome to {{ app_name }}!
+
+Hello, {{ user_name }}!
+
+We're thrilled to have you join us! Your account has been successfully created, and you're now part of the {{ app_name }} community.
+
+We've designed {{ app_name }} to help you achieve more. Here's what you can look forward to:
+
+What's Next?
+- Complete your profile to get personalized recommendations
+- Explore our features and discover what {{ app_name }} can do for you
+- Connect with our community and share your experience
+- Reach out to support if you have any questions
+
+If you have any questions or need assistance, our support team is always here to help. We're committed to making your experience with {{ app_name }} exceptional.
+
+Welcome aboard, and let's get started!
+
+---
+This email was sent to you because you created an account on {{ app_name }}.
+
+© {{ year }} {{ app_name }}. All rights reserved.

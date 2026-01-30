@@ -73,7 +73,9 @@ class TestCloudinaryServiceUploadFile:
             "resource_type": "image",
         }
 
-        with patch("app.shared.services.cloudinary.cloudinary.uploader.upload"), patch(
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.uploader.upload"
+        ), patch(
             "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = mock_upload_result
@@ -140,7 +142,9 @@ class TestCloudinaryServiceUploadFile:
             "resource_type": "image",
         }
 
-        with patch("app.shared.services.cloudinary.cloudinary.uploader.upload"), patch(
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.uploader.upload"
+        ), patch(
             "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = mock_upload_result

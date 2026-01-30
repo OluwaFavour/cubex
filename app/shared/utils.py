@@ -5,9 +5,12 @@ This module provides reusable utility functions including:
 - Secure password hashing using bcrypt
 - Password verification against hashed values
 - JWT token creation and decoding
+- HMAC-based OTP hashing for queryable secure storage
 """
 
 from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
 import json
 import secrets
 from typing import Any
@@ -364,6 +367,132 @@ def mask_otp(otp: str) -> str:
         return otp
 
     return f"{otp[0]}{'*' * (len(otp) - 2)}{otp[-1]}"
+
+
+def hmac_hash_otp(otp: str | None, secret: str | None) -> str:
+    """
+    Hash an OTP using HMAC-SHA256 for secure, queryable storage.
+
+    Unlike bcrypt, HMAC produces deterministic hashes that can be used
+    to query the database directly while still providing security through
+    the secret key. This is ideal for OTP verification where the hash
+    needs to be queryable.
+
+    Args:
+        otp: The OTP code to hash. Cannot be None or empty.
+        secret: The secret key for HMAC. Cannot be None or empty.
+
+    Returns:
+        str: The HMAC-SHA256 hash as a 64-character hexadecimal string.
+
+    Raises:
+        ValueError: If otp or secret is None or empty.
+
+    Examples:
+        >>> hashed = hmac_hash_otp("123456", "my_secret_key")
+        >>> len(hashed)
+        64
+        >>> hmac_hash_otp("123456", "my_secret_key") == hashed
+        True
+
+    Security Notes:
+        - Uses HMAC-SHA256 which is cryptographically secure
+        - Deterministic output allows database queries
+        - Security depends on keeping the secret key private
+        - Different from bcrypt which is designed for passwords
+    """
+    if not otp:
+        utils_logger.error("Attempted to hash None or empty OTP")
+        raise ValueError("OTP cannot be None or empty")
+
+    if not secret:
+        utils_logger.error("Attempted to hash OTP with None or empty secret")
+        raise ValueError("Secret cannot be None or empty")
+
+    try:
+        # Create HMAC-SHA256 hash
+        otp_bytes = otp.encode("utf-8")
+        secret_bytes = secret.encode("utf-8")
+
+        hash_obj = hmac.new(secret_bytes, otp_bytes, hashlib.sha256)
+        hashed = hash_obj.hexdigest()
+
+        utils_logger.debug(f"OTP {mask_otp(otp)} hashed successfully with HMAC-SHA256")
+        return hashed
+
+    except Exception as e:
+        utils_logger.error(f"Failed to hash OTP: {type(e).__name__} - {str(e)}")
+        raise
+
+
+def hmac_verify_otp(
+    otp: str | None, hashed_otp: str | None, secret: str | None
+) -> bool:
+    """
+    Verify an OTP against its HMAC-SHA256 hash using constant-time comparison.
+
+    This function safely compares an OTP with its stored hash using
+    constant-time comparison to prevent timing attacks.
+
+    Args:
+        otp: The plain text OTP to verify. Can be None.
+        hashed_otp: The HMAC-SHA256 hash to verify against. Can be None.
+        secret: The secret key used for hashing. Can be None.
+
+    Returns:
+        bool: True if OTP matches the hash, False otherwise.
+              Returns False for any invalid inputs (None, empty, invalid format).
+
+    Examples:
+        >>> hashed = hmac_hash_otp("123456", "secret")
+        >>> hmac_verify_otp("123456", hashed, "secret")
+        True
+        >>> hmac_verify_otp("654321", hashed, "secret")
+        False
+        >>> hmac_verify_otp(None, hashed, "secret")
+        False
+
+    Security Notes:
+        - Uses hmac.compare_digest for constant-time comparison
+        - Safe against timing attacks
+        - Handles invalid inputs gracefully without raising exceptions
+    """
+    # Handle None or empty values gracefully
+    if not otp or not hashed_otp or not secret:
+        utils_logger.warning(
+            "OTP verification attempted with invalid value(s): "
+            f"otp={'None/empty' if not otp else 'provided'}, "
+            f"hashed_otp={'None/empty' if not hashed_otp else 'provided'}, "
+            f"secret={'None/empty' if not secret else 'provided'}"
+        )
+        return False
+
+    try:
+        # Validate that hashed_otp is valid hexadecimal
+        try:
+            int(hashed_otp, 16)
+        except ValueError:
+            utils_logger.warning("OTP verification failed: invalid hash format")
+            return False
+
+        # Compute hash of provided OTP
+        computed_hash = hmac_hash_otp(otp, secret)
+
+        # Use constant-time comparison to prevent timing attacks
+        result = hmac.compare_digest(computed_hash, hashed_otp)
+
+        if result:
+            utils_logger.info(f"OTP {mask_otp(otp)} verification successful")
+        else:
+            utils_logger.warning(f"OTP {mask_otp(otp)} verification failed: mismatch")
+
+        return result
+
+    except Exception as e:
+        utils_logger.error(
+            f"Unexpected error during OTP verification: {type(e).__name__} - {str(e)}"
+        )
+        return False
 
 
 def get_device_info(user_agent: str | None) -> str | None:
