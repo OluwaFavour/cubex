@@ -269,6 +269,10 @@ class GitHubOAuthService(BaseOAuthProvider):
         GitHub users may have multiple email addresses. This method
         fetches all emails and returns the primary verified one.
 
+        Note: This is an internal method that assumes the client is already
+        initialized. It should only be called from methods that have already
+        called init().
+
         Args:
             access_token: A valid access token.
 
@@ -276,8 +280,10 @@ class GitHubOAuthService(BaseOAuthProvider):
             tuple: (email, email_verified) - The primary email and verification status.
                    Returns (None, False) if no suitable email is found.
         """
-        await cls.init()
-        assert cls._client is not None
+        # Client should already be initialized by caller (get_user_info)
+        if cls._client is None:
+            auth_logger.warning("_get_primary_email called without initialized client")
+            return None, False
 
         headers = {
             "Authorization": f"Bearer {access_token}",
