@@ -1,40 +1,71 @@
 # Quick Test Reference
 
-## Files Created
+## Test Suite Structure
 
 ```bash
-📁 app/tests/
-├── 📄 __init__.py                 # Package initialization
-├── 📄 conftest.py                 # Shared pytest fixtures & config
-├── 📄 test_utils.py               # Tests for app.shared.utils (68 tests)
-├── 📄 README.md                   # How to run tests
-└── 📄 TEST_SUMMARY.md             # Detailed test documentation
+📁 app/tests/ (266 tests total)
+├── 📄 __init__.py                                # Package initialization
+├── 📄 conftest.py                                # Shared fixtures & config
+├── 📄 README.md                                  # How to run tests
+├── 📄 TEST_SUMMARY.md                            # Detailed documentation
+├── 📄 QUICK_REFERENCE.md                         # This file
+├── 📄 test_main.py                               # Main app (33 tests)
+├── 📄 test_utils.py                              # Utils (76 tests)
+├── 📁 core/
+│   └── 📄 test_dependencies.py                   # Dependencies (3 tests)
+├── 📁 services/
+│   ├── 📄 test_brevo.py                         # Email service (41 tests)
+│   ├── 📄 test_cloudinary.py                    # File service (23 tests)
+│   └── 📄 test_template.py                      # Templates (17 tests)
+├── 📁 infrastructure/
+│   ├── 📁 messaging/
+│   │   ├── 📄 test_connection.py                # RabbitMQ (5 tests)
+│   │   ├── 📄 test_queues.py                    # Queues (17 tests)
+│   │   ├── 📄 test_publisher.py                 # Publisher (7 tests)
+│   │   ├── 📄 test_consumer.py                  # Consumer (13 tests)
+│   │   └── 📄 test_main.py                      # Startup (10 tests)
+│   └── 📁 scheduler/
+│       └── 📄 test_main.py                      # Scheduler (4 tests)
+└── 📁 shared/
+    ├── 📁 db/
+    │   └── 📄 test_config.py                    # DB config (7 tests)
+    └── 📁 exceptions/
+        ├── 📄 test_types.py                     # Exceptions (8 tests)
+        └── 📄 test_handlers.py                  # Handlers (5 tests)
 
 📁 project root/
-├── 📄 pyproject.toml              # Pytest configuration
-└── 📄 requirements-dev.txt        # Test dependencies
+├── 📄 pyproject.toml                            # Pytest configuration
+└── 📄 requirements-dev.txt                      # Test dependencies
 ```
 
 ## Quick Commands
 
 ```bash
-# Run all tests
+# Run all tests (266 tests)
 pytest app/tests/ -v
+
+# Run with coverage (100% coverage)
+pytest app/tests/ --cov=app --cov-report=html
+pytest app/tests/ --cov=app --cov-report=term-missing
 
 # Run unit tests only (skip integration tests)
 pytest app/tests/ -v -m "not integration"
 
-# Run integration tests only (requires real database)
+# Run integration tests only (requires TEST_DATABASE_URL in .env)
 pytest app/tests/ -v -m integration
 
-# Run all utils tests
-pytest app/tests/test_utils.py -v
+# Run specific modules
+pytest app/tests/test_utils.py -v                              # Utils (76 tests)
+pytest app/tests/test_main.py -v                               # Main (33 tests)
+pytest app/tests/services/ -v                                  # Services (81 tests)
+pytest app/tests/infrastructure/messaging/ -v                   # Messaging (49 tests)
+pytest app/tests/infrastructure/scheduler/ -v                   # Scheduler (4 tests)
+pytest app/tests/core/ -v                                      # Core (3 tests)
+pytest app/tests/shared/ -v                                    # Shared (20 tests)
 
-# Run all main.py tests
-pytest app/tests/test_main.py -v
-
-# Run with coverage
-pytest app/tests/ --cov=app --cov-report=html
+# Run specific test files
+pytest app/tests/services/test_brevo.py -v                     # Brevo (41 tests)
+pytest app/tests/infrastructure/messaging/test_consumer.py -v  # Consumer (13 tests)
 
 # Run specific test class
 pytest app/tests/test_utils.py::TestHashPassword -v
@@ -44,24 +75,32 @@ pytest app/tests/ -x
 
 # Run with print statements shown
 pytest app/tests/ -s
+
+# Run quietly (minimal output)
+pytest app/tests/ -q
 ```
 
-## Test Classes Overview
+## Test Statistics by Module
 
-| Class | Tests | Function Tested |
-| ------- | ------- | ---------------- |
-| `TestHashPassword` | 6 | `hash_password()` |
-| `TestVerifyPassword` | 9 | `verify_password()` |
-| `TestCreateJwtToken` | 9 | `create_jwt_token()` |
-| `TestDecodeJwtToken` | 7 | `decode_jwt_token()` |
-| `TestConvertUnixTimestampToDatetime` | 5 | `convert_unix_timestamp_to_datetime()` |
-| `TestGenerateOtpCode` | 5 | `generate_otp_code()` |
-| `TestMaskOtp` | 6 | `mask_otp()` |
-| `TestGetDeviceInfo` | 9 | `get_device_info()` |
-| `TestGenerateOpenapiJson` | 5 | `generate_openapi_json()` |
-| `TestWriteToFileAsync` | 7 | `write_to_file_async()` |
-| **TOTAL** | **68** | **10 functions** |
+| Module | Tests | Coverage | Files |
+| ------ | ----- | -------- | ----- |
+| **Core** | 3 | 100% | 1 |
+| **Main App** | 33 | 100% | 1 |
+| **Utils** | 76 | 100% | 1 |
+| **Services** | 81 | 100% | 3 |
+| ├─ Brevo | 41 | 100% | 1 |
+| ├─ Cloudinary | 23 | 100% | 1 |
+| └─ Template | 17 | 100% | 1 |
+| **Infrastructure** | 53 | 100% | 6 |
+| ├─ Messaging | 49 | 100% | 5 |
+| └─ Scheduler | 4 | 100% | 1 |
+| **Shared** | 20 | 100% | 3 |
+| ├─ Database | 7 | 100% | 1 |
+| └─ Exceptions | 13 | 100% | 2 |
+| **TOTAL** | **266** | **100%** | **15** |
 
-## Coverage: 90%
+## Coverage: 100% 🎉
 
-✅ All 68 tests passing
+✅ All 266 tests passing  
+✅ 648/648 statements covered  
+✅ 0 missing lines

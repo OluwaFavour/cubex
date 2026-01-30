@@ -64,7 +64,38 @@ pytest -vv
 
 ## Test Structure
 
-- `test_utils.py` - Tests for utility functions in `app.shared.utils`
+### Core Tests
+
+- `core/test_dependencies.py` - Tests for FastAPI dependencies (3 tests)
+
+### Main Application Tests
+
+- `test_main.py` - Tests for FastAPI app initialization and endpoints (33 tests)
+- `test_utils.py` - Tests for utility functions in `app.shared.utils` (76 tests)
+
+### Services Tests
+
+- `services/test_brevo.py` - Tests for Brevo email service (41 tests)
+- `services/test_cloudinary.py` - Tests for Cloudinary file service (23 tests)
+- `services/test_template.py` - Tests for Jinja2 template rendering (17 tests)
+
+### Infrastructure Tests
+
+- `infrastructure/messaging/test_connection.py` - RabbitMQ connection (5 tests)
+- `infrastructure/messaging/test_queues.py` - Queue configuration (17 tests)
+- `infrastructure/messaging/test_publisher.py` - Event publishing (7 tests)
+- `infrastructure/messaging/test_consumer.py` - Message processing (13 tests)
+- `infrastructure/messaging/test_main.py` - Consumer startup (10 tests)
+- `infrastructure/scheduler/test_main.py` - Scheduler initialization (4 tests)
+
+### Shared Module Tests
+
+- `shared/db/test_config.py` - Database configuration (7 tests)
+- `shared/exceptions/test_types.py` - Exception types (8 tests)
+- `shared/exceptions/test_handlers.py` - Exception handlers (5 tests)
+
+### Configuration
+
 - `conftest.py` - Shared pytest fixtures and configuration
 
 ## Writing Tests
@@ -123,11 +154,22 @@ def test_with_fixture(sample_user):
 
 ## Coverage
 
-The project aims for high test coverage (>80%). Check coverage with:
+**Current Coverage: 100%** (648/648 statements)
+
+The project maintains 100% test coverage across all modules. Check coverage with:
 
 ```bash
 pytest --cov=app --cov-report=term-missing
 ```
+
+### Coverage by Module
+
+- Core: 100% (6 statements)
+- Main: 100% (78 statements)
+- Utils: 100% (132 statements)
+- Services: 100% (207 statements)
+- Infrastructure: 100% (110 statements)
+- Shared: 100% (115 statements)
 
 ## Continuous Integration
 
