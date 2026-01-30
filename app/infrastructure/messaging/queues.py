@@ -1,7 +1,12 @@
+from functools import lru_cache
 from typing import Annotated, Any, Callable
 
-from functools import lru_cache
 from pydantic import BaseModel, Field, model_validator
+
+from app.infrastructure.messaging.handlers.email_handler import (
+    handle_otp_email,
+    handle_password_reset_confirmation_email,
+)
 
 
 class RetryQueue(BaseModel):
@@ -60,31 +65,24 @@ class QueueConfig(BaseModel):
 
 
 QUEUE_CONFIG = [
-    # Example queue configurations:
-    # {
-    #     "name": "paystack_events",
-    #     "handler": handle_paystack_events,
-    #     "retry_queues": [
-    #         {"name": "paystack_events_retry_30s", "ttl": 30 * 1000},  # 30 seconds
-    #         {"name": "paystack_events_retry_5m", "ttl": 5 * 60 * 1000},  # 5 minutes
-    #         {"name": "paystack_events_retry_1h", "ttl": 60 * 60 * 1000},  # 1 hour
-    #     ],
-    #     "dead_letter_queue": "paystack_events_dead",
-    # },
-    # {
-    #     "name": "paystack_refund",
-    #     "handler": handle_paystack_refund,
-    #     "retry_queue": "paystack_refund_retry",
-    #     "retry_ttl": 60 * 1000,  # 1 minute
-    #     "max_retries": 5,
-    #     "dead_letter_queue": "paystack_refund_dead",
-    # },
-    # {
-    #     "name": "booking_completed",
-    #     "handler": handle_booking_completed,
-    #     "retry_ttl": 30 * 1000,  # 30 seconds
-    #     "max_retries": 5,
-    # },
+    # OTP Email Queue - sends OTP codes for verification and password reset
+    {
+        "name": "otp_emails",
+        "handler": handle_otp_email,
+        "retry_queue": "otp_emails_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "otp_emails_dead",
+    },
+    # Password Reset Confirmation Email Queue
+    {
+        "name": "password_reset_confirmation_emails",
+        "handler": handle_password_reset_confirmation_email,
+        "retry_queue": "password_reset_confirmation_emails_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "password_reset_confirmation_emails_dead",
+    },
 ]
 
 

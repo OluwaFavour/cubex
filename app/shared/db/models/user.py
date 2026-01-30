@@ -1,11 +1,14 @@
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import Boolean, Enum, ForeignKey, String
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.db.models.base import BaseModel
 from app.shared.enums import OAuthProviders
+
+if TYPE_CHECKING:
+    from app.shared.db.models.refresh_token import RefreshToken
 
 
 class User(BaseModel):
@@ -47,6 +50,12 @@ class User(BaseModel):
 
     oauth_accounts: Mapped[list["OAuthAccount"]] = relationship(
         "OAuthAccount",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        "RefreshToken",
         back_populates="user",
         cascade="all, delete-orphan",
     )

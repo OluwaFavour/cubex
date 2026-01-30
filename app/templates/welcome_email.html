@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome to {{ app_name }}</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          sans-serif;
+        line-height: 1.6;
+        color: #333333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 40px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .header h1 {
+        color: #2563eb;
+        margin: 0;
+        font-size: 28px;
+      }
+      .welcome-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+      .content {
+        margin-bottom: 30px;
+      }
+      .content h2 {
+        color: #1f2937;
+        font-size: 24px;
+        margin-bottom: 16px;
+      }
+      .content p {
+        color: #4b5563;
+        font-size: 16px;
+        margin-bottom: 16px;
+      }
+      .features {
+        background-color: #f9fafb;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+      }
+      .features h3 {
+        color: #1f2937;
+        font-size: 18px;
+        margin-bottom: 12px;
+      }
+      .features ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .features li {
+        padding: 8px 0;
+        color: #4b5563;
+        font-size: 14px;
+      }
+      .features li::before {
+        content: "✓ ";
+        color: #10b981;
+        font-weight: bold;
+      }
+      .cta-button {
+        display: inline-block;
+        background-color: #2563eb;
+        color: #ffffff;
+        text-decoration: none;
+        padding: 14px 32px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 16px;
+        margin: 20px 0;
+      }
+      .cta-button:hover {
+        background-color: #1d4ed8;
+      }
+      .footer {
+        text-align: center;
+        color: #9ca3af;
+        font-size: 12px;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+      }
+      .social-links {
+        margin-top: 16px;
+      }
+      .social-links a {
+        color: #6b7280;
+        text-decoration: none;
+        margin: 0 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="welcome-icon">🎉</div>
+        <h1>Welcome to {{ app_name }}!</h1>
+      </div>
+
+      <div class="content">
+        <h2>Hello, {{ user_name }}!</h2>
+        <p>
+          We're thrilled to have you join us! Your account has been successfully
+          created, and you're now part of the {{ app_name }} community.
+        </p>
+        <p>
+          We've designed {{ app_name }} to help you achieve more. Here's what
+          you can look forward to:
+        </p>
+
+        <div class="features">
+          <h3>What's Next?</h3>
+          <ul>
+            <li>Complete your profile to get personalized recommendations</li>
+            <li>
+              Explore our features and discover what {{ app_name }} can do for
+              you
+            </li>
+            <li>Connect with our community and share your experience</li>
+            <li>Reach out to support if you have any questions</li>
+          </ul>
+        </div>
+
+        <p>
+          If you have any questions or need assistance, our support team is
+          always here to help. We're committed to making your experience with {{
+          app_name }} exceptional.
+        </p>
+
+        <p>Welcome aboard, and let's get started!</p>
+      </div>
+
+      <div class="footer">
+        <p>
+          This email was sent to you because you created an account on {{
+          app_name }}.
+        </p>
+        <p>&copy; {{ year }} {{ app_name }}. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+</html>
