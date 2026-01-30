@@ -53,7 +53,7 @@ class QueueConfig(BaseModel):
             )
         if retry_queue and not retry_ttl:
             raise ValueError("'retry_ttl' must be set when using 'retry_queue'.")
-        if retry_queues:
+        if retry_queues is not None:
             if len(retry_queues) == 0:
                 raise ValueError("'retry_queues' must contain at least one entry.")
         return values

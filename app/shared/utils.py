@@ -449,7 +449,7 @@ async def write_to_file_async(file_path: str, data: str) -> None:
         None
     """
     try:
-        async with aiofiles.open(file_path, mode="w") as file:
+        async with aiofiles.open(file_path, mode="w", encoding="utf-8") as file:
             await file.write(data)
         utils_logger.info(f"Data written to file {file_path} successfully.")
     except Exception as e:

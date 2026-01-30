@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.shared.logger import setup_logger
+from app.shared.logger import setup_logger, init_sentry
 
 
 class Settings(BaseSettings):
@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # RabbitMQ settings
     RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672//"
 
+    # Sentry settings
+    SENTRY_DSN: str = ""
+    SENTRY_ENVIRONMENT: str = "development"
+    SENTRY_TRACES_SAMPLE_RATE: float = 1.0
+    SENTRY_ENABLE_TRACING: bool = False
+
     model_config: SettingsConfigDict = SettingsConfigDict(  # type: ignore
         env_file=".env",
         extra="ignore",
@@ -63,32 +69,63 @@ def get_settings() -> Settings:
 
 settings = get_settings()
 
-# Configure loggers
+# Initialize Sentry once globally (non-blocking, runs in background threads)
+init_sentry(
+    dsn=settings.SENTRY_DSN,
+    environment=settings.SENTRY_ENVIRONMENT,
+    traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+    enable_tracing=settings.SENTRY_ENABLE_TRACING,
+)
+
+# Configure loggers with component-specific Sentry tags for separation of concerns
+# Each logger gets its own log file and Sentry tag for easy filtering
 app_logger = setup_logger(
-    name="app_logger", log_file="logs/app.log", level=logging.INFO
+    name="app_logger",
+    log_file="logs/app.log",
+    level=logging.INFO,
+    sentry_tag="app",
 )
 database_logger = setup_logger(
-    name="database_logger", log_file="logs/database.log", level=logging.INFO
+    name="database_logger",
+    log_file="logs/database.log",
+    level=logging.INFO,
+    sentry_tag="database",
 )
 request_logger = setup_logger(
-    name="request_logger", log_file="logs/requests.log", level=logging.INFO
+    name="request_logger",
+    log_file="logs/requests.log",
+    level=logging.INFO,
+    sentry_tag="request",
 )
 cloudinary_logger = setup_logger(
     name="cloudinary_logger",
     log_file="logs/cloudinary.log",
     level=logging.INFO,
+    sentry_tag="cloudinary",
 )
 brevo_logger = setup_logger(
-    name="brevo_logger", log_file="logs/brevo.log", level=logging.INFO
+    name="brevo_logger",
+    log_file="logs/brevo.log",
+    level=logging.INFO,
+    sentry_tag="email",
 )
 rabbitmq_logger = setup_logger(
-    name="rabbitmq_logger", log_file="logs/rabbitmq.log", level=logging.INFO
+    name="rabbitmq_logger",
+    log_file="logs/rabbitmq.log",
+    level=logging.INFO,
+    sentry_tag="messaging",
 )
 scheduler_logger = setup_logger(
-    name="scheduler_logger", log_file="logs/scheduler.log", level=logging.INFO
+    name="scheduler_logger",
+    log_file="logs/scheduler.log",
+    level=logging.INFO,
+    sentry_tag="scheduler",
 )
 utils_logger = setup_logger(
-    name="utils_logger", log_file="logs/utils.log", level=logging.INFO
+    name="utils_logger",
+    log_file="logs/utils.log",
+    level=logging.INFO,
+    sentry_tag="utils",
 )
 
 __all__ = [
