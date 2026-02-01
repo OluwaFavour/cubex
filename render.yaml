@@ -1,0 +1,59 @@
+# ============================================================================
+# Render Blueprint for CubeX Application
+# ============================================================================
+# Auto-deploy configuration for the FastAPI application
+#
+# Triggers deployment on changes to:
+#   - app/ folder (application code)
+#   - migrations/ folder (database migrations)
+# ============================================================================
+
+services:
+  - type: web
+    name: cubex-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+
+    # Docker command to run
+    dockerCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+    # Auto-deploy on push
+    autoDeploy: true
+
+    # Pre-deploy: install requirements and run migrations
+    preDeployCommand: pip install -r requirements.txt && alembic upgrade head
+
+    # Health check configuration
+    healthCheckPath: /health
+
+    # Environment variables (set these in Render dashboard)
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: "8000"
+      - key: DATABASE_URL
+        sync: false  # Set manually in dashboard
+      - key: SESSION_SECRET_KEY
+        generateValue: true
+      - key: ACCESS_TOKEN_SECRET_KEY
+        generateValue: true
+      - key: REDIS_URL
+        sync: false  # Set manually in dashboard
+      - key: RABBITMQ_URL
+        sync: false  # Set manually in dashboard
+      - key: SENTRY_DSN
+        sync: false  # Optional: Set in dashboard
+      - key: BREVO_API_KEY
+        sync: false  # Set manually in dashboard
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false  # Set manually in dashboard
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false  # Set manually in dashboard
+      - key: GITHUB_OAUTH_CLIENT_ID
+        sync: false  # Set manually in dashboard
+      - key: GITHUB_OAUTH_CLIENT_SECRET
+        sync: false  # Set manually in dashboard

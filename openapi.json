@@ -1,0 +1,2400 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "CUEBEX",
+        "description": "\n    CUEBEX\n    ",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000"
+        }
+    ],
+    "paths": {
+        "/auth/signup": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Sign up with email",
+                "description": "## Create a New User Account\n\nRegister a new user with email and password credentials. Upon successful\nregistration, a **6-digit OTP verification code** is sent to the provided\nemail address.\n\n### Authentication Flow\n\n1. **Submit signup request** with email, password, and optional full name\n2. **Receive OTP** via email (valid for 10 minutes)\n3. **Verify email** using `POST /auth/signup/verify` with the OTP\n4. **Receive tokens** upon successful verification\n\n### Password Requirements\n\n- Minimum **8 characters**\n- At least **one uppercase letter** (A-Z)\n- At least **one lowercase letter** (a-z)\n- At least **one digit** (0-9)\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `email` | string | \u2705 | Valid email address |\n| `password` | string | \u2705 | Password meeting complexity requirements |\n| `full_name` | string | \u274c | User's display name (1-255 chars) |\n\n### Success Response (201)\n\nReturns confirmation that verification code was sent:\n\n```json\n{\n  \"message\": \"Verification code sent to your email\",\n  \"email\": \"user@example.com\",\n  \"requires_verification\": true\n}\n```\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `409 Conflict` | Email already registered |\n| `422 Unprocessable Entity` | Invalid email format or password requirements not met |\n\n### Notes\n\n- The user account is created in an **unverified state**\n- Email verification is **required** before the user can sign in\n- If the email fails to send, the account is still created (retry with `/signup/resend`)",
+                "operationId": "signup_auth_signup_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SignupRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SignupResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Email already registered",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "User with this email already exists."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/signup/verify": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Verify email and complete signup",
+                "description": "## Complete Email Verification\n\nVerify the user's email address using the OTP code sent during signup.\nOn successful verification, the user receives authentication tokens and\ncan immediately access protected resources.\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `email` | string | \u2705 | Email address the OTP was sent to |\n| `otp_code` | string | \u2705 | 6-digit verification code |\n\n### Success Response (200)\n\nReturns JWT tokens for authentication:\n\n```json\n{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"refresh_token\": \"dGhpcyBpcyBhIHJlZnJl...\",\n  \"token_type\": \"bearer\",\n  \"expires_in\": 900\n}\n```\n\n### Token Details\n\n| Token | Lifetime | Purpose |\n|-------|----------|--------|\n| `access_token` | 15 minutes | Used in `Authorization: Bearer <token>` header |\n| `refresh_token` | 7 days | Used to obtain new access tokens |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `400 Bad Request` | Invalid OTP code or expired |\n| `404 Not Found` | User with this email doesn't exist |\n| `422 Unprocessable Entity` | Invalid OTP format (must be 6 digits) |\n| `429 Too Many Requests` | Exceeded maximum verification attempts (5) |\n\n### Notes\n\n- OTP codes expire after **10 minutes**\n- Maximum **5 verification attempts** per OTP\n- After 5 failed attempts, request a new code via `/signup/resend`\n- Device info is captured from `User-Agent` header for session tracking",
+                "operationId": "verify_signup_auth_signup_verify_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OTPVerifyRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TokenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or expired OTP code",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Invalid verification code"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "User not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Too many verification attempts. Please request a new code."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/signup/resend": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Resend verification code",
+                "description": "## Resend Email Verification Code\n\nRequest a new OTP verification code to be sent to the user's email.\nUse this when the original code has expired or wasn't received.\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `email` | string | \u2705 | Email address to send OTP to |\n\n### Success Response (200)\n\n```json\n{\n  \"message\": \"Verification code sent to your email\",\n  \"success\": true\n}\n```\n\n### Security Behavior\n\nFor security reasons, this endpoint **always returns success** even if:\n- The email doesn't exist in the system\n- The email is already verified\n\nThis prevents email enumeration attacks.\n\n### Conditional Responses\n\n| Scenario | Response |\n|----------|----------|\n| Email exists & unverified | New OTP sent, `success: true` |\n| Email already verified | `success: false`, message indicates already verified |\n| Email not found | `success: true` (security measure) |\n\n### Notes\n\n- Previous OTP codes are **invalidated** when a new one is sent\n- Rate limiting may apply (check `429` responses)\n- New OTP is valid for **10 minutes**",
+                "operationId": "resend_verification_auth_signup_resend_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ResendOTPRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/signin": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Sign in with email",
+                "description": "## Sign In with Email & Password\n\nAuthenticate a user with their email and password credentials.\nReturns JWT tokens for accessing protected resources.\n\n### Request Body\n\n| Field | Type | Required | Default | Description |\n|-------|------|----------|---------|-------------|\n| `email` | string | \u2705 | - | User's registered email |\n| `password` | string | \u2705 | - | User's password |\n| `remember_me` | boolean | \u274c | `false` | Extend session duration |\n\n### Session Duration\n\n| `remember_me` | Refresh Token Lifetime |\n|---------------|------------------------|\n| `false` | 7 days |\n| `true` | 30 days |\n\n### Success Response (200)\n\n```json\n{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"refresh_token\": \"dGhpcyBpcyBhIHJlZnJl...\",\n  \"token_type\": \"bearer\",\n  \"expires_in\": 900\n}\n```\n\n### Using the Tokens\n\nInclude the access token in the `Authorization` header:\n\n```http\nAuthorization: Bearer eyJhbGciOiJIUzI1NiIs...\n```\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `401 Unauthorized` | Invalid email/password, unverified email, or disabled account |\n| `422 Unprocessable Entity` | Invalid request format |\n\n### Prerequisites\n\n- User must have **verified their email** via OTP\n- Account must be **active** (not soft-deleted)\n\n### Notes\n\n- Device info captured from `User-Agent` for session management\n- Each sign-in creates a new session (viewable via `/auth/sessions`)\n- OAuth-only users (no password) cannot use this endpoint",
+                "operationId": "signin_auth_signin_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TokenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials or unverified email",
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "invalid_credentials": {
+                                        "summary": "Invalid email or password",
+                                        "value": {
+                                            "detail": "Invalid email or password"
+                                        }
+                                    },
+                                    "email_not_verified": {
+                                        "summary": "Email not verified",
+                                        "value": {
+                                            "detail": "Email not verified. Please verify your email first."
+                                        }
+                                    },
+                                    "account_disabled": {
+                                        "summary": "Account disabled",
+                                        "value": {
+                                            "detail": "Account is disabled."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/token/refresh": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Refresh access token",
+                "description": "## Refresh Access Token\n\nExchange a valid refresh token for a new access token. Use this endpoint\nwhen the access token has expired to maintain the user's session without\nrequiring re-authentication.\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `refresh_token` | string | \u2705 | The refresh token from sign-in/signup |\n\n### Success Response (200)\n\n```json\n{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"token_type\": \"bearer\",\n  \"expires_in\": 900\n}\n```\n\n### Token Lifecycle\n\n```\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502  Access Token   \u2502     \u2502  Refresh Token  \u2502\n\u2502   (15 minutes)  \u2502     \u2502  (7-30 days)    \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n         \u2502                       \u2502\n         \u25bc                       \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502    Expired?     \u2502 Yes \u2502 POST /token/    \u2502\n\u2502                 \u2502\u2500\u2500\u2500\u2500\u25b6\u2502    refresh      \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                                 \u2502\n                                 \u25bc\n                        \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                        \u2502  New Access     \u2502\n                        \u2502    Token        \u2502\n                        \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `401 Unauthorized` | Token is invalid, expired, or revoked |\n| `422 Unprocessable Entity` | Missing refresh_token field |\n\n### Notes\n\n- The **refresh token itself is not rotated** (same token remains valid)\n- Refresh tokens can be revoked via `/signout` or `/signout/all`\n- If refresh token expires, user must sign in again\n- User account must still be active for refresh to succeed",
+                "operationId": "refresh_token_auth_token_refresh_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RefreshTokenRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AccessTokenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid, expired, or revoked refresh token",
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "invalid_token": {
+                                        "summary": "Invalid token",
+                                        "value": {
+                                            "detail": "Invalid refresh token."
+                                        }
+                                    },
+                                    "expired_token": {
+                                        "summary": "Token expired",
+                                        "value": {
+                                            "detail": "Refresh token has expired."
+                                        }
+                                    },
+                                    "revoked_token": {
+                                        "summary": "Token revoked",
+                                        "value": {
+                                            "detail": "Refresh token has been revoked."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/signout": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Sign out",
+                "description": "## Sign Out (Single Device)\n\nRevoke a specific refresh token, effectively signing out from one device/session.\nThe associated access tokens will no longer be refreshable.\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `refresh_token` | string | \u2705 | The refresh token to revoke |\n\n### Success Responses (200)\n\n**Token successfully revoked:**\n```json\n{\n  \"message\": \"Successfully signed out\",\n  \"success\": true\n}\n```\n\n**Token not found or already revoked:**\n```json\n{\n  \"message\": \"Token not found or already revoked\",\n  \"success\": false\n}\n```\n\n### Behavior\n\n| Scenario | Result |\n|----------|--------|\n| Valid token | Token revoked, `success: true` |\n| Already revoked | No change, `success: false` |\n| Invalid/unknown token | No change, `success: false` |\n\n### Notes\n\n- This endpoint **does not require authentication** (stateless signout)\n- Existing access tokens remain valid until they expire (15 min)\n- For immediate invalidation across all devices, use `/signout/all`\n- Does not affect other sessions/devices",
+                "operationId": "signout_auth_signout_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RefreshTokenRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/signout/all": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Sign out all devices",
+                "description": "## Sign Out (All Devices)\n\nRevoke **all** refresh tokens for the authenticated user, signing them out\nfrom every device and session. Useful for security incidents or when\nchanging sensitive account settings.\n\n### Authentication Required\n\n```http\nAuthorization: Bearer <access_token>\n```\n\n### Success Response (200)\n\n```json\n{\n  \"message\": \"Signed out from 3 device(s)\",\n  \"success\": true\n}\n```\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `401 Unauthorized` | Missing or invalid access token |\n\n### Use Cases\n\n- \ud83d\udd12 **Security breach** - Suspect unauthorized access\n- \ud83d\udd11 **Password change** - Automatically called after password change\n- \ud83d\udcf1 **Lost device** - Revoke access from lost/stolen device\n- \ud83e\uddf9 **Session cleanup** - Clear all old sessions\n\n### Notes\n\n- Requires a valid **access token** (unlike single-device signout)\n- The current session is **also revoked**\n- Returns count of revoked sessions for confirmation\n- Access tokens remain valid until expiry (15 min max)",
+                "operationId": "signout_all_auth_signout_all_post",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Not authenticated"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ]
+            }
+        },
+        "/auth/oauth/{provider}": {
+            "get": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Initiate OAuth flow",
+                "description": "## Initiate OAuth Authentication\n\nBegin the OAuth 2.0 authorization flow with a supported provider.\nReturns an authorization URL to redirect the user to the provider's\nconsent screen.\n\n### Supported Providers\n\n| Provider | Path Value | Scopes Requested |\n|----------|------------|------------------|\n| Google | `google` | `openid`, `email`, `profile` |\n| GitHub | `github` | `user:email`, `read:user` |\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `provider` | string | OAuth provider: `google` or `github` |\n\n### Query Parameters\n\n| Parameter | Type | Default | Description |\n|-----------|------|---------|-------------|\n| `remember_me` | boolean | `false` | Extend session to 30 days |\n| `callback_url` | string | `null` | Frontend URL for redirect after OAuth |\n\n### Success Response (200)\n\n```json\n{\n  \"authorization_url\": \"https://accounts.google.com/o/oauth2/v2/auth?...\",\n  \"state\": \"eyJhbGciOiJIUzI1NiIs...\"\n}\n```\n\n### OAuth Flow Diagram\n\n```\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502  Client  \u2502     \u2502   Backend   \u2502     \u2502   Provider   \u2502\n\u2514\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2518     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n     \u2502                  \u2502                   \u2502\n     \u2502 GET /oauth/google\u2502                   \u2502\n     \u2502\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25b6\u2502                   \u2502\n     \u2502                  \u2502                   \u2502\n     \u2502 authorization_url\u2502                   \u2502\n     \u2502\u25c0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2502                   \u2502\n     \u2502                  \u2502                   \u2502\n     \u2502 Redirect user to authorization_url  \u2502\n     \u2502\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25b6\u2502\n     \u2502                  \u2502                   \u2502\n     \u2502                  \u2502  User consents    \u2502\n     \u2502                  \u2502                   \u2502\n     \u2502 Redirect to callback with code       \u2502\n     \u2502\u25c0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2502\n     \u2502                  \u2502                   \u2502\n     \u2502                  \u2502                   \u2502\n```\n\n### Callback URL Validation\n\nIf `callback_url` is provided:\n- Must be in the configured **CORS origins** list\n- Must use **HTTPS** in production environments\n- Tokens will be returned as **URL fragment** parameters\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `400 Bad Request` | Invalid callback URL |\n| `422 Unprocessable Entity` | Invalid provider value |\n\n### Next Steps\n\n1. Redirect user to `authorization_url`\n2. User authenticates with provider\n3. Provider redirects to `/oauth/{provider}/callback`\n4. Tokens returned (JSON or URL fragment based on `callback_url`)",
+                "operationId": "oauth_init_auth_oauth__provider__get",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/OAuthProviders"
+                        }
+                    },
+                    {
+                        "name": "remember_me",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "description": "Extend session to 30 days",
+                            "default": false,
+                            "title": "Remember Me"
+                        },
+                        "description": "Extend session to 30 days"
+                    },
+                    {
+                        "name": "callback_url",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Frontend callback URL for redirect after OAuth. Must be in CORS origins.",
+                            "title": "Callback Url"
+                        },
+                        "description": "Frontend callback URL for redirect after OAuth. Must be in CORS origins."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthInitResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid callback URL",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Invalid callback URL. Must be in allowed origins and use HTTPS in production."
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid provider",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": [
+                                        {
+                                            "type": "enum",
+                                            "loc": [
+                                                "path",
+                                                "provider"
+                                            ],
+                                            "msg": "Input should be 'google' or 'github'"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/oauth/{provider}/callback": {
+            "get": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "OAuth callback",
+                "description": "## OAuth Callback Handler\n\nHandle the OAuth provider callback after user authorization. This endpoint:\n\n1. Validates the CSRF state parameter\n2. Exchanges the authorization code for provider tokens\n3. Retrieves user profile from the provider\n4. Creates or links user account\n5. Issues application tokens\n\n### Query Parameters\n\n| Parameter | Type | Source | Description |\n|-----------|------|--------|-------------|\n| `code` | string | Provider | Authorization code from OAuth provider |\n| `state` | string | Provider | CSRF state from `/oauth/{provider}` init |\n\n### Response Behavior\n\nThe response depends on whether `callback_url` was provided during init:\n\n#### Without `callback_url` \u2192 JSON Response (200)\n\n```json\n{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"refresh_token\": \"dGhpcyBpcyBhIHJlZnJl...\",\n  \"token_type\": \"bearer\",\n  \"expires_in\": 900\n}\n```\n\n#### With `callback_url` \u2192 Redirect (307)\n\nRedirects to:\n```\n{callback_url}#access_token=...&refresh_token=...&token_type=bearer&expires_in=900\n```\n\n> \u26a0\ufe0f **Note:** Tokens are in the **URL fragment** (`#`), not query params (`?`).\n> This prevents tokens from being logged in server access logs.\n\n### User Account Handling\n\n| Scenario | Behavior |\n|----------|----------|\n| New email | Create new user account |\n| Existing email (same provider) | Sign in to existing account |\n| Existing email (different provider) | Link OAuth to existing account |\n| Existing email (has password) | Link OAuth, preserve password |\n\n### Error Responses\n\n| Status | Scenario | Behavior |\n|--------|----------|----------|\n| `400` | Invalid/expired state | JSON error (can't redirect) |\n| `307` | OAuth error + callback_url | Redirect to `{callback_url}?error=...` |\n| `400` | OAuth error, no callback_url | JSON error response |\n\n### Error Redirect Format\n\nWhen `callback_url` is set and an error occurs:\n```\n{callback_url}?error=oauth_error\n```\n\n### Security Notes\n\n- State parameter expires after **10 minutes**\n- State is cryptographically signed to prevent tampering\n- Authorization codes are **single-use** (provider enforced)\n- Email from provider is automatically marked as **verified**",
+                "operationId": "oauth_callback_auth_oauth__provider__callback_get",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/OAuthProviders"
+                        }
+                    },
+                    {
+                        "name": "code",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Authorization code from provider",
+                            "title": "Code"
+                        },
+                        "description": "Authorization code from provider"
+                    },
+                    {
+                        "name": "state",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "State parameter for CSRF validation",
+                            "title": "State"
+                        },
+                        "description": "State parameter for CSRF validation"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TokenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "OAuth error or invalid state",
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "invalid_state": {
+                                        "summary": "Invalid state parameter",
+                                        "value": {
+                                            "detail": "Invalid state parameter."
+                                        }
+                                    },
+                                    "oauth_error": {
+                                        "summary": "OAuth provider error",
+                                        "value": {
+                                            "detail": "OAuth authentication failed"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "307": {
+                        "description": "Redirect to frontend callback URL with tokens in fragment",
+                        "headers": {
+                            "Location": {
+                                "description": "Redirect URL with tokens: `{callback_url}#access_token=...&refresh_token=...`",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/password/reset": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Request password reset",
+                "description": "## Request Password Reset\n\nInitiate the password reset flow by sending a 6-digit OTP code\nto the user's registered email address.\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `email` | string | \u2705 | Email address of the account |\n\n### Success Response (200)\n\n```json\n{\n  \"message\": \"If the email exists and has a password, a reset code has been sent\",\n  \"success\": true\n}\n```\n\n### Security Design\n\nThis endpoint **always returns the same response** regardless of:\n- Whether the email exists\n- Whether the user has a password set\n- Whether the email was successfully sent\n\nThis prevents **email enumeration attacks** where attackers could\ndiscover which emails are registered.\n\n### Conditions for OTP to be Sent\n\n| Condition | OTP Sent? |\n|-----------|----------|\n| Email exists + has password | \u2705 Yes |\n| Email exists + OAuth-only (no password) | \u274c No |\n| Email doesn't exist | \u274c No |\n\n### Next Steps\n\n1. User receives OTP via email (valid for **10 minutes**)\n2. Submit OTP + new password to `/password/reset/confirm`\n\n### Notes\n\n- Previous reset OTPs are invalidated when requesting a new one\n- OAuth-only users should sign in with their OAuth provider\n- Rate limiting may apply to prevent abuse",
+                "operationId": "request_password_reset_auth_password_reset_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PasswordResetRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/password/reset/confirm": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Confirm password reset",
+                "description": "## Confirm Password Reset\n\nComplete the password reset process by verifying the OTP and setting\na new password. All existing sessions are revoked for security.\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `email` | string | \u2705 | Email address of the account |\n| `otp_code` | string | \u2705 | 6-digit verification code |\n| `new_password` | string | \u2705 | New password (see requirements) |\n\n### Password Requirements\n\n- Minimum **8 characters**\n- At least **one uppercase letter** (A-Z)\n- At least **one lowercase letter** (a-z)\n- At least **one digit** (0-9)\n\n### Success Response (200)\n\n```json\n{\n  \"message\": \"Password has been reset successfully\",\n  \"success\": true\n}\n```\n\n### Security Actions on Success\n\n1. \u2705 Password updated\n2. \u2705 OTP invalidated\n3. \u2705 **All refresh tokens revoked** (signs out all devices)\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `400 Bad Request` | Invalid or expired OTP code |\n| `422 Unprocessable Entity` | Invalid OTP format or password requirements not met |\n| `429 Too Many Requests` | Exceeded 5 verification attempts |\n\n### Notes\n\n- OTP codes expire after **10 minutes**\n- Maximum **5 attempts** per OTP, then must request new code\n- User must sign in again after password reset\n- If OTP attempts exhausted, request new code via `/password/reset`",
+                "operationId": "confirm_password_reset_auth_password_reset_confirm_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or expired OTP",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Invalid verification code"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Too many verification attempts. Please request a new code."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/password/change": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Change password",
+                "description": "## Change Password\n\nUpdate the password for the currently authenticated user. Requires\nverification of the current password for security.\n\n### Authentication Required\n\n```http\nAuthorization: Bearer <access_token>\n```\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `current_password` | string | \u2705 | User's current password |\n| `new_password` | string | \u2705 | New password (see requirements) |\n\n### Password Requirements\n\n- Minimum **8 characters**\n- At least **one uppercase letter** (A-Z)\n- At least **one lowercase letter** (a-z)\n- At least **one digit** (0-9)\n\n### Success Response (200)\n\n```json\n{\n  \"message\": \"Password changed successfully. You have been signed out from other devices.\",\n  \"success\": true\n}\n```\n\n### Security Actions on Success\n\n1. \u2705 Password updated\n2. \u2705 **All other sessions revoked** (current session preserved)\n3. \u2705 Event logged for audit trail\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `401 Unauthorized` | Not authenticated or current password incorrect |\n| `422 Unprocessable Entity` | Password requirements not met |\n\n### Notes\n\n- OAuth-only users must first set a password via different flow\n- Current session remains active after password change\n- All **other** devices/sessions are signed out\n- Consider using this when security is a concern",
+                "operationId": "change_password_auth_password_change_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChangePasswordRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated or current password incorrect",
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "not_authenticated": {
+                                        "summary": "Not authenticated",
+                                        "value": {
+                                            "detail": "Not authenticated"
+                                        }
+                                    },
+                                    "wrong_password": {
+                                        "summary": "Current password incorrect",
+                                        "value": {
+                                            "detail": "Current password is incorrect"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ]
+            }
+        },
+        "/auth/me": {
+            "get": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Get current user profile",
+                "description": "## Get Current User Profile\n\nRetrieve the complete profile information for the authenticated user,\nincluding account status, OAuth connections, and metadata.\n\n### Authentication Required\n\n```http\nAuthorization: Bearer <access_token>\n```\n\n### Success Response (200)\n\n```json\n{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"email\": \"user@example.com\",\n  \"email_verified\": true,\n  \"full_name\": \"John Doe\",\n  \"avatar_url\": \"https://example.com/avatar.jpg\",\n  \"is_active\": true,\n  \"created_at\": \"2024-01-15T10:30:00Z\",\n  \"updated_at\": \"2024-01-20T14:22:00Z\",\n  \"has_password\": true,\n  \"oauth_providers\": [\"google\", \"github\"]\n}\n```\n\n### Response Fields\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Unique user identifier |\n| `email` | string | User's email address |\n| `email_verified` | boolean | Whether email is verified |\n| `full_name` | string | User's display name |\n| `avatar_url` | string | URL to profile picture |\n| `is_active` | boolean | Account active status |\n| `created_at` | datetime | Account creation timestamp |\n| `updated_at` | datetime | Last profile update timestamp |\n| `has_password` | boolean | `true` if user can sign in with password |\n| `oauth_providers` | array | List of linked OAuth providers |\n\n### Understanding `has_password`\n\n| Value | Meaning |\n|-------|--------|\n| `true` | User signed up with email/password OR has set a password |\n| `false` | OAuth-only user, cannot use password signin |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `401 Unauthorized` | Missing or invalid access token |\n| `404 Not Found` | User deleted (edge case) |",
+                "operationId": "get_profile_auth_me_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProfileResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found (rare edge case)",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "User not found"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Not authenticated"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Delete account",
+                "description": "## Delete User Account\n\nPermanently delete (soft delete) the authenticated user's account.\nThis action signs out all devices and marks the account as deleted.\n\n### Authentication Required\n\n```http\nAuthorization: Bearer <access_token>\n```\n\n### Success Response (200)\n\n```json\n{\n  \"message\": \"Account has been deleted\",\n  \"success\": true\n}\n```\n\n### What Happens on Deletion\n\n1. \u2705 Account marked as **soft deleted** (not permanently removed)\n2. \u2705 All refresh tokens **revoked** (signed out everywhere)\n3. \u2705 Email becomes **available** for new registration\n4. \u2705 OAuth connections **preserved** (for potential recovery)\n5. \u2705 Event **logged** for audit trail\n\n### Soft Delete vs Hard Delete\n\n| Aspect | Soft Delete (Current) |\n|--------|----------------------|\n| Data retained | \u2705 Yes (configurable period) |\n| Can recover | \u26a0\ufe0f Contact support |\n| Email reusable | \u2705 Yes |\n| Tokens valid | \u274c No |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `401 Unauthorized` | Missing or invalid access token |\n\n### \u26a0\ufe0f Warning\n\nThis action:\n- **Signs out** the user from all devices immediately\n- Cannot be easily undone by the user\n- May result in **data loss** after the retention period\n\n### Notes\n\n- Consider implementing a confirmation step in your UI\n- Account recovery may be possible within a grace period (contact support)\n- Associated data (posts, comments, etc.) handling depends on application policy",
+                "operationId": "delete_account_auth_me_delete",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Not authenticated"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Update user profile",
+                "description": "## Update User Profile\n\nPartially update the authenticated user's profile. Only provided fields\nare updated; omitted fields remain unchanged.\n\n### Authentication Required\n\n```http\nAuthorization: Bearer <access_token>\n```\n\n### Request Body (all fields optional)\n\n| Field | Type | Constraints | Description |\n|-------|------|-------------|-------------|\n| `full_name` | string | 1-255 chars | User's display name |\n| `avatar_url` | string | max 512 chars | URL to profile picture |\n\n### Example Request\n\n```json\n{\n  \"full_name\": \"Jane Doe\"\n}\n```\n\nOnly `full_name` will be updated; `avatar_url` remains unchanged.\n\n### Success Response (200)\n\nReturns the complete updated profile:\n\n```json\n{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"email\": \"user@example.com\",\n  \"email_verified\": true,\n  \"full_name\": \"Jane Doe\",\n  \"avatar_url\": \"https://example.com/avatar.jpg\",\n  \"is_active\": true,\n  \"created_at\": \"2024-01-15T10:30:00Z\",\n  \"updated_at\": \"2024-01-21T09:15:00Z\",\n  \"has_password\": true,\n  \"oauth_providers\": [\"google\"]\n}\n```\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `401 Unauthorized` | Missing or invalid access token |\n| `404 Not Found` | User deleted (edge case) |\n| `422 Unprocessable Entity` | Validation failed (e.g., name too long) |\n\n### Notes\n\n- **Email cannot be changed** via this endpoint (requires verification flow)\n- Empty request body (`{}`) is valid (no changes made)\n- `updated_at` timestamp is refreshed on any change",
+                "operationId": "update_profile_auth_me_patch",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProfileUpdateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProfileResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found (rare edge case)",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "User not found"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Not authenticated"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ]
+            }
+        },
+        "/auth/sessions": {
+            "post": {
+                "tags": [
+                    "Authentication",
+                    "Authentication"
+                ],
+                "summary": "Get active sessions",
+                "description": "## List Active Sessions\n\nRetrieve all active sessions (refresh tokens) for the authenticated user.\nUseful for session management UI where users can view and revoke sessions.\n\n### Authentication Required\n\n```http\nAuthorization: Bearer <access_token>\n```\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `refresh_token` | string | \u2705 | Current session's refresh token (to identify current session) |\n\n### Why POST instead of GET?\n\nThe current refresh token is needed to identify which session is the\n\"current\" one. Since tokens should not be passed in URLs (security),\nthis endpoint uses POST with a request body.\n\n### Success Response (200)\n\n```json\n{\n  \"sessions\": [\n    {\n      \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"device_info\": \"Chrome 120 on Windows\",\n      \"created_at\": \"2024-01-20T10:30:00Z\",\n      \"expires_at\": \"2024-01-27T10:30:00Z\",\n      \"is_current\": true\n    },\n    {\n      \"id\": \"660f9500-f30c-52e5-b827-557766551111\",\n      \"device_info\": \"Safari on iPhone\",\n      \"created_at\": \"2024-01-18T14:22:00Z\",\n      \"expires_at\": \"2024-02-17T14:22:00Z\",\n      \"is_current\": false\n    }\n  ],\n  \"total\": 2\n}\n```\n\n### Session Fields\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Session identifier |\n| `device_info` | string | Browser/device description (from User-Agent) |\n| `created_at` | datetime | When session was created (sign-in time) |\n| `expires_at` | datetime | When refresh token expires |\n| `is_current` | boolean | `true` if this is the requesting session |\n\n### Understanding `expires_at`\n\n| Sign-in Type | Expiration |\n|--------------|------------|\n| Normal (`remember_me: false`) | 7 days from sign-in |\n| Extended (`remember_me: true`) | 30 days from sign-in |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `401 Unauthorized` | Missing or invalid access token |\n| `422 Unprocessable Entity` | Missing refresh_token in body |\n\n### Use Cases\n\n- \ud83d\udcf1 **Session management UI** - Show users their active sessions\n- \ud83d\udd12 **Security audit** - Check for unauthorized sessions\n- \ud83e\uddf9 **Cleanup** - Identify old sessions to revoke\n\n### Notes\n\n- Only **active** (non-expired, non-revoked) sessions are returned\n- `device_info` may be `null` if User-Agent was not available\n- Use `/signout` to revoke individual sessions\n- Use `/signout/all` to revoke all sessions at once",
+                "operationId": "get_sessions_auth_sessions_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RefreshTokenRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ActiveSessionsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Not authenticated"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ]
+            }
+        },
+        "/health": {
+            "get": {
+                "summary": "Health Check",
+                "description": "Health check endpoint to verify if the API is running.\n\nChecks:\n    - Database connectivity\n    - Redis connectivity",
+                "operationId": "health_check_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "AccessTokenResponse": {
+                "properties": {
+                    "access_token": {
+                        "type": "string",
+                        "title": "Access Token",
+                        "description": "New short-lived JWT access token"
+                    },
+                    "token_type": {
+                        "type": "string",
+                        "const": "bearer",
+                        "title": "Token Type",
+                        "default": "bearer"
+                    },
+                    "expires_in": {
+                        "type": "integer",
+                        "title": "Expires In",
+                        "description": "Access token expiration time in seconds"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "access_token",
+                    "expires_in"
+                ],
+                "title": "AccessTokenResponse",
+                "description": "Response schema for refreshed access token."
+            },
+            "ActiveSessionResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "title": "Id"
+                    },
+                    "device_info": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Device Info"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Created At"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Expires At"
+                    },
+                    "is_current": {
+                        "type": "boolean",
+                        "title": "Is Current",
+                        "description": "Whether this is the current session"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "device_info",
+                    "created_at",
+                    "expires_at",
+                    "is_current"
+                ],
+                "title": "ActiveSessionResponse",
+                "description": "Response schema for an active session."
+            },
+            "ActiveSessionsResponse": {
+                "properties": {
+                    "sessions": {
+                        "items": {
+                            "$ref": "#/components/schemas/ActiveSessionResponse"
+                        },
+                        "type": "array",
+                        "title": "Sessions"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "sessions",
+                    "total"
+                ],
+                "title": "ActiveSessionsResponse",
+                "description": "Response schema for listing active sessions."
+            },
+            "ChangePasswordRequest": {
+                "properties": {
+                    "current_password": {
+                        "type": "string",
+                        "title": "Current Password",
+                        "description": "Current password"
+                    },
+                    "new_password": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "minLength": 8,
+                        "title": "New Password",
+                        "description": "Password (min 8 characters)"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "current_password",
+                    "new_password"
+                ],
+                "title": "ChangePasswordRequest",
+                "description": "Request schema for changing password (authenticated user)."
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "LoginRequest": {
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email",
+                        "description": "User's email address"
+                    },
+                    "password": {
+                        "type": "string",
+                        "title": "Password",
+                        "description": "User's password"
+                    },
+                    "remember_me": {
+                        "type": "boolean",
+                        "title": "Remember Me",
+                        "description": "If true, extends refresh token duration to 30 days",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "title": "LoginRequest",
+                "description": "Request schema for email signin."
+            },
+            "MessageResponse": {
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "success": {
+                        "type": "boolean",
+                        "title": "Success",
+                        "default": true
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "message"
+                ],
+                "title": "MessageResponse",
+                "description": "Generic message response."
+            },
+            "OAuthInitResponse": {
+                "properties": {
+                    "authorization_url": {
+                        "type": "string",
+                        "title": "Authorization Url",
+                        "description": "URL to redirect user for OAuth consent"
+                    },
+                    "state": {
+                        "type": "string",
+                        "title": "State",
+                        "description": "CSRF protection state parameter"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "authorization_url",
+                    "state"
+                ],
+                "title": "OAuthInitResponse",
+                "description": "Response schema for OAuth initialization."
+            },
+            "OAuthProviders": {
+                "type": "string",
+                "enum": [
+                    "google",
+                    "github"
+                ],
+                "title": "OAuthProviders",
+                "description": "Supported OAuth providers for authentication."
+            },
+            "OTPVerifyRequest": {
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email",
+                        "description": "Email the OTP was sent to"
+                    },
+                    "otp_code": {
+                        "type": "string",
+                        "maxLength": 6,
+                        "minLength": 6,
+                        "pattern": "^\\d{6}$",
+                        "title": "Otp Code",
+                        "description": "6-digit verification code"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "email",
+                    "otp_code"
+                ],
+                "title": "OTPVerifyRequest",
+                "description": "Request schema for OTP verification."
+            },
+            "PasswordResetConfirmRequest": {
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email",
+                        "description": "Email address"
+                    },
+                    "otp_code": {
+                        "type": "string",
+                        "maxLength": 6,
+                        "minLength": 6,
+                        "pattern": "^\\d{6}$",
+                        "title": "Otp Code",
+                        "description": "6-digit verification code"
+                    },
+                    "new_password": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "minLength": 8,
+                        "title": "New Password",
+                        "description": "Password (min 8 characters)"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "email",
+                    "otp_code",
+                    "new_password"
+                ],
+                "title": "PasswordResetConfirmRequest",
+                "description": "Request schema for confirming password reset with OTP."
+            },
+            "PasswordResetRequest": {
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email",
+                        "description": "Email address for password reset"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "email"
+                ],
+                "title": "PasswordResetRequest",
+                "description": "Request schema for initiating password reset."
+            },
+            "ProfileResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "title": "Id"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email"
+                    },
+                    "email_verified": {
+                        "type": "boolean",
+                        "title": "Email Verified"
+                    },
+                    "full_name": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Full Name"
+                    },
+                    "avatar_url": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Avatar Url"
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "title": "Is Active"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Created At"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Updated At"
+                    },
+                    "has_password": {
+                        "type": "boolean",
+                        "title": "Has Password",
+                        "description": "Whether user has a password set (false for OAuth-only)"
+                    },
+                    "oauth_providers": {
+                        "items": {
+                            "$ref": "#/components/schemas/OAuthProviders"
+                        },
+                        "type": "array",
+                        "title": "Oauth Providers",
+                        "description": "List of linked OAuth providers"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "email",
+                    "email_verified",
+                    "full_name",
+                    "avatar_url",
+                    "is_active",
+                    "created_at",
+                    "updated_at",
+                    "has_password"
+                ],
+                "title": "ProfileResponse",
+                "description": "Response schema for user profile."
+            },
+            "ProfileUpdateRequest": {
+                "properties": {
+                    "full_name": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "maxLength": 255,
+                                "minLength": 1
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Full Name",
+                        "description": "User's full name"
+                    },
+                    "avatar_url": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "maxLength": 512
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Avatar Url",
+                        "description": "URL to user's avatar image"
+                    }
+                },
+                "type": "object",
+                "title": "ProfileUpdateRequest",
+                "description": "Request schema for updating user profile."
+            },
+            "RefreshTokenRequest": {
+                "properties": {
+                    "refresh_token": {
+                        "type": "string",
+                        "title": "Refresh Token",
+                        "description": "The refresh token to use"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "refresh_token"
+                ],
+                "title": "RefreshTokenRequest",
+                "description": "Request schema for token refresh."
+            },
+            "ResendOTPRequest": {
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email",
+                        "description": "Email to resend OTP to"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "email"
+                ],
+                "title": "ResendOTPRequest",
+                "description": "Request schema for resending OTP."
+            },
+            "SignupRequest": {
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email",
+                        "description": "User's email address"
+                    },
+                    "password": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "minLength": 8,
+                        "title": "Password",
+                        "description": "Password (min 8 characters)"
+                    },
+                    "full_name": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "maxLength": 255,
+                                "minLength": 1
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Full Name",
+                        "description": "User's full name"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "title": "SignupRequest",
+                "description": "Request schema for email signup."
+            },
+            "SignupResponse": {
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "title": "Message",
+                        "default": "Verification code sent to your email"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email"
+                    },
+                    "requires_verification": {
+                        "type": "boolean",
+                        "title": "Requires Verification",
+                        "default": true
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "email"
+                ],
+                "title": "SignupResponse",
+                "description": "Response schema for successful signup (pending verification)."
+            },
+            "TokenResponse": {
+                "properties": {
+                    "access_token": {
+                        "type": "string",
+                        "title": "Access Token",
+                        "description": "Short-lived JWT access token"
+                    },
+                    "refresh_token": {
+                        "type": "string",
+                        "title": "Refresh Token",
+                        "description": "Long-lived refresh token"
+                    },
+                    "token_type": {
+                        "type": "string",
+                        "const": "bearer",
+                        "title": "Token Type",
+                        "default": "bearer"
+                    },
+                    "expires_in": {
+                        "type": "integer",
+                        "title": "Expires In",
+                        "description": "Access token expiration time in seconds"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "access_token",
+                    "refresh_token",
+                    "expires_in"
+                ],
+                "title": "TokenResponse",
+                "description": "Response schema for successful authentication."
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        },
+        "securitySchemes": {
+            "HTTPBearer": {
+                "type": "http",
+                "scheme": "bearer"
+            }
+        }
+    }
+}

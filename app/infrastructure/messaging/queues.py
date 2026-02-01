@@ -1,0 +1,94 @@
+from functools import lru_cache
+from typing import Annotated, Any, Callable
+
+from pydantic import BaseModel, Field, model_validator
+
+from app.infrastructure.messaging.handlers.email_handler import (
+    handle_otp_email,
+    handle_password_reset_confirmation_email,
+)
+
+
+class RetryQueue(BaseModel):
+    name: Annotated[str, Field(description="Name of the retry queue")]
+    ttl: Annotated[int, Field(gt=0, description="Time to live in milliseconds")]
+
+
+class QueueConfig(BaseModel):
+    name: Annotated[str, Field(description="Name of the main queue")]
+    handler: Annotated[
+        Callable[[dict[str, Any]], Any],
+        Field(description="Function to handle messages from the queue"),
+    ]
+    retry_queue: Annotated[
+        str | None, Field(description="Name of the retry queue (if single retry)")
+    ] = None
+    retry_queues: Annotated[
+        list[RetryQueue] | None,
+        Field(description="List of retry queues with TTLs (if multiple retries)"),
+    ] = None
+    retry_ttl: Annotated[
+        int | None,
+        Field(
+            gt=0,
+            description="Time to live in milliseconds for single retry queue",
+        ),
+    ] = None
+    max_retries: Annotated[
+        int | None,
+        Field(
+            gt=0,
+            description="Maximum number of retries for single retry queue",
+        ),
+    ] = None
+    dead_letter_queue: Annotated[
+        str | None, Field(description="Name of the dead letter queue")
+    ] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_retry_configuration(cls, values: dict[str, Any]) -> dict[str, Any]:
+        retry_queue = values.get("retry_queue")
+        retry_queues = values.get("retry_queues")
+        retry_ttl = values.get("retry_ttl")
+
+        if retry_queue and retry_queues:
+            raise ValueError(
+                "Specify either 'retry_queue' or 'retry_queues', not both."
+            )
+        if retry_queue and not retry_ttl:
+            raise ValueError("'retry_ttl' must be set when using 'retry_queue'.")
+        if retry_queues is not None:
+            if len(retry_queues) == 0:
+                raise ValueError("'retry_queues' must contain at least one entry.")
+        return values
+
+
+QUEUE_CONFIG = [
+    # OTP Email Queue - sends OTP codes for verification and password reset
+    {
+        "name": "otp_emails",
+        "handler": handle_otp_email,
+        "retry_queue": "otp_emails_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "otp_emails_dead",
+    },
+    # Password Reset Confirmation Email Queue
+    {
+        "name": "password_reset_confirmation_emails",
+        "handler": handle_password_reset_confirmation_email,
+        "retry_queue": "password_reset_confirmation_emails_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "password_reset_confirmation_emails_dead",
+    },
+]
+
+
+@lru_cache()
+def get_queue_configs() -> list[QueueConfig]:
+    return [
+        QueueConfig.model_validate(config, from_attributes=True)
+        for config in QUEUE_CONFIG
+    ]
