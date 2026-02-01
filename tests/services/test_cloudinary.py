@@ -21,7 +21,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import UploadFile, status
 
-from app.shared.services.cloudinary import CloudinaryService
+from app.shared.services.cloudinary import (
+    CloudinaryService,
+    CloudinaryUploadCredentials,
+)
 from app.shared.exceptions.types import AppException
 
 
@@ -73,9 +76,7 @@ class TestCloudinaryServiceUploadFile:
             "resource_type": "image",
         }
 
-        with patch(
-            "app.shared.services.cloudinary.cloudinary.uploader.upload"
-        ), patch(
+        with patch("app.shared.services.cloudinary.cloudinary.uploader.upload"), patch(
             "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = mock_upload_result
@@ -142,9 +143,7 @@ class TestCloudinaryServiceUploadFile:
             "resource_type": "image",
         }
 
-        with patch(
-            "app.shared.services.cloudinary.cloudinary.uploader.upload"
-        ), patch(
+        with patch("app.shared.services.cloudinary.cloudinary.uploader.upload"), patch(
             "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = mock_upload_result
@@ -479,3 +478,351 @@ class TestCloudinaryServiceErrorHandling:
 
             assert "Specific upload error" in str(exc_info.value.message)
             assert "try again" in exc_info.value.message.lower()
+
+
+class TestCloudinaryServiceGenerateUploadCredentials:
+    """Test suite for generate_upload_credentials method for secure client-side uploads."""
+
+    def setup_method(self):
+        """Set up test fixtures before each test method."""
+        # Initialize CloudinaryService with test credentials
+        CloudinaryService.cloud_name = "test-cloud"
+        CloudinaryService.api_key = "test-api-key"
+        CloudinaryService.api_secret = "test-api-secret"
+
+    def teardown_method(self):
+        """Clean up after each test method."""
+        # Reset class attributes
+        CloudinaryService.cloud_name = None
+        CloudinaryService.api_key = None
+        CloudinaryService.api_secret = None
+
+    def test_generate_upload_credentials_success(self):
+        """Test successful generation of upload credentials."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "generated_signature"
+
+            credentials = CloudinaryService.generate_upload_credentials()
+
+            assert isinstance(credentials, CloudinaryUploadCredentials)
+            assert (
+                credentials.upload_url
+                == "https://api.cloudinary.com/v1_1/test-cloud/auto/upload"
+            )
+            assert credentials.api_key == "test-api-key"
+            assert credentials.timestamp == 1234567890
+            assert credentials.signature == "generated_signature"
+            assert credentials.cloud_name == "test-cloud"
+            assert credentials.resource_type == "auto"
+
+    def test_generate_upload_credentials_with_folder(self):
+        """Test generation of upload credentials with folder parameter."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "signature_with_folder"
+
+            credentials = CloudinaryService.generate_upload_credentials(
+                folder="uploads/images"
+            )
+
+            assert credentials.folder == "uploads/images"
+            # Verify folder was included in params to sign
+            call_args = mock_sign.call_args[0]
+            params = call_args[0]
+            assert params["folder"] == "uploads/images"
+
+    def test_generate_upload_credentials_with_resource_type(self):
+        """Test generation of upload credentials with different resource types."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "signature"
+
+            # Test image resource type
+            credentials = CloudinaryService.generate_upload_credentials(
+                resource_type="image"
+            )
+            assert credentials.resource_type == "image"
+            assert "image/upload" in credentials.upload_url
+
+            # Test video resource type
+            credentials = CloudinaryService.generate_upload_credentials(
+                resource_type="video"
+            )
+            assert credentials.resource_type == "video"
+            assert "video/upload" in credentials.upload_url
+
+            # Test raw resource type
+            credentials = CloudinaryService.generate_upload_credentials(
+                resource_type="raw"
+            )
+            assert credentials.resource_type == "raw"
+            assert "raw/upload" in credentials.upload_url
+
+    def test_generate_upload_credentials_with_upload_preset(self):
+        """Test generation of upload credentials with upload preset."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "signature_with_preset"
+
+            credentials = CloudinaryService.generate_upload_credentials(
+                upload_preset="my_preset"
+            )
+
+            assert credentials.upload_preset == "my_preset"
+            # Verify upload_preset was included in params to sign
+            call_args = mock_sign.call_args[0]
+            params = call_args[0]
+            assert params["upload_preset"] == "my_preset"
+
+    def test_generate_upload_credentials_with_eager(self):
+        """Test generation of upload credentials with eager transformations."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "signature_with_eager"
+
+            credentials = CloudinaryService.generate_upload_credentials(
+                eager="w_400,h_300,c_pad|w_260,h_200,c_crop"
+            )
+
+            assert credentials.eager == "w_400,h_300,c_pad|w_260,h_200,c_crop"
+            # Verify eager was included in params to sign
+            call_args = mock_sign.call_args[0]
+            params = call_args[0]
+            assert params["eager"] == "w_400,h_300,c_pad|w_260,h_200,c_crop"
+
+    def test_generate_upload_credentials_with_kwargs(self):
+        """Test generation of upload credentials with additional kwargs."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "signature_with_kwargs"
+
+            credentials = CloudinaryService.generate_upload_credentials(
+                public_id="custom_public_id",
+                tags="tag1,tag2,tag3",
+            )
+
+            # Verify kwargs are included in params to sign
+            call_args = mock_sign.call_args[0]
+            params = call_args[0]
+            assert params["public_id"] == "custom_public_id"
+            assert params["tags"] == "tag1,tag2,tag3"
+
+            # Verify kwargs are accessible on the model (due to extra="allow")
+            assert credentials.model_extra.get("public_id") == "custom_public_id"
+            assert credentials.model_extra.get("tags") == "tag1,tag2,tag3"
+
+    def test_generate_upload_credentials_with_all_parameters(self):
+        """Test generation of upload credentials with all parameters."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "full_signature"
+
+            credentials = CloudinaryService.generate_upload_credentials(
+                folder="test/uploads",
+                resource_type="image",
+                upload_preset="preset1",
+                eager="w_200,h_200",
+                public_id="my_image",
+                tags="important",
+            )
+
+            assert (
+                credentials.upload_url
+                == "https://api.cloudinary.com/v1_1/test-cloud/image/upload"
+            )
+            assert credentials.api_key == "test-api-key"
+            assert credentials.timestamp == 1234567890
+            assert credentials.signature == "full_signature"
+            assert credentials.cloud_name == "test-cloud"
+            assert credentials.folder == "test/uploads"
+            assert credentials.resource_type == "image"
+            assert credentials.upload_preset == "preset1"
+            assert credentials.eager == "w_200,h_200"
+
+    def test_generate_upload_credentials_raises_exception_when_not_configured(self):
+        """Test that generate_upload_credentials raises AppException when Cloudinary is not configured."""
+        # Set credentials to None to simulate unconfigured state
+        CloudinaryService.cloud_name = None
+        CloudinaryService.api_key = None
+        CloudinaryService.api_secret = None
+
+        with pytest.raises(AppException) as exc_info:
+            CloudinaryService.generate_upload_credentials()
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "not properly configured" in exc_info.value.message
+
+    def test_generate_upload_credentials_raises_exception_when_cloud_name_missing(self):
+        """Test that generate_upload_credentials raises AppException when cloud_name is missing."""
+        CloudinaryService.cloud_name = None
+
+        with pytest.raises(AppException) as exc_info:
+            CloudinaryService.generate_upload_credentials()
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "not properly configured" in exc_info.value.message
+
+    def test_generate_upload_credentials_raises_exception_when_api_key_missing(self):
+        """Test that generate_upload_credentials raises AppException when api_key is missing."""
+        CloudinaryService.api_key = None
+
+        with pytest.raises(AppException) as exc_info:
+            CloudinaryService.generate_upload_credentials()
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "not properly configured" in exc_info.value.message
+
+    def test_generate_upload_credentials_raises_exception_when_api_secret_missing(self):
+        """Test that generate_upload_credentials raises AppException when api_secret is missing."""
+        CloudinaryService.api_secret = None
+
+        with pytest.raises(AppException) as exc_info:
+            CloudinaryService.generate_upload_credentials()
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "not properly configured" in exc_info.value.message
+
+    def test_generate_upload_credentials_raises_exception_on_signature_failure(self):
+        """Test that generate_upload_credentials raises AppException when signature generation fails."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign:
+            mock_sign.side_effect = Exception("Signature generation failed")
+
+            with pytest.raises(AppException) as exc_info:
+                CloudinaryService.generate_upload_credentials()
+
+            assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to generate upload credentials" in exc_info.value.message
+            assert "Signature generation failed" in exc_info.value.message
+
+    def test_generate_upload_credentials_logs_success(self):
+        """Test that generate_upload_credentials logs successful credential generation."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch(
+            "app.shared.services.cloudinary.time.time"
+        ) as mock_time, patch(
+            "app.shared.services.cloudinary.cloudinary_logger"
+        ) as mock_logger:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "signature"
+
+            CloudinaryService.generate_upload_credentials()
+
+            mock_logger.info.assert_called_once()
+            assert "Generated Cloudinary upload credentials successfully" in str(
+                mock_logger.info.call_args
+            )
+
+    def test_generate_upload_credentials_logs_error_on_failure(self):
+        """Test that generate_upload_credentials logs errors on failure."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch(
+            "app.shared.services.cloudinary.cloudinary_logger"
+        ) as mock_logger:
+            mock_sign.side_effect = Exception("Test error")
+
+            with pytest.raises(AppException):
+                CloudinaryService.generate_upload_credentials()
+
+            mock_logger.error.assert_called_once()
+            assert "Failed to generate upload credentials" in str(
+                mock_logger.error.call_args
+            )
+
+    def test_generate_upload_credentials_signature_uses_api_secret(self):
+        """Test that signature generation uses the correct API secret."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "signature"
+
+            CloudinaryService.generate_upload_credentials()
+
+            # Verify api_sign_request was called with the correct api_secret
+            call_args = mock_sign.call_args[0]
+            assert call_args[1] == "test-api-secret"
+
+    def test_generate_upload_credentials_timestamp_in_params(self):
+        """Test that timestamp is included in params to sign."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 9876543210
+            mock_sign.return_value = "signature"
+
+            credentials = CloudinaryService.generate_upload_credentials()
+
+            # Verify timestamp is in params to sign
+            call_args = mock_sign.call_args[0]
+            params = call_args[0]
+            assert params["timestamp"] == 9876543210
+            assert credentials.timestamp == 9876543210
+
+    def test_generate_upload_credentials_none_kwargs_excluded(self):
+        """Test that None kwargs are excluded from the result."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "signature"
+
+            credentials = CloudinaryService.generate_upload_credentials(
+                folder=None,
+                upload_preset=None,
+                eager=None,
+            )
+
+            assert credentials.folder is None
+            assert credentials.upload_preset is None
+            assert credentials.eager is None
+
+    def test_generate_upload_credentials_returns_pydantic_model(self):
+        """Test that the return type is CloudinaryUploadCredentials Pydantic model."""
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            mock_time.return_value = 1234567890
+            mock_sign.return_value = "signature"
+
+            credentials = CloudinaryService.generate_upload_credentials()
+
+            assert isinstance(credentials, CloudinaryUploadCredentials)
+            # Verify it can be serialized to dict/json
+            credentials_dict = credentials.model_dump()
+            assert "upload_url" in credentials_dict
+            assert "api_key" in credentials_dict
+            assert "timestamp" in credentials_dict
+            assert "signature" in credentials_dict
+
+    def test_generate_upload_credentials_chained_exception(self):
+        """Test that AppException chains original exception."""
+        original_error = ValueError("Original error")
+
+        with patch(
+            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign:
+            mock_sign.side_effect = original_error
+
+            with pytest.raises(AppException) as exc_info:
+                CloudinaryService.generate_upload_credentials()
+
+            assert exc_info.value.__cause__ is original_error
