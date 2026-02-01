@@ -1076,6 +1076,144 @@ class TestGetProfileEndpoint:
             assert response.is_active is True
 
 
+class TestGetAvatarUploadCredentialsEndpoint:
+    """Test suite for GET /me/avatar/upload-credentials endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_avatar_upload_credentials_success(self, mock_user):
+        """Test successful avatar upload credentials generation."""
+        from app.shared.routers.auth import get_avatar_upload_credentials
+        from app.shared.services.cloudinary import CloudinaryUploadCredentials
+
+        mock_credentials = CloudinaryUploadCredentials(
+            upload_url="https://api.cloudinary.com/v1_1/test-cloud/image/upload",
+            api_key="test_api_key",
+            timestamp=1706745600,
+            signature="test_signature",
+            cloud_name="test-cloud",
+            folder="avatars",
+            resource_type="image",
+        )
+
+        with patch(
+            "app.shared.routers.auth.CloudinaryService.generate_upload_credentials",
+            return_value=mock_credentials,
+        ) as mock_generate:
+            response = await get_avatar_upload_credentials(user=mock_user)
+
+            assert (
+                response.upload_url
+                == "https://api.cloudinary.com/v1_1/test-cloud/image/upload"
+            )
+            assert response.api_key == "test_api_key"
+            assert response.cloud_name == "test-cloud"
+            assert response.folder == "avatars"
+            assert response.resource_type == "image"
+
+            # Verify it was called with correct parameters
+            mock_generate.assert_called_once_with(
+                folder="avatars",
+                resource_type="image",
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_avatar_upload_credentials_returns_correct_model(self, mock_user):
+        """Test that the endpoint returns CloudinaryUploadCredentials model."""
+        from app.shared.routers.auth import get_avatar_upload_credentials
+        from app.shared.services.cloudinary import CloudinaryUploadCredentials
+
+        mock_credentials = CloudinaryUploadCredentials(
+            upload_url="https://api.cloudinary.com/v1_1/test-cloud/image/upload",
+            api_key="test_api_key",
+            timestamp=1706745600,
+            signature="test_signature",
+            cloud_name="test-cloud",
+            folder="avatars",
+            resource_type="image",
+        )
+
+        with patch(
+            "app.shared.routers.auth.CloudinaryService.generate_upload_credentials",
+            return_value=mock_credentials,
+        ):
+            response = await get_avatar_upload_credentials(user=mock_user)
+
+            assert isinstance(response, CloudinaryUploadCredentials)
+
+    @pytest.mark.asyncio
+    async def test_get_avatar_upload_credentials_logs_request(self, mock_user):
+        """Test that the endpoint logs the request."""
+        from app.shared.routers.auth import get_avatar_upload_credentials
+        from app.shared.services.cloudinary import CloudinaryUploadCredentials
+
+        mock_credentials = CloudinaryUploadCredentials(
+            upload_url="https://api.cloudinary.com/v1_1/test-cloud/image/upload",
+            api_key="test_api_key",
+            timestamp=1706745600,
+            signature="test_signature",
+            cloud_name="test-cloud",
+            folder="avatars",
+            resource_type="image",
+        )
+
+        with patch(
+            "app.shared.routers.auth.CloudinaryService.generate_upload_credentials",
+            return_value=mock_credentials,
+        ), patch(
+            "app.shared.routers.auth.auth_logger.info",
+        ) as mock_logger:
+            await get_avatar_upload_credentials(user=mock_user)
+
+            # Verify logging was called
+            mock_logger.assert_called_once()
+            call_args = mock_logger.call_args[0][0]
+            assert str(mock_user.id) in call_args
+            assert "avatar upload credentials" in call_args.lower()
+
+    @pytest.mark.asyncio
+    async def test_get_avatar_upload_credentials_raises_when_cloudinary_not_configured(
+        self, mock_user
+    ):
+        """Test that the endpoint raises exception when Cloudinary is not configured."""
+        from app.shared.routers.auth import get_avatar_upload_credentials
+        from app.shared.exceptions.types import AppException
+        from fastapi import status
+
+        with patch(
+            "app.shared.routers.auth.CloudinaryService.generate_upload_credentials",
+            side_effect=AppException(
+                message="Cloudinary is not properly configured.",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ),
+        ):
+            with pytest.raises(AppException) as exc_info:
+                await get_avatar_upload_credentials(user=mock_user)
+
+            assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Cloudinary" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_get_avatar_upload_credentials_raises_on_signature_failure(
+        self, mock_user
+    ):
+        """Test that the endpoint raises exception when signature generation fails."""
+        from app.shared.routers.auth import get_avatar_upload_credentials
+        from app.shared.exceptions.types import AppException
+        from fastapi import status
+
+        with patch(
+            "app.shared.routers.auth.CloudinaryService.generate_upload_credentials",
+            side_effect=AppException(
+                message="Failed to generate upload credentials: Signature error",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ),
+        ):
+            with pytest.raises(AppException) as exc_info:
+                await get_avatar_upload_credentials(user=mock_user)
+
+            assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
 class TestUpdateProfileEndpoint:
     """Test suite for PATCH /me endpoint."""
 

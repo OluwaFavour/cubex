@@ -1,11 +1,34 @@
+import time
+from typing import Any
+
 from anyio.to_thread import run_sync
+from pydantic import BaseModel
 
 import cloudinary.api
 import cloudinary.uploader
+import cloudinary.utils
 from fastapi import UploadFile, status
 
 from app.shared.config import cloudinary_logger
 from app.shared.exceptions.types import AppException
+
+
+class CloudinaryUploadCredentials(BaseModel):
+    """
+    Pydantic model representing the credentials needed for secure client-side uploads to Cloudinary.
+    """
+
+    upload_url: str
+    api_key: str
+    timestamp: int
+    signature: str
+    cloud_name: str
+    folder: str | None = None
+    resource_type: str = "auto"
+    upload_preset: str | None = None
+    eager: str | None = None
+
+    model_config = {"extra": "allow"}
 
 
 class CloudinaryService:
@@ -32,11 +55,136 @@ class CloudinaryService:
         -------
         None
         """
+        cls.api_key = api_key
+        cls.cloud_name = cloud_name
+        cls.api_secret = api_secret
         cloudinary.config(
             cloud_name=cloud_name,
             api_key=api_key,
             api_secret=api_secret,
         )
+
+    @classmethod
+    def generate_upload_credentials(
+        cls,
+        folder: str | None = None,
+        resource_type: str = "auto",
+        upload_preset: str | None = None,
+        eager: str | None = None,
+        **kwargs: Any,
+    ) -> CloudinaryUploadCredentials:
+        """
+        Generate signed upload credentials for secure client-side uploads to Cloudinary.
+
+        This method generates all necessary parameters (signature, timestamp, api_key, etc.)
+        that the frontend needs to upload files directly to Cloudinary without exposing
+        the API secret.
+
+        Parameters
+        ----------
+        folder : str | None, optional
+            The Cloudinary folder path where the uploaded file will be stored.
+        resource_type : str, optional
+            The type of resource to upload. Can be "image", "video", "raw", or "auto".
+            Defaults to "auto".
+        upload_preset : str | None, optional
+            An upload preset to use for the upload. If provided, it will be included
+            in the signed parameters.
+        eager : str | None, optional
+            Eager transformations to apply after upload. Format: "transformation1|transformation2".
+        **kwargs : Any
+            Additional parameters to include in the signature (e.g., public_id,
+            transformation, tags, etc.).
+
+        Returns
+        -------
+        CloudinaryUploadCredentials
+            A Pydantic model containing:
+                - upload_url: The Cloudinary upload endpoint URL.
+                - api_key: The Cloudinary API key (safe to expose).
+                - timestamp: The Unix timestamp used for signing.
+                - signature: The generated signature for the upload.
+                - cloud_name: The Cloudinary cloud name.
+                - folder: The target folder (if provided).
+                - resource_type: The resource type for the upload.
+                - upload_preset: The upload preset (if provided).
+                - eager: The eager transformations (if provided).
+                - Additional kwargs passed to the method.
+
+        Raises
+        ------
+        AppException
+            If Cloudinary is not configured or signature generation fails.
+
+        Example
+        -------
+        Frontend usage with the returned credentials:
+        ```javascript
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('api_key', credentials.api_key);
+        formData.append('timestamp', credentials.timestamp);
+        formData.append('signature', credentials.signature);
+        if (credentials.folder) formData.append('folder', credentials.folder);
+
+        fetch(credentials.upload_url, { method: 'POST', body: formData });
+        ```
+        """
+        try:
+            if not cls.cloud_name or not cls.api_key or not cls.api_secret:
+                raise AppException(
+                    message="Cloudinary is not properly configured.",
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            timestamp = int(time.time())
+
+            # Build parameters to sign
+            params_to_sign: dict[str, Any] = {
+                "timestamp": timestamp,
+            }
+
+            if folder:
+                params_to_sign["folder"] = folder
+            if upload_preset:
+                params_to_sign["upload_preset"] = upload_preset
+            if eager:
+                params_to_sign["eager"] = eager
+
+            # Add any additional kwargs to params
+            params_to_sign.update(kwargs)
+
+            # Generate signature
+            signature = cloudinary.utils.api_sign_request(
+                params_to_sign, cls.api_secret
+            )
+
+            # Build upload URL
+            upload_url = f"https://api.cloudinary.com/v1_1/{cls.cloud_name}/{resource_type}/upload"
+
+            cloudinary_logger.info("Generated Cloudinary upload credentials successfully.")
+
+            return CloudinaryUploadCredentials(
+                upload_url=upload_url,
+                api_key=cls.api_key,
+                timestamp=timestamp,
+                signature=signature,
+                cloud_name=cls.cloud_name,
+                folder=folder,
+                resource_type=resource_type,
+                upload_preset=upload_preset,
+                eager=eager,
+                **{k: v for k, v in kwargs.items() if v is not None},
+            )
+
+        except AppException:
+            raise
+        except Exception as e:
+            cloudinary_logger.error(f"Failed to generate upload credentials: {str(e)}")
+            raise AppException(
+                message=f"Failed to generate upload credentials: {str(e)}",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
 
     @classmethod
     async def upload_file(

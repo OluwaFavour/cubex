@@ -59,6 +59,10 @@ from app.shared.schemas.auth import (
     OTPVerifyRequest,
 )
 from app.shared.services.auth import AuthService
+from app.shared.services.cloudinary import (
+    CloudinaryService,
+    CloudinaryUploadCredentials,
+)
 from app.shared.services.oauth import OAuthStateManager
 from app.shared.utils import get_device_info
 
@@ -1980,6 +1984,170 @@ async def get_profile(
         raise HTTPException(status_code=404, detail="User not found")
 
     return _build_profile_response(reloaded_user)
+
+
+@router.get(
+    "/me/avatar/upload-credentials",
+    response_model=CloudinaryUploadCredentials,
+    summary="Get avatar upload credentials",
+    description="""
+## Get Avatar Upload Credentials
+
+Generate signed Cloudinary credentials for secure client-side profile picture upload.
+The frontend can use these credentials to upload directly to Cloudinary without
+exposing sensitive API secrets.
+
+### Authentication Required
+
+```http
+Authorization: Bearer <access_token>
+```
+
+### Success Response (200)
+
+```json
+{
+  "upload_url": "https://api.cloudinary.com/v1_1/your-cloud/image/upload",
+  "api_key": "123456789012345",
+  "timestamp": 1706745600,
+  "signature": "abcdef1234567890abcdef1234567890abcdef12",
+  "cloud_name": "your-cloud",
+  "folder": "avatars",
+  "resource_type": "image",
+  "upload_preset": null,
+  "eager": null
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `upload_url` | string | Cloudinary upload endpoint URL |
+| `api_key` | string | Cloudinary API key (safe for frontend) |
+| `timestamp` | integer | Unix timestamp for signature validation |
+| `signature` | string | Signed hash for secure upload authentication |
+| `cloud_name` | string | Your Cloudinary cloud name |
+| `folder` | string | Target folder for uploaded avatars |
+| `resource_type` | string | Resource type (`image`) |
+| `upload_preset` | string | Upload preset (if configured) |
+| `eager` | string | Eager transformations (if any) |
+
+### Frontend Usage Example
+
+```javascript
+// 1. Get credentials from this endpoint
+const response = await fetch('/auth/me/avatar/upload-credentials', {
+  headers: { 'Authorization': `Bearer ${accessToken}` }
+});
+const credentials = await response.json();
+
+// 2. Upload directly to Cloudinary
+const formData = new FormData();
+formData.append('file', selectedFile);
+formData.append('api_key', credentials.api_key);
+formData.append('timestamp', credentials.timestamp);
+formData.append('signature', credentials.signature);
+formData.append('folder', credentials.folder);
+
+const uploadResponse = await fetch(credentials.upload_url, {
+  method: 'POST',
+  body: formData
+});
+const result = await uploadResponse.json();
+
+// 3. Update profile with the returned URL
+await fetch('/auth/me', {
+  method: 'PATCH',
+  headers: {
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ avatar_url: result.secure_url })
+});
+```
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `401 Unauthorized` | Missing or invalid access token |
+| `500 Internal Server Error` | Cloudinary not configured |
+| `503 Service Unavailable` | Failed to generate credentials |
+
+### Notes
+
+- Credentials are **time-limited** (signature includes timestamp)
+- Files are uploaded to the `avatars` folder in Cloudinary
+- Only **image** uploads are allowed with these credentials
+- After upload, use `PATCH /auth/me` to update `avatar_url`
+""",
+    responses={
+        401: {
+            "description": "Not authenticated",
+            "content": {
+                "application/json": {"example": {"detail": "Not authenticated"}}
+            },
+        },
+        500: {
+            "description": "Cloudinary not configured",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Cloudinary is not properly configured."}
+                }
+            },
+        },
+        503: {
+            "description": "Failed to generate credentials",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Failed to generate upload credentials"}
+                }
+            },
+        },
+    },
+)
+async def get_avatar_upload_credentials(
+    user: CurrentActiveUser,
+) -> CloudinaryUploadCredentials:
+    """
+    Generate signed Cloudinary credentials for secure client-side avatar upload.
+
+    This endpoint generates all necessary parameters (signature, timestamp,
+    api_key, etc.) that the frontend needs to upload a profile picture
+    directly to Cloudinary without exposing the API secret.
+
+    Args:
+        user (CurrentActiveUser): The currently authenticated user, injected
+            via FastAPI dependency. Used to ensure only authenticated users
+            can generate upload credentials.
+
+    Returns:
+        CloudinaryUploadCredentials: A Pydantic model containing:
+            - upload_url: The Cloudinary upload endpoint URL
+            - api_key: The Cloudinary API key (safe to expose)
+            - timestamp: Unix timestamp used for signing
+            - signature: The generated signature for the upload
+            - cloud_name: The Cloudinary cloud name
+            - folder: Target folder ("avatars")
+            - resource_type: Set to "image" for profile pictures
+
+    Raises:
+        HTTPException (401): If the user is not authenticated.
+        AppException (500): If Cloudinary is not properly configured.
+        AppException (503): If signature generation fails.
+
+    Note:
+        The generated credentials are time-sensitive. The frontend should
+        use them promptly after receiving them. After uploading to Cloudinary,
+        the frontend should call PATCH /auth/me with the returned secure_url
+        to update the user's avatar_url.
+    """
+    auth_logger.info(f"Generating avatar upload credentials for user {user.id}")
+    return CloudinaryService.generate_upload_credentials(
+        folder="avatars",
+        resource_type="image",
+    )
 
 
 @router.patch(
