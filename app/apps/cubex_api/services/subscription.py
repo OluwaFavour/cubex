@@ -1079,6 +1079,24 @@ class SubscriptionService:
             f"{current_plan.name} -> {new_plan.name}"
         )
 
+        # Send upgrade confirmation email to workspace owner
+        workspace = await workspace_db.get_by_id(session, workspace_id)
+        if workspace and workspace.owner:
+            await publish_event(
+                "subscription_activated_emails",
+                {
+                    "email": workspace.owner.email,
+                    "full_name": workspace.owner.full_name or "Valued Customer",
+                    "plan_name": new_plan.name,
+                    "product_type": ProductType.API.value,
+                    "workspace_name": workspace.display_name,
+                },
+            )
+            stripe_logger.info(
+                f"Upgrade email queued for {workspace.owner.email}: "
+                f"{current_plan.name} -> {new_plan.name}"
+            )
+
         return updated_subscription
 
 
