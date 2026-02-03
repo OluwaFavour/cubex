@@ -335,6 +335,9 @@ def mock_email_service():
     This fixture mocks:
     1. The message queue publisher to prevent RabbitMQ connections
     2. Avoid async event loop cleanup issues
+
+    Note: We must patch publish_event in each module that imports it,
+    because Python binds the import to the module's namespace.
     """
 
     async def mock_publish_event(*args, **kwargs):
@@ -346,6 +349,21 @@ def mock_email_service():
         side_effect=mock_publish_event,
     ), patch(
         "app.shared.services.auth.publish_event",
+        side_effect=mock_publish_event,
+    ), patch(
+        "app.apps.cubex_api.services.workspace.publish_event",
+        side_effect=mock_publish_event,
+    ), patch(
+        "app.apps.cubex_api.services.subscription.publish_event",
+        side_effect=mock_publish_event,
+    ), patch(
+        "app.apps.cubex_career.services.subscription.publish_event",
+        side_effect=mock_publish_event,
+    ), patch(
+        "app.shared.routers.webhook.publish_event",
+        side_effect=mock_publish_event,
+    ), patch(
+        "app.infrastructure.messaging.handlers.stripe.publish_event",
         side_effect=mock_publish_event,
     ):
         yield
