@@ -741,6 +741,7 @@ class TestCreateInvitation:
         payload = {
             "email": "newinvite@example.com",
             "role": MemberRole.MEMBER.value,
+            "callback_url": "http://localhost:3000/invitation",
         }
         response = await authenticated_client.post(
             f"/api/workspaces/{test_workspace.id}/invitations", json=payload
@@ -760,6 +761,7 @@ class TestCreateInvitation:
         payload = {
             "email": "admin.invite@example.com",
             "role": MemberRole.ADMIN.value,
+            "callback_url": "http://localhost:3000/invitation",
         }
         response = await authenticated_client.post(
             f"/api/workspaces/{test_workspace.id}/invitations", json=payload
@@ -779,6 +781,7 @@ class TestCreateInvitation:
         payload = {
             "email": invitation.email,
             "role": MemberRole.MEMBER.value,
+            "callback_url": "http://localhost:3000/invitation",
         }
         response = await authenticated_client.post(
             f"/api/workspaces/{test_workspace.id}/invitations", json=payload
@@ -795,6 +798,7 @@ class TestCreateInvitation:
         payload = {
             "email": member_user.email,
             "role": MemberRole.MEMBER.value,
+            "callback_url": "http://localhost:3000/invitation",
         }
         response = await authenticated_client.post(
             f"/api/workspaces/{test_workspace.id}/invitations", json=payload
@@ -813,7 +817,11 @@ class TestCreateInvitation:
         token = create_test_access_token(member_user)
         client.headers["Authorization"] = f"Bearer {token}"
 
-        payload = {"email": "test@example.com", "role": MemberRole.MEMBER.value}
+        payload = {
+            "email": "test@example.com",
+            "role": MemberRole.MEMBER.value,
+            "callback_url": "http://localhost:3000/invitation",
+        }
         response = await client.post(
             f"/api/workspaces/{test_workspace.id}/invitations", json=payload
         )

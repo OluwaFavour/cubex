@@ -141,31 +141,42 @@ class TestInvitationCreate:
         data = InvitationCreate(
             email="user@example.com",
             role="member",
+            callback_url="https://app.example.com/invitation",
         )
 
         assert data.email == "user@example.com"
         assert data.role == "member"
+        assert data.callback_url == "https://app.example.com/invitation"
 
     def test_invitation_create_default_role(self):
         """Test InvitationCreate with default role."""
-        data = InvitationCreate(email="user@example.com")
+        data = InvitationCreate(
+            email="user@example.com",
+            callback_url="https://app.example.com/invitation",
+        )
 
         assert data.email == "user@example.com"
         assert data.role == "member"
+        assert data.callback_url == "https://app.example.com/invitation"
 
     def test_invitation_create_admin_role(self):
         """Test InvitationCreate with admin role."""
         data = InvitationCreate(
             email="admin@example.com",
             role="admin",
+            callback_url="https://app.example.com/invitation",
         )
 
         assert data.role == "admin"
+        assert data.callback_url == "https://app.example.com/invitation"
 
     def test_invitation_create_invalid_email(self):
         """Test InvitationCreate fails with invalid email."""
         with pytest.raises(ValidationError):
-            InvitationCreate(email="invalid-email")
+            InvitationCreate(
+                email="invalid-email",
+                callback_url="https://app.example.com/invitation",
+            )
 
 
 class TestInvitationResponse:
