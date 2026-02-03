@@ -11,6 +11,8 @@ Supports both API (workspace-based) and Career (user-based) subscriptions.
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.shared.config import stripe_logger
 from app.shared.db import AsyncSessionLocal
 from app.shared.db.crud import (
@@ -20,6 +22,7 @@ from app.shared.db.crud import (
     api_subscription_context_db,
     career_subscription_context_db,
 )
+from app.shared.db.models import Subscription
 from app.shared.enums import ProductType
 from app.shared.services import RedisService
 from app.apps.cubex_api.services import subscription_service as api_subscription_service
@@ -36,35 +39,342 @@ STRIPE_EVENT_KEY_PREFIX = "stripe_event:"
 STRIPE_EVENT_TTL = 48 * 3600
 
 
+# =============================================================================
+# Idempotency Helpers
+# =============================================================================
+
+
 async def _is_event_already_processed(event_id: str) -> bool:
-    """
-    Check if a Stripe event has already been processed using Redis.
-
-    Only checks if the key exists - does NOT set it.
-    Use _mark_event_as_processed() after successful processing.
-
-    Args:
-        event_id: The Stripe event ID.
-
-    Returns:
-        True if event was already processed, False if it's new.
-    """
+    """Check if a Stripe event has already been processed using Redis."""
     key = f"{STRIPE_EVENT_KEY_PREFIX}{event_id}"
     return await RedisService.exists(key)
 
 
 async def _mark_event_as_processed(event_id: str) -> None:
-    """
-    Mark a Stripe event as successfully processed in Redis.
-
-    Uses set_if_not_exists for atomic operation (race condition safe).
-    Should only be called after successful event processing.
-
-    Args:
-        event_id: The Stripe event ID.
-    """
+    """Mark a Stripe event as successfully processed in Redis."""
     key = f"{STRIPE_EVENT_KEY_PREFIX}{event_id}"
     await RedisService.set_if_not_exists(key, "1", ttl=STRIPE_EVENT_TTL)
+
+
+# =============================================================================
+# Email Notification Helpers
+# =============================================================================
+
+
+async def _get_career_user_email_info(
+    session: AsyncSession, subscription_id: UUID
+) -> tuple[str, str] | None:
+    """Get email and full_name for a Career subscription user."""
+    context = await career_subscription_context_db.get_by_subscription(
+        session, subscription_id
+    )
+    if not context:
+        return None
+    user = await user_db.get_by_id(session, context.user_id)
+    if not user:
+        return None
+    return user.email, user.full_name or "Valued Customer"
+
+
+async def _get_api_workspace_owner_email_info(
+    session: AsyncSession, subscription_id: UUID
+) -> tuple[str, str, str] | None:
+    """Get email, full_name, and workspace_name for an API subscription owner."""
+    context = await api_subscription_context_db.get_by_subscription(
+        session, subscription_id
+    )
+    if not context:
+        return None
+    workspace = await workspace_db.get_by_id(session, context.workspace_id)
+    if not workspace or not workspace.owner:
+        return None
+    return (
+        workspace.owner.email,
+        workspace.owner.full_name or "Valued Customer",
+        workspace.display_name,
+    )
+
+
+async def _send_subscription_activated_email(
+    session: AsyncSession,
+    subscription: Subscription,
+    old_plan_name: str,
+) -> None:
+    """Send plan change notification email."""
+    if subscription.plan.product_type == ProductType.CAREER:
+        info = await _get_career_user_email_info(session, subscription.id)
+        if info:
+            email, full_name = info
+            await publish_event(
+                "subscription_activated_emails",
+                {
+                    "email": email,
+                    "full_name": full_name,
+                    "plan_name": subscription.plan.name,
+                    "product_type": ProductType.CAREER.value,
+                },
+            )
+            stripe_logger.info(
+                f"Plan change email queued for {email}: "
+                f"{old_plan_name} -> {subscription.plan.name}"
+            )
+    else:
+        info = await _get_api_workspace_owner_email_info(session, subscription.id)
+        if info:
+            email, full_name, workspace_name = info
+            await publish_event(
+                "subscription_activated_emails",
+                {
+                    "email": email,
+                    "full_name": full_name,
+                    "plan_name": subscription.plan.name,
+                    "product_type": ProductType.API.value,
+                    "workspace_name": workspace_name,
+                },
+            )
+            stripe_logger.info(
+                f"Plan change email queued for {email}: "
+                f"{old_plan_name} -> {subscription.plan.name}"
+            )
+
+
+async def _send_subscription_canceled_email(
+    session: AsyncSession,
+    subscription: Subscription,
+    plan_name: str,
+) -> None:
+    """Send subscription cancellation notification email."""
+    if subscription.plan.product_type == ProductType.CAREER:
+        info = await _get_career_user_email_info(session, subscription.id)
+        if info:
+            email, full_name = info
+            await publish_event(
+                "subscription_canceled_emails",
+                {
+                    "email": email,
+                    "user_name": full_name,
+                    "plan_name": plan_name,
+                    "workspace_name": None,
+                    "product_name": "Cubex Career",
+                },
+            )
+    else:
+        info = await _get_api_workspace_owner_email_info(session, subscription.id)
+        if info:
+            email, full_name, workspace_name = info
+            await publish_event(
+                "subscription_canceled_emails",
+                {
+                    "email": email,
+                    "user_name": full_name,
+                    "plan_name": plan_name,
+                    "workspace_name": workspace_name,
+                    "product_name": "Cubex API",
+                },
+            )
+
+
+async def _send_payment_failed_email(
+    session: AsyncSession,
+    subscription: Subscription,
+    plan_name: str,
+    amount_str: str | None,
+) -> None:
+    """Send payment failure notification email."""
+    if subscription.product_type == ProductType.CAREER:
+        info = await _get_career_user_email_info(session, subscription.id)
+        if info:
+            email, full_name = info
+            await publish_event(
+                "payment_failed_emails",
+                {
+                    "email": email,
+                    "user_name": full_name,
+                    "plan_name": plan_name,
+                    "workspace_name": None,
+                    "amount": amount_str,
+                    "product_name": "Cubex Career",
+                },
+            )
+    else:
+        info = await _get_api_workspace_owner_email_info(session, subscription.id)
+        if info:
+            email, full_name, workspace_name = info
+            await publish_event(
+                "payment_failed_emails",
+                {
+                    "email": email,
+                    "user_name": full_name,
+                    "plan_name": plan_name,
+                    "workspace_name": workspace_name,
+                    "amount": amount_str,
+                    "product_name": "Cubex API",
+                },
+            )
+
+
+# =============================================================================
+# Checkout Processing Helpers
+# =============================================================================
+
+
+async def _process_career_checkout(
+    stripe_subscription_id: str,
+    stripe_customer_id: str,
+    user_id: UUID,
+    plan_id: UUID,
+) -> None:
+    """Process checkout completion for Career subscription."""
+    stripe_logger.info(
+        f"Processing Career checkout completed: user={user_id}, "
+        f"subscription={stripe_subscription_id}"
+    )
+    async with AsyncSessionLocal.begin() as session:
+        await career_subscription_service.handle_checkout_completed(
+            session,
+            stripe_subscription_id=stripe_subscription_id,
+            stripe_customer_id=stripe_customer_id,
+            user_id=user_id,
+            plan_id=plan_id,
+            commit_self=False,
+        )
+    stripe_logger.info(
+        f"Career checkout completed processed successfully: user={user_id}"
+    )
+
+
+async def _process_api_checkout(
+    stripe_subscription_id: str,
+    stripe_customer_id: str,
+    workspace_id: UUID,
+    plan_id: UUID,
+    seat_count: int,
+) -> None:
+    """Process checkout completion for API subscription."""
+    stripe_logger.info(
+        f"Processing API checkout completed: workspace={workspace_id}, "
+        f"subscription={stripe_subscription_id}"
+    )
+    async with AsyncSessionLocal.begin() as session:
+        await api_subscription_service.handle_checkout_completed(
+            session,
+            stripe_subscription_id=stripe_subscription_id,
+            stripe_customer_id=stripe_customer_id,
+            workspace_id=workspace_id,
+            plan_id=plan_id,
+            seat_count=seat_count,
+            commit_self=False,
+        )
+    stripe_logger.info(
+        f"API checkout completed processed successfully: workspace={workspace_id}"
+    )
+
+
+# =============================================================================
+# Subscription Update/Delete Helpers
+# =============================================================================
+
+
+async def _process_subscription_update(stripe_subscription_id: str) -> None:
+    """Process subscription update event."""
+    stripe_logger.info(f"Processing subscription updated: {stripe_subscription_id}")
+
+    async with AsyncSessionLocal.begin() as session:
+        subscription = await subscription_db.get_by_stripe_subscription_id(
+            session, stripe_subscription_id
+        )
+        if not subscription:
+            stripe_logger.warning(
+                f"Subscription {stripe_subscription_id} not found, skipping update"
+            )
+            return
+
+        old_plan_id = subscription.plan_id
+        old_plan_name = subscription.plan.name
+
+        # Route to appropriate service
+        if subscription.plan.product_type == ProductType.CAREER:
+            updated = await career_subscription_service.handle_subscription_updated(
+                session,
+                stripe_subscription_id=stripe_subscription_id,
+                commit_self=False,
+            )
+            stripe_logger.info(f"Career subscription updated: {stripe_subscription_id}")
+        else:
+            updated = await api_subscription_service.handle_subscription_updated(
+                session,
+                stripe_subscription_id=stripe_subscription_id,
+                commit_self=False,
+            )
+            stripe_logger.info(f"API subscription updated: {stripe_subscription_id}")
+
+        # Send email if plan changed
+        if updated and updated.plan_id != old_plan_id:
+            await _send_subscription_activated_email(session, updated, old_plan_name)
+
+
+async def _process_subscription_deletion(stripe_subscription_id: str) -> None:
+    """Process subscription deletion event."""
+    stripe_logger.info(f"Processing subscription deleted: {stripe_subscription_id}")
+
+    async with AsyncSessionLocal.begin() as session:
+        subscription = await subscription_db.get_by_stripe_subscription_id(
+            session, stripe_subscription_id
+        )
+        if not subscription:
+            stripe_logger.warning(
+                f"Subscription {stripe_subscription_id} not found, skipping delete"
+            )
+            return
+
+        plan = await plan_db.get_by_id(session, subscription.plan_id)
+        plan_name = plan.name if plan else "your plan"
+
+        # Route to appropriate service
+        if subscription.plan.product_type == ProductType.CAREER:
+            await career_subscription_service.handle_subscription_deleted(
+                session,
+                stripe_subscription_id=stripe_subscription_id,
+                commit_self=False,
+            )
+            stripe_logger.info(f"Career subscription deleted: {stripe_subscription_id}")
+        else:
+            await api_subscription_service.handle_subscription_deleted(
+                session,
+                stripe_subscription_id=stripe_subscription_id,
+                commit_self=False,
+            )
+            stripe_logger.info(f"API subscription deleted: {stripe_subscription_id}")
+
+        # Send cancellation email
+        await _send_subscription_canceled_email(session, subscription, plan_name)
+
+
+async def _process_payment_failure(
+    stripe_subscription_id: str | None,
+    amount_due: int | None,
+) -> None:
+    """Process payment failure - send notification email."""
+    if not stripe_subscription_id:
+        return
+
+    async with AsyncSessionLocal() as session:
+        subscription = await subscription_db.get_by_stripe_subscription_id(
+            session, stripe_subscription_id
+        )
+        if not subscription:
+            return
+
+        plan = await plan_db.get_by_id(session, subscription.plan_id)
+        plan_name = plan.name if plan else "your plan"
+        amount_str = f"${amount_due / 100:.2f}" if amount_due else None
+
+        await _send_payment_failed_email(session, subscription, plan_name, amount_str)
+
+
+# =============================================================================
+# Main Event Handlers
+# =============================================================================
 
 
 async def handle_stripe_checkout_completed(event: dict[str, Any]) -> None:
@@ -72,28 +382,11 @@ async def handle_stripe_checkout_completed(event: dict[str, Any]) -> None:
     Handle checkout.session.completed events from Stripe.
 
     Routes to API or Career service based on product_type in metadata.
-
-    Args:
-        event: Event data containing:
-            - event_id (str): Stripe event ID for idempotency
-            - stripe_subscription_id (str): Stripe subscription ID
-            - stripe_customer_id (str): Stripe customer ID
-            - product_type (str): "api" or "career"
-            - workspace_id (str | None): Workspace UUID (for API)
-            - user_id (str | None): User UUID (for Career)
-            - plan_id (str): Plan UUID
-            - seat_count (int): Number of seats (API only)
-
-    Raises:
-        Exception: If processing fails, exception is raised to trigger retry.
     """
     event_id = event["event_id"]
 
-    # Idempotency check
     if await _is_event_already_processed(event_id):
-        stripe_logger.info(
-            f"Checkout completed event {event_id} already processed, skipping"
-        )
+        stripe_logger.info(f"Checkout event {event_id} already processed, skipping")
         return
 
     stripe_subscription_id = event["stripe_subscription_id"]
@@ -101,66 +394,27 @@ async def handle_stripe_checkout_completed(event: dict[str, Any]) -> None:
     product_type = event.get("product_type", "api")
     plan_id = UUID(event["plan_id"])
 
-    if product_type == "career":
-        # Career subscription (user-based)
-        user_id = UUID(event["user_id"])
-        stripe_logger.info(
-            f"Processing Career checkout completed: user={user_id}, "
-            f"subscription={stripe_subscription_id}"
-        )
-
-        try:
-            async with AsyncSessionLocal.begin() as session:
-                await career_subscription_service.handle_checkout_completed(
-                    session,
-                    stripe_subscription_id=stripe_subscription_id,
-                    stripe_customer_id=stripe_customer_id,
-                    user_id=user_id,
-                    plan_id=plan_id,
-                    commit_self=False,
-                )
-
-            stripe_logger.info(
-                f"Career checkout completed processed successfully: user={user_id}"
+    try:
+        if product_type == "career":
+            await _process_career_checkout(
+                stripe_subscription_id,
+                stripe_customer_id,
+                UUID(event["user_id"]),
+                plan_id,
             )
-            # Mark event as processed only after successful completion
-            await _mark_event_as_processed(event_id)
-        except Exception as e:
-            stripe_logger.error(
-                f"Failed to process Career checkout completed for user {user_id}: {e}"
+        else:
+            await _process_api_checkout(
+                stripe_subscription_id,
+                stripe_customer_id,
+                UUID(event["workspace_id"]),
+                plan_id,
+                event["seat_count"],
             )
-            raise
-    else:
-        # API subscription (workspace-based)
-        workspace_id = UUID(event["workspace_id"])
-        seat_count = event["seat_count"]
-        stripe_logger.info(
-            f"Processing API checkout completed: workspace={workspace_id}, "
-            f"subscription={stripe_subscription_id}"
-        )
-
-        try:
-            async with AsyncSessionLocal.begin() as session:
-                await api_subscription_service.handle_checkout_completed(
-                    session,
-                    stripe_subscription_id=stripe_subscription_id,
-                    stripe_customer_id=stripe_customer_id,
-                    workspace_id=workspace_id,
-                    plan_id=plan_id,
-                    seat_count=seat_count,
-                    commit_self=False,
-                )
-
-            stripe_logger.info(
-                f"API checkout completed processed successfully: workspace={workspace_id}"
-            )
-            # Mark event as processed only after successful completion
-            await _mark_event_as_processed(event_id)
-        except Exception as e:
-            stripe_logger.error(
-                f"Failed to process API checkout completed for workspace {workspace_id}: {e}"
-            )
-            raise
+        await _mark_event_as_processed(event_id)
+    except Exception as e:
+        entity_id = event.get("user_id") or event.get("workspace_id")
+        stripe_logger.error(f"Failed to process checkout for {entity_id}: {e}")
+        raise
 
 
 async def handle_stripe_subscription_updated(event: dict[str, Any]) -> None:
@@ -168,18 +422,9 @@ async def handle_stripe_subscription_updated(event: dict[str, Any]) -> None:
     Handle customer.subscription.created/updated events from Stripe.
 
     Routes to API or Career service based on the subscription's plan product type.
-
-    Args:
-        event: Event data containing:
-            - event_id (str): Stripe event ID for idempotency
-            - stripe_subscription_id (str): Stripe subscription ID
-
-    Raises:
-        Exception: If processing fails, exception is raised to trigger retry.
     """
     event_id = event["event_id"]
 
-    # Idempotency check
     if await _is_event_already_processed(event_id):
         stripe_logger.info(
             f"Subscription updated event {event_id} already processed, skipping"
@@ -188,102 +433,9 @@ async def handle_stripe_subscription_updated(event: dict[str, Any]) -> None:
 
     stripe_subscription_id = event["stripe_subscription_id"]
 
-    stripe_logger.info(f"Processing subscription updated: {stripe_subscription_id}")
-
     try:
-        async with AsyncSessionLocal.begin() as session:
-            # Look up subscription to determine product type
-            subscription = await subscription_db.get_by_stripe_subscription_id(
-                session, stripe_subscription_id
-            )
-
-            if not subscription:
-                stripe_logger.warning(
-                    f"Subscription {stripe_subscription_id} not found, skipping update"
-                )
-                return
-
-            # Store old plan info to detect changes
-            old_plan_id = subscription.plan_id
-            old_plan_name = subscription.plan.name
-
-            # Route to appropriate service based on plan's product type
-            if subscription.plan.product_type == ProductType.CAREER:
-                updated_subscription = (
-                    await career_subscription_service.handle_subscription_updated(
-                        session,
-                        stripe_subscription_id=stripe_subscription_id,
-                        commit_self=False,
-                    )
-                )
-                stripe_logger.info(
-                    f"Career subscription updated: {stripe_subscription_id}"
-                )
-
-                # Send email notification if plan changed (upgrade/downgrade)
-                if updated_subscription and updated_subscription.plan_id != old_plan_id:
-                    # Get user email from career subscription context
-                    context = await career_subscription_context_db.get_by_subscription(
-                        session, updated_subscription.id
-                    )
-                    if context:
-                        user = await user_db.get_by_id(session, context.user_id)
-                        if user:
-                            await publish_event(
-                                "subscription_activated_emails",
-                                {
-                                    "email": user.email,
-                                    "full_name": user.full_name or "Valued Customer",
-                                    "plan_name": updated_subscription.plan.name,
-                                    "product_type": ProductType.CAREER.value,
-                                },
-                            )
-                            stripe_logger.info(
-                                f"Plan change email queued for {user.email}: "
-                                f"{old_plan_name} -> {updated_subscription.plan.name}"
-                            )
-            else:
-                updated_subscription = (
-                    await api_subscription_service.handle_subscription_updated(
-                        session,
-                        stripe_subscription_id=stripe_subscription_id,
-                        commit_self=False,
-                    )
-                )
-                stripe_logger.info(
-                    f"API subscription updated: {stripe_subscription_id}"
-                )
-
-                # Send email notification if plan changed (upgrade/downgrade)
-                if updated_subscription and updated_subscription.plan_id != old_plan_id:
-                    # Get workspace owner email from API subscription context
-                    context = await api_subscription_context_db.get_by_subscription(
-                        session, updated_subscription.id
-                    )
-                    if context:
-                        workspace = await workspace_db.get_by_id(
-                            session, context.workspace_id
-                        )
-                        if workspace and workspace.owner:
-                            await publish_event(
-                                "subscription_activated_emails",
-                                {
-                                    "email": workspace.owner.email,
-                                    "full_name": workspace.owner.full_name
-                                    or "Valued Customer",
-                                    "plan_name": updated_subscription.plan.name,
-                                    "product_type": ProductType.API.value,
-                                    "workspace_name": workspace.display_name,
-                                },
-                            )
-                            stripe_logger.info(
-                                f"Plan change email queued for {workspace.owner.email}: "
-                                f"{old_plan_name} -> {updated_subscription.plan.name}"
-                            )
-
-        # Mark event as processed only after successful completion
+        await _process_subscription_update(stripe_subscription_id)
         await _mark_event_as_processed(event_id)
-
     except Exception as e:
         stripe_logger.error(
             f"Failed to process subscription updated {stripe_subscription_id}: {e}"
@@ -297,18 +449,9 @@ async def handle_stripe_subscription_deleted(event: dict[str, Any]) -> None:
 
     Routes to API or Career service based on the subscription's plan product type.
     Freezes workspace (API) or downgrades user (Career) when subscription is canceled.
-
-    Args:
-        event: Event data containing:
-            - event_id (str): Stripe event ID for idempotency
-            - stripe_subscription_id (str): Stripe subscription ID
-
-    Raises:
-        Exception: If processing fails, exception is raised to trigger retry.
     """
     event_id = event["event_id"]
 
-    # Idempotency check
     if await _is_event_already_processed(event_id):
         stripe_logger.info(
             f"Subscription deleted event {event_id} already processed, skipping"
@@ -317,88 +460,9 @@ async def handle_stripe_subscription_deleted(event: dict[str, Any]) -> None:
 
     stripe_subscription_id = event["stripe_subscription_id"]
 
-    stripe_logger.info(f"Processing subscription deleted: {stripe_subscription_id}")
-
     try:
-        async with AsyncSessionLocal.begin() as session:
-            # Look up subscription to determine product type
-            subscription = await subscription_db.get_by_stripe_subscription_id(
-                session, stripe_subscription_id
-            )
-
-            if not subscription:
-                stripe_logger.warning(
-                    f"Subscription {stripe_subscription_id} not found, skipping delete"
-                )
-                return
-
-            # Get plan info for email
-            plan = await plan_db.get_by_id(session, subscription.plan_id)
-            plan_name = plan.name if plan else "your plan"
-
-            # Route to appropriate service based on plan's product type
-            if subscription.plan.product_type == ProductType.CAREER:
-                await career_subscription_service.handle_subscription_deleted(
-                    session,
-                    stripe_subscription_id=stripe_subscription_id,
-                    commit_self=False,
-                )
-                stripe_logger.info(
-                    f"Career subscription deleted: {stripe_subscription_id}"
-                )
-
-                # Queue cancellation email for Career user
-                context = await career_subscription_context_db.get_by_subscription(
-                    session, subscription.id
-                )
-                if context:
-                    user = await user_db.get_by_id(session, context.user_id)
-                    if user:
-                        await publish_event(
-                            "subscription_canceled_emails",
-                            {
-                                "email": user.email,
-                                "user_name": user.full_name,
-                                "plan_name": plan_name,
-                                "workspace_name": None,
-                                "product_name": "Cubex Career",
-                            },
-                        )
-            else:
-                await api_subscription_service.handle_subscription_deleted(
-                    session,
-                    stripe_subscription_id=stripe_subscription_id,
-                    commit_self=False,
-                )
-                stripe_logger.info(
-                    f"API subscription deleted: {stripe_subscription_id}"
-                )
-
-                # Queue cancellation email for API workspace owner
-                context = await api_subscription_context_db.get_by_subscription(
-                    session, subscription.id
-                )
-                if context:
-                    workspace = await workspace_db.get_by_id(
-                        session, context.workspace_id
-                    )
-                    if workspace:
-                        owner = await user_db.get_by_id(session, workspace.owner_id)
-                        if owner:
-                            await publish_event(
-                                "subscription_canceled_emails",
-                                {
-                                    "email": owner.email,
-                                    "user_name": owner.full_name,
-                                    "plan_name": plan_name,
-                                    "workspace_name": workspace.display_name,
-                                    "product_name": "Cubex API",
-                                },
-                            )
-
-        # Mark event as processed only after successful completion
+        await _process_subscription_deletion(stripe_subscription_id)
         await _mark_event_as_processed(event_id)
-
     except Exception as e:
         stripe_logger.error(
             f"Failed to process subscription deleted {stripe_subscription_id}: {e}"
@@ -411,22 +475,9 @@ async def handle_stripe_payment_failed(event: dict[str, Any]) -> None:
     Handle invoice.payment_failed events from Stripe.
 
     Sends payment failure notification email and logs the failure.
-    Subscription status will be updated via customer.subscription.updated event.
-
-    Args:
-        event: Event data containing:
-            - event_id (str): Stripe event ID for idempotency
-            - stripe_subscription_id (str | None): Stripe subscription ID
-            - customer_email (str | None): Customer email
-            - amount_due (int | None): Amount due in cents
-
-    Note:
-        The subscription status update will come via a separate
-        subscription.updated event from Stripe.
     """
     event_id = event["event_id"]
 
-    # Idempotency check
     if await _is_event_already_processed(event_id):
         stripe_logger.info(
             f"Payment failed event {event_id} already processed, skipping"
@@ -438,78 +489,14 @@ async def handle_stripe_payment_failed(event: dict[str, Any]) -> None:
     amount_due = event.get("amount_due")
 
     stripe_logger.warning(
-        f"Payment failed for subscription {stripe_subscription_id}, "
-        f"customer: {customer_email}"
+        f"Payment failed for subscription {stripe_subscription_id}, customer: {customer_email}"
     )
 
-    # Send payment failed email if we have subscription info
-    if stripe_subscription_id:
-        try:
-            async with AsyncSessionLocal() as session:
-                subscription = await subscription_db.get_by_stripe_subscription_id(
-                    session, stripe_subscription_id
-                )
+    try:
+        await _process_payment_failure(stripe_subscription_id, amount_due)
+    except Exception as e:
+        stripe_logger.error(f"Failed to queue payment failed email: {e}")
 
-                if subscription:
-                    plan = await plan_db.get_by_id(session, subscription.plan_id)
-                    plan_name = plan.name if plan else "your plan"
-
-                    # Format amount (convert cents to dollars)
-                    amount_str = None
-                    if amount_due:
-                        amount_str = f"${amount_due / 100:.2f}"
-
-                    if subscription.product_type == ProductType.CAREER:
-                        # Career subscription - email the user
-                        context = (
-                            await career_subscription_context_db.get_by_subscription(
-                                session, subscription.id
-                            )
-                        )
-                        if context:
-                            user = await user_db.get_by_id(session, context.user_id)
-                            if user:
-                                await publish_event(
-                                    "payment_failed_emails",
-                                    {
-                                        "email": user.email,
-                                        "user_name": user.full_name,
-                                        "plan_name": plan_name,
-                                        "workspace_name": None,
-                                        "amount": amount_str,
-                                        "product_name": "Cubex Career",
-                                    },
-                                )
-                    else:
-                        # API subscription - email the workspace owner
-                        context = await api_subscription_context_db.get_by_subscription(
-                            session, subscription.id
-                        )
-                        if context:
-                            workspace = await workspace_db.get_by_id(
-                                session, context.workspace_id
-                            )
-                            if workspace:
-                                owner = await user_db.get_by_id(
-                                    session, workspace.owner_id
-                                )
-                                if owner:
-                                    await publish_event(
-                                        "payment_failed_emails",
-                                        {
-                                            "email": owner.email,
-                                            "user_name": owner.full_name,
-                                            "plan_name": plan_name,
-                                            "workspace_name": workspace.display_name,
-                                            "amount": amount_str,
-                                            "product_name": "Cubex API",
-                                        },
-                                    )
-        except Exception as e:
-            # Don't fail the handler if email queueing fails
-            stripe_logger.error(f"Failed to queue payment failed email: {e}")
-
-    # Mark event as processed
     await _mark_event_as_processed(event_id)
 
 
