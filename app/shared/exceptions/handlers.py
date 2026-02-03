@@ -10,11 +10,16 @@ from app.shared.exceptions.types import (
     BadRequestException,
     ConflictException,
     DatabaseException,
+    ForbiddenException,
+    IdempotencyException,
     NotFoundException,
     OAuthException,
     OTPExpiredException,
     OTPInvalidException,
+    RateLimitException,
     RateLimitExceededException,
+    StripeAPIException,
+    StripeCardException,
     TooManyAttemptsException,
 )
 
@@ -233,6 +238,120 @@ async def bad_request_exception_handler(request: Request, exc: Exception):
     )
 
 
+async def forbidden_exception_handler(request: Request, exc: Exception):
+    """
+    Handles forbidden exceptions by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (ForbiddenException): The forbidden exception instance.
+
+    Returns:
+        JSONResponse: A response containing the error message and status code 403.
+    """
+    forb_exc = cast(ForbiddenException, exc)
+    request_logger.warning(f"ForbiddenException: {exc}")
+    return JSONResponse(
+        status_code=forb_exc.status_code,
+        content={"detail": str(exc)},
+    )
+
+
+async def stripe_api_exception_handler(request: Request, exc: Exception):
+    """
+    Handles Stripe API exceptions by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (StripeAPIException): The Stripe API exception instance.
+
+    Returns:
+        JSONResponse: A response containing the error details and appropriate status code.
+    """
+    stripe_exc = cast(StripeAPIException, exc)
+    request_logger.error(
+        f"StripeAPIException: {exc} | Request-Id: {stripe_exc.request_id}"
+    )
+    return JSONResponse(
+        status_code=stripe_exc.status_code,
+        content={
+            "detail": str(exc),
+            "error_type": stripe_exc.error_type,
+            "stripe_code": stripe_exc.stripe_code,
+            "request_id": stripe_exc.request_id,
+        },
+    )
+
+
+async def stripe_card_exception_handler(request: Request, exc: Exception):
+    """
+    Handles Stripe card exceptions by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (StripeCardException): The Stripe card exception instance.
+
+    Returns:
+        JSONResponse: A response containing the card error details and status code 402.
+    """
+    card_exc = cast(StripeCardException, exc)
+    request_logger.warning(
+        f"StripeCardException: {exc} | Decline code: {card_exc.decline_code}"
+    )
+    return JSONResponse(
+        status_code=card_exc.status_code,
+        content={
+            "detail": str(exc),
+            "stripe_code": card_exc.stripe_code,
+            "decline_code": card_exc.decline_code,
+            "param": card_exc.param,
+        },
+    )
+
+
+async def idempotency_exception_handler(request: Request, exc: Exception):
+    """
+    Handles idempotency exceptions by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (IdempotencyException): The idempotency exception instance.
+
+    Returns:
+        JSONResponse: A response containing the error details and status code 409.
+    """
+    idemp_exc = cast(IdempotencyException, exc)
+    request_logger.warning(
+        f"IdempotencyException: {exc} | Request-Id: {idemp_exc.request_id}"
+    )
+    return JSONResponse(
+        status_code=idemp_exc.status_code,
+        content={
+            "detail": str(exc),
+            "request_id": idemp_exc.request_id,
+        },
+    )
+
+
+async def stripe_rate_limit_exception_handler(request: Request, exc: Exception):
+    """
+    Handles Stripe rate limit exceptions by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (RateLimitException): The Stripe rate limit exception instance.
+
+    Returns:
+        JSONResponse: A response containing the error message and status code 429.
+    """
+    rate_exc = cast(RateLimitException, exc)
+    request_logger.warning(f"RateLimitException (Stripe): {exc}")
+    return JSONResponse(
+        status_code=rate_exc.status_code,
+        content={"detail": str(exc)},
+    )
+
+
 exception_schema: dict[int | str, dict[str, Any]] = {
     status.HTTP_400_BAD_REQUEST: {
         "description": "Bad Request",
@@ -297,5 +416,10 @@ __all__ = [
     "not_found_exception_handler",
     "conflict_exception_handler",
     "bad_request_exception_handler",
+    "forbidden_exception_handler",
+    "stripe_api_exception_handler",
+    "stripe_card_exception_handler",
+    "idempotency_exception_handler",
+    "stripe_rate_limit_exception_handler",
     "exception_schema",
 ]

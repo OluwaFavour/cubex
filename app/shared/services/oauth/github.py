@@ -412,8 +412,6 @@ class GitHubOAuthService(BaseOAuthProvider):
                 )
                 if attempt < max_retries:
                     # Small delay before retry
-                    import asyncio
-
                     await asyncio.sleep(0.5)
                     continue
 

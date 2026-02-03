@@ -328,3 +328,227 @@ class EmailManagerService:
             context=context,
             recipient_name=display_name,
         )
+
+    @classmethod
+    async def send_subscription_activated_email(
+        cls,
+        email: str,
+        user_name: str | None = None,
+        plan_name: str | None = None,
+        workspace_name: str | None = None,
+        seat_count: int | None = None,
+        product_name: str = "Cubex",
+    ) -> bool:
+        """
+        Send a subscription activation confirmation email.
+
+        Notifies the user when their subscription becomes active.
+
+        Args:
+            email: Recipient email address.
+            user_name: Recipient name for personalization.
+            plan_name: Name of the subscribed plan.
+            workspace_name: Name of the workspace (for API subscriptions).
+            seat_count: Number of seats in the subscription (for API subscriptions).
+            product_name: Product name (e.g., "Cubex API", "Cubex Career").
+
+        Returns:
+            bool: True if email was sent successfully, False otherwise.
+
+        Example:
+            >>> await EmailManagerService.send_subscription_activated_email(
+            ...     email="owner@example.com",
+            ...     user_name="John",
+            ...     plan_name="Pro",
+            ...     workspace_name="Acme Corp",
+            ...     seat_count=5,
+            ...     product_name="Cubex API",
+            ... )
+            True
+        """
+        display_name = user_name or "User"
+
+        context = {
+            "name": display_name,
+            "plan_name": plan_name or "your plan",
+            "workspace_name": workspace_name,
+            "seat_count": seat_count,
+            "product_name": product_name,
+        }
+
+        return await cls.send_email(
+            email=email,
+            subject=f"Your {product_name} Subscription is Active - {settings.APP_NAME}",
+            html_template="subscription_activated.html",
+            text_template="subscription_activated.txt",
+            context=context,
+            recipient_name=display_name,
+        )
+
+    @classmethod
+    async def send_subscription_canceled_email(
+        cls,
+        email: str,
+        user_name: str | None = None,
+        plan_name: str | None = None,
+        workspace_name: str | None = None,
+        product_name: str = "Cubex",
+    ) -> bool:
+        """
+        Send a subscription cancellation confirmation email.
+
+        Notifies the user when their subscription is canceled.
+
+        Args:
+            email: Recipient email address.
+            user_name: Recipient name for personalization.
+            plan_name: Name of the canceled plan.
+            workspace_name: Name of the workspace (for API subscriptions).
+            product_name: Product name (e.g., "Cubex API", "Cubex Career").
+
+        Returns:
+            bool: True if email was sent successfully, False otherwise.
+
+        Example:
+            >>> await EmailManagerService.send_subscription_canceled_email(
+            ...     email="owner@example.com",
+            ...     user_name="John",
+            ...     plan_name="Pro",
+            ...     workspace_name="Acme Corp",
+            ...     product_name="Cubex API",
+            ... )
+            True
+        """
+        display_name = user_name or "User"
+
+        context = {
+            "name": display_name,
+            "plan_name": plan_name or "your plan",
+            "workspace_name": workspace_name,
+            "product_name": product_name,
+        }
+
+        return await cls.send_email(
+            email=email,
+            subject=f"{product_name} Subscription Canceled - {settings.APP_NAME}",
+            html_template="subscription_canceled.html",
+            text_template="subscription_canceled.txt",
+            context=context,
+            recipient_name=display_name,
+        )
+
+    @classmethod
+    async def send_payment_failed_email(
+        cls,
+        email: str,
+        user_name: str | None = None,
+        plan_name: str | None = None,
+        workspace_name: str | None = None,
+        amount: str | None = None,
+        update_payment_url: str | None = None,
+        product_name: str = "Cubex",
+    ) -> bool:
+        """
+        Send a payment failure notification email.
+
+        Notifies the user when a subscription payment fails.
+
+        Args:
+            email: Recipient email address.
+            user_name: Recipient name for personalization.
+            plan_name: Name of the plan.
+            workspace_name: Name of the workspace (for API subscriptions).
+            amount: Payment amount that failed.
+            update_payment_url: URL to update payment method.
+            product_name: Product name (e.g., "Cubex API", "Cubex Career").
+
+        Returns:
+            bool: True if email was sent successfully, False otherwise.
+
+        Example:
+            >>> await EmailManagerService.send_payment_failed_email(
+            ...     email="owner@example.com",
+            ...     user_name="John",
+            ...     plan_name="Pro",
+            ...     workspace_name="Acme Corp",
+            ...     amount="49.00",
+            ...     update_payment_url="https://app.cubex.com/billing",
+            ...     product_name="Cubex API",
+            ... )
+            True
+        """
+        display_name = user_name or "User"
+
+        context = {
+            "name": display_name,
+            "plan_name": plan_name or "your plan",
+            "workspace_name": workspace_name,
+            "amount": amount or "N/A",
+            "update_payment_url": update_payment_url or "#",
+            "product_name": product_name,
+        }
+
+        return await cls.send_email(
+            email=email,
+            subject=f"{product_name} Payment Failed - Action Required - {settings.APP_NAME}",
+            html_template="payment_failed.html",
+            text_template="payment_failed.txt",
+            context=context,
+            recipient_name=display_name,
+        )
+
+    @classmethod
+    async def send_workspace_invitation_email(
+        cls,
+        email: str,
+        inviter_name: str,
+        workspace_name: str,
+        role: str,
+        invitation_link: str,
+        expiry_hours: int = 72,
+    ) -> bool:
+        """
+        Send a workspace invitation email.
+
+        Notifies a user that they've been invited to join a workspace.
+
+        Args:
+            email: Recipient email address (invitee).
+            inviter_name: Name of the person sending the invitation.
+            workspace_name: Name of the workspace.
+            role: Role being offered (e.g., "Admin", "Member").
+            invitation_link: Full URL to accept the invitation.
+            expiry_hours: Hours until invitation expires (default: 72).
+
+        Returns:
+            bool: True if email was sent successfully, False otherwise.
+
+        Example:
+            >>> await EmailManagerService.send_workspace_invitation_email(
+            ...     email="newmember@example.com",
+            ...     inviter_name="John Doe",
+            ...     workspace_name="Acme Corp",
+            ...     role="Member",
+            ...     invitation_link="https://app.cubex.com/invites/accept/abc123",
+            ...     expiry_hours=72,
+            ... )
+            True
+        """
+        context = {
+            "app_name": settings.APP_NAME,
+            "invitee_email": email,
+            "inviter_name": inviter_name,
+            "workspace_name": workspace_name,
+            "role": role,
+            "invitation_link": invitation_link,
+            "expiry_hours": expiry_hours,
+            "year": datetime.now().year,
+        }
+
+        return await cls.send_email(
+            email=email,
+            subject=f"You're invited to join {workspace_name} - {settings.APP_NAME}",
+            html_template="workspace_invitation.html",
+            text_template="workspace_invitation.txt",
+            context=context,
+        )

@@ -6,6 +6,16 @@ from pydantic import BaseModel, Field, model_validator
 from app.infrastructure.messaging.handlers.email_handler import (
     handle_otp_email,
     handle_password_reset_confirmation_email,
+    handle_subscription_activated_email,
+    handle_subscription_canceled_email,
+    handle_payment_failed_email,
+    handle_workspace_invitation_email,
+)
+from app.infrastructure.messaging.handlers.stripe import (
+    handle_stripe_checkout_completed,
+    handle_stripe_subscription_updated,
+    handle_stripe_subscription_deleted,
+    handle_stripe_payment_failed,
 )
 
 
@@ -82,6 +92,78 @@ QUEUE_CONFIG = [
         "retry_ttl": 30 * 1000,  # 30 seconds
         "max_retries": 3,
         "dead_letter_queue": "password_reset_confirmation_emails_dead",
+    },
+    # Subscription Activated Email Queue
+    {
+        "name": "subscription_activated_emails",
+        "handler": handle_subscription_activated_email,
+        "retry_queue": "subscription_activated_emails_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "subscription_activated_emails_dead",
+    },
+    # Subscription Canceled Email Queue
+    {
+        "name": "subscription_canceled_emails",
+        "handler": handle_subscription_canceled_email,
+        "retry_queue": "subscription_canceled_emails_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "subscription_canceled_emails_dead",
+    },
+    # Payment Failed Email Queue
+    {
+        "name": "payment_failed_emails",
+        "handler": handle_payment_failed_email,
+        "retry_queue": "payment_failed_emails_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "payment_failed_emails_dead",
+    },
+    # Workspace Invitation Email Queue
+    {
+        "name": "workspace_invitation_emails",
+        "handler": handle_workspace_invitation_email,
+        "retry_queue": "workspace_invitation_emails_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "workspace_invitation_emails_dead",
+    },
+    # Stripe Checkout Completed - activates subscription after payment
+    {
+        "name": "stripe_checkout_completed",
+        "handler": handle_stripe_checkout_completed,
+        "retry_queue": "stripe_checkout_completed_retry",
+        "retry_ttl": 60 * 1000,  # 1 minute
+        "max_retries": 5,
+        "dead_letter_queue": "stripe_checkout_completed_dead",
+    },
+    # Stripe Subscription Updated - syncs subscription status
+    {
+        "name": "stripe_subscription_updated",
+        "handler": handle_stripe_subscription_updated,
+        "retry_queue": "stripe_subscription_updated_retry",
+        "retry_ttl": 60 * 1000,  # 1 minute
+        "max_retries": 5,
+        "dead_letter_queue": "stripe_subscription_updated_dead",
+    },
+    # Stripe Subscription Deleted - freezes workspace
+    {
+        "name": "stripe_subscription_deleted",
+        "handler": handle_stripe_subscription_deleted,
+        "retry_queue": "stripe_subscription_deleted_retry",
+        "retry_ttl": 60 * 1000,  # 1 minute
+        "max_retries": 5,
+        "dead_letter_queue": "stripe_subscription_deleted_dead",
+    },
+    # Stripe Payment Failed - logs failure (subscription update comes separately)
+    {
+        "name": "stripe_payment_failed",
+        "handler": handle_stripe_payment_failed,
+        "retry_queue": "stripe_payment_failed_retry",
+        "retry_ttl": 60 * 1000,  # 1 minute
+        "max_retries": 3,
+        "dead_letter_queue": "stripe_payment_failed_dead",
     },
 ]
 

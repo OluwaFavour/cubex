@@ -1,0 +1,20 @@
+You're Invited to {{ workspace_name }}!
+
+Hi there,
+
+{{ inviter_name }} has invited you to join their workspace on {{ app_name }}.
+
+Workspace: {{ workspace_name }}
+Role: {{ role }}
+
+Click the link below to accept this invitation:
+{{ invitation_link }}
+
+IMPORTANT: This invitation expires in {{ expiry_hours }} hours.
+
+If you don't have an account yet, you'll be able to create one when accepting the invitation.
+
+---
+This invitation was sent to {{ invitee_email }} by {{ inviter_name }}.
+
+© {{ year }} {{ app_name }}. All rights reserved.

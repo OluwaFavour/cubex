@@ -80,6 +80,17 @@ class Settings(BaseSettings):
     SENTRY_ENVIRONMENT: str = "development"
     SENTRY_TRACES_SAMPLE_RATE: float = 1.0
 
+    # Stripe settings
+    STRIPE_API_KEY: str = "your_stripe_api_key"
+    STRIPE_WEBHOOK_SECRET: str = "your_stripe_webhook_secret"
+    STRIPE_API_BASE_URL: str = "https://api.stripe.com"
+    ## Stripe price settings
+    STRIPE_CUBEX_API_PRICE_PROFESSIONAL: str = "price_1NEXAMPLEPROFESSIONAL"
+    STRIPE_CUBEX_API_PRICE_BASIC: str = "price_1NEXAMPLEBASIC"
+    ## Stripe price settings - Cubex Career
+    STRIPE_CUBEX_CAREER_PRICE_PLUS: str = "price_1NEXAMPLECAREERPLUS"
+    STRIPE_CUBEX_CAREER_PRICE_PRO: str = "price_1NEXAMPLECAREERPRO"
+
     model_config: SettingsConfigDict = SettingsConfigDict(  # type: ignore
         env_file=".env",
         extra="ignore",
@@ -174,6 +185,30 @@ email_manager_logger = setup_logger(
     level=logging.INFO,
     sentry_tag="email_manager",
 )
+stripe_logger = setup_logger(
+    name="stripe_logger",
+    log_file="logs/stripe.log",
+    level=logging.INFO,
+    sentry_tag="stripe",
+)
+plan_logger = setup_logger(
+    name="plan_logger",
+    log_file="logs/plan.log",
+    level=logging.INFO,
+    sentry_tag="plan",
+)
+workspace_logger = setup_logger(
+    name="workspace_logger",
+    log_file="logs/workspace.log",
+    level=logging.INFO,
+    sentry_tag="workspace",
+)
+webhook_logger = setup_logger(
+    name="webhook_logger",
+    log_file="logs/webhook.log",
+    level=logging.INFO,
+    sentry_tag="webhook",
+)
 
 __all__ = [
     "settings",
@@ -189,4 +224,8 @@ __all__ = [
     "redis_logger",
     "rate_limit_logger",
     "email_manager_logger",
+    "stripe_logger",
+    "plan_logger",
+    "workspace_logger",
+    "webhook_logger",
 ]

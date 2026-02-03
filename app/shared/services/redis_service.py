@@ -330,5 +330,49 @@ class RedisService:
             redis_logger.error(f"Redis exists({key}) failed: {str(e)}")
             return False
 
+    @classmethod
+    async def set_if_not_exists(
+        cls,
+        key: str,
+        value: str = "1",
+        ttl: int = 48 * 3600,
+    ) -> bool:
+        """
+        Atomically set a value only if the key does not exist, with TTL.
+
+        Uses Redis SET NX EX command for atomic check-and-set with expiration.
+        Ideal for implementing idempotency checks (e.g., Stripe event deduplication).
+
+        Args:
+            key: The key to set.
+            value: The value to store. Defaults to "1".
+            ttl: Time-to-live in seconds. Defaults to 48 hours.
+
+        Returns:
+            bool: True if the key was set (didn't exist), False if key already existed.
+
+        Example:
+            >>> is_new = await RedisService.set_if_not_exists(f"stripe_event:{event_id}")
+            >>> if not is_new:
+            ...     return  # Already processed
+        """
+        if cls._client is None:
+            redis_logger.warning(
+                f"Redis set_if_not_exists({key}) attempted but client not initialized"
+            )
+            return False
+
+        try:
+            # SET key value NX EX ttl - atomically set if not exists with expiry
+            result = await cls._client.set(key, value, nx=True, ex=ttl)
+            was_set = result is not None
+            redis_logger.debug(
+                f"Redis set_if_not_exists({key}) result: {was_set}, TTL: {ttl}s"
+            )
+            return was_set
+        except Exception as e:
+            redis_logger.error(f"Redis set_if_not_exists({key}) failed: {str(e)}")
+            return False
+
 
 __all__ = ["RedisService"]

@@ -28,6 +28,7 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger("apscheduler").setLevel(logging.DEBUG)
 
 scheduler = AsyncIOScheduler(
+    # Create jobstores per job
     # jobstores={
     #     "refunds": SQLAlchemyJobStore(
     #         url=settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql"),

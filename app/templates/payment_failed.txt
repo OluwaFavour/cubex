@@ -1,0 +1,28 @@
+{{ product_name }} Payment Failed
+
+Hi {{ name }},
+
+We were unable to process your payment for your {{ product_name }} {{ plan_name }} subscription.
+
+Payment Details:
+- Product: {{ product_name }}
+- Plan: {{ plan_name }}
+{% if workspace_name %}- Workspace: {{ workspace_name }}
+{% endif %}- Amount: ${{ amount }}
+
+This could happen for several reasons:
+- Your card may have expired
+- Insufficient funds in your account
+- Your bank declined the transaction
+
+What to do next:
+Please update your payment method in your billing settings to avoid any interruption to your service. We'll automatically retry the payment in a few days.
+
+Update your payment method here: {{ update_payment_url }}
+
+If you continue to experience issues, please contact our support team for assistance.
+
+Best regards,
+The Cubex Team
+
+© 2026 Cubex. All rights reserved.
