@@ -203,25 +203,83 @@ async def handle_stripe_subscription_updated(event: dict[str, Any]) -> None:
                 )
                 return
 
+            # Store old plan info to detect changes
+            old_plan_id = subscription.plan_id
+            old_plan_name = subscription.plan.name
+
             # Route to appropriate service based on plan's product type
             if subscription.plan.product_type == ProductType.CAREER:
-                await career_subscription_service.handle_subscription_updated(
-                    session,
-                    stripe_subscription_id=stripe_subscription_id,
-                    commit_self=False,
+                updated_subscription = (
+                    await career_subscription_service.handle_subscription_updated(
+                        session,
+                        stripe_subscription_id=stripe_subscription_id,
+                        commit_self=False,
+                    )
                 )
                 stripe_logger.info(
                     f"Career subscription updated: {stripe_subscription_id}"
                 )
+
+                # Send email notification if plan changed (upgrade/downgrade)
+                if updated_subscription and updated_subscription.plan_id != old_plan_id:
+                    # Get user email from career subscription context
+                    context = await career_subscription_context_db.get_by_subscription(
+                        session, updated_subscription.id
+                    )
+                    if context:
+                        user = await user_db.get_by_id(session, context.user_id)
+                        if user:
+                            await publish_event(
+                                "subscription_activated_emails",
+                                {
+                                    "email": user.email,
+                                    "full_name": user.full_name or "Valued Customer",
+                                    "plan_name": updated_subscription.plan.name,
+                                    "product_type": ProductType.CAREER.value,
+                                },
+                            )
+                            stripe_logger.info(
+                                f"Plan change email queued for {user.email}: "
+                                f"{old_plan_name} -> {updated_subscription.plan.name}"
+                            )
             else:
-                await api_subscription_service.handle_subscription_updated(
-                    session,
-                    stripe_subscription_id=stripe_subscription_id,
-                    commit_self=False,
+                updated_subscription = (
+                    await api_subscription_service.handle_subscription_updated(
+                        session,
+                        stripe_subscription_id=stripe_subscription_id,
+                        commit_self=False,
+                    )
                 )
                 stripe_logger.info(
                     f"API subscription updated: {stripe_subscription_id}"
                 )
+
+                # Send email notification if plan changed (upgrade/downgrade)
+                if updated_subscription and updated_subscription.plan_id != old_plan_id:
+                    # Get workspace owner email from API subscription context
+                    context = await api_subscription_context_db.get_by_subscription(
+                        session, updated_subscription.id
+                    )
+                    if context:
+                        workspace = await workspace_db.get_by_id(
+                            session, context.workspace_id
+                        )
+                        if workspace and workspace.owner:
+                            await publish_event(
+                                "subscription_activated_emails",
+                                {
+                                    "email": workspace.owner.email,
+                                    "full_name": workspace.owner.full_name
+                                    or "Valued Customer",
+                                    "plan_name": updated_subscription.plan.name,
+                                    "product_type": ProductType.API.value,
+                                    "workspace_name": workspace.display_name,
+                                },
+                            )
+                            stripe_logger.info(
+                                f"Plan change email queued for {workspace.owner.email}: "
+                                f"{old_plan_name} -> {updated_subscription.plan.name}"
+                            )
 
         # Mark event as processed only after successful completion
         await _mark_event_as_processed(event_id)
