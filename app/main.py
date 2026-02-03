@@ -232,7 +232,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
-app.include_router(webhook_router)
+app.include_router(webhook_router, tags=["Webhooks"])
 app.include_router(workspace_router, prefix="/api", tags=["API - Workspaces"])
 app.include_router(api_subscription_router, prefix="/api", tags=["API - Subscriptions"])
 app.include_router(

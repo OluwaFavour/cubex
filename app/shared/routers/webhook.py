@@ -17,7 +17,7 @@ from app.shared.services.payment.stripe.main import Stripe
 from app.infrastructure.messaging.publisher import publish_event
 
 
-router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
+router = APIRouter(prefix="/webhooks")
 
 
 # ============================================================================
@@ -39,7 +39,80 @@ EVENT_QUEUE_MAPPING: dict[str, str] = {
 # ============================================================================
 
 
-@router.post("/stripe", status_code=status.HTTP_200_OK)
+@router.post(
+    "/stripe",
+    status_code=status.HTTP_200_OK,
+    summary="Handle Stripe webhook events",
+    description="""
+Receives and processes Stripe webhook events with secure signature verification.
+
+This endpoint is called by Stripe to notify the application of payment events.
+Events are verified using webhook signature and then published to message queues
+for asynchronous processing.
+
+**Handled Event Types:**
+- `checkout.session.completed` - New subscription checkout completed
+- `customer.subscription.created` - Subscription created
+- `customer.subscription.updated` - Subscription modified (plan change, renewal)
+- `customer.subscription.deleted` - Subscription cancelled
+- `invoice.paid` - Invoice successfully paid
+- `invoice.payment_failed` - Invoice payment failed
+
+**Processing Flow:**
+1. Verify Stripe signature header
+2. Parse and validate event payload
+3. Publish to appropriate message queue
+4. Return 200 OK immediately (async processing)
+
+**Note:** This endpoint should only be called by Stripe's webhook system.
+Configure the webhook URL in your Stripe Dashboard.
+    """,
+    responses={
+        200: {
+            "description": "Webhook received and processed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "received": {
+                            "summary": "Event received and queued",
+                            "value": {"status": "received"},
+                        },
+                        "ignored": {
+                            "summary": "Unhandled event type",
+                            "value": {"status": "ignored"},
+                        },
+                        "publish_failed": {
+                            "summary": "Failed to publish to queue",
+                            "value": {"status": "publish_failed"},
+                        },
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid request - missing signature or verification failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "missing_signature": {
+                            "summary": "Missing Stripe-Signature header",
+                            "value": {"detail": "Missing Stripe-Signature header"},
+                        },
+                        "invalid_signature": {
+                            "summary": "Signature verification failed",
+                            "value": {"detail": "Invalid signature"},
+                        },
+                        "missing_fields": {
+                            "summary": "Missing event id or type",
+                            "value": {"detail": "Missing event id or type"},
+                        },
+                    }
+                }
+            },
+        },
+    },
+    tags=["Webhooks"],
+)
 async def handle_stripe_webhook(request: Request) -> dict[str, str]:
     """
     Handle Stripe webhook events.
@@ -138,8 +211,10 @@ def _build_queue_message(
                 "stripe_subscription_id": obj.get("subscription"),
                 "stripe_customer_id": obj.get("customer"),
                 "workspace_id": metadata.get("workspace_id"),
+                "user_id": metadata.get("user_id"),
                 "plan_id": metadata.get("plan_id"),
                 "seat_count": int(metadata.get("seat_count", "1")),
+                "product_type": metadata.get("product_type", "api"),
             }
         )
 

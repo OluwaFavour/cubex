@@ -7,7 +7,7 @@ Emails are sent asynchronously to avoid blocking the main request flow.
 
 from typing import Any
 
-from app.shared.config import auth_logger, stripe_logger
+from app.shared.config import auth_logger, stripe_logger, workspace_logger
 from app.shared.enums import OTPPurpose
 from app.shared.services.email_manager import EmailManagerService
 
@@ -261,5 +261,61 @@ async def handle_payment_failed_email(event: dict[str, Any]) -> None:
     except Exception as e:
         stripe_logger.error(
             f"Failed to send payment failed email: email={email}, error={e}"
+        )
+        raise  # Re-raise to trigger retry mechanism
+
+
+async def handle_workspace_invitation_email(event: dict[str, Any]) -> None:
+    """
+    Handle workspace invitation email sending events.
+
+    Sends an invitation email when a user is invited to join a workspace.
+
+    Args:
+        event: Event data containing:
+            - email (str): Recipient (invitee) email address
+            - inviter_name (str): Name of the person sending the invitation
+            - workspace_name (str): Name of the workspace
+            - role (str): Role being offered (e.g., "Admin", "Member")
+            - invitation_link (str): Full URL to accept the invitation
+            - expiry_hours (int): Hours until invitation expires (default: 72)
+
+    Raises:
+        Exception: If email sending fails, exception is raised to trigger retry.
+    """
+    email = event["email"]
+    inviter_name = event["inviter_name"]
+    workspace_name = event["workspace_name"]
+    role = event["role"]
+    invitation_link = event["invitation_link"]
+    expiry_hours = event.get("expiry_hours", 72)
+
+    workspace_logger.info(
+        f"Processing workspace invitation email: email={email}, workspace={workspace_name}"
+    )
+
+    try:
+        result = await EmailManagerService.send_workspace_invitation_email(
+            email=email,
+            inviter_name=inviter_name,
+            workspace_name=workspace_name,
+            role=role,
+            invitation_link=invitation_link,
+            expiry_hours=expiry_hours,
+        )
+
+        if result:
+            workspace_logger.info(
+                f"Workspace invitation email sent successfully: email={email}"
+            )
+        else:
+            workspace_logger.warning(
+                f"Workspace invitation email service returned False: email={email}"
+            )
+            raise Exception(f"Email service failed for {email}")
+
+    except Exception as e:
+        workspace_logger.error(
+            f"Failed to send workspace invitation email: email={email}, error={e}"
         )
         raise  # Re-raise to trigger retry mechanism

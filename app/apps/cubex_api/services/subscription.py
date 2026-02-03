@@ -39,6 +39,7 @@ from app.shared.exceptions.types import (
     NotFoundException,
 )
 from app.shared.services.payment.stripe.main import Stripe
+from app.infrastructure.messaging.publisher import publish_event
 from app.shared.services.payment.stripe.types import (
     CheckoutSession,
     Invoice,
@@ -166,7 +167,7 @@ class SubscriptionService:
         plan_id: UUID,
     ) -> Plan:
         """
-        Get plan by ID.
+        Get API plan by ID.
 
         Args:
             session: Database session.
@@ -176,11 +177,13 @@ class SubscriptionService:
             Plan.
 
         Raises:
-            PlanNotFoundException: If plan not found.
+            PlanNotFoundException: If plan not found or not an API plan.
         """
         plan = await plan_db.get_by_id(session, plan_id)
         if not plan or plan.is_deleted or not plan.is_active:
             raise PlanNotFoundException()
+        if plan.product_type != ProductType.API:
+            raise PlanNotFoundException("Plan is not an API plan.")
         return plan
 
     async def get_active_plans(
@@ -188,15 +191,15 @@ class SubscriptionService:
         session: AsyncSession,
     ) -> list[Plan]:
         """
-        Get all active plans available for purchase.
+        Get all active API plans available for purchase.
 
         Args:
             session: Database session.
 
         Returns:
-            List of active plans.
+            List of active API plans.
         """
-        return await plan_db.get_active_plans(session)
+        return await plan_db.get_active_plans(session, product_type=ProductType.API)
 
     async def create_checkout_session(
         self,
@@ -263,6 +266,7 @@ class SubscriptionService:
                 "workspace_id": str(workspace_id),
                 "plan_id": str(plan_id),
                 "seat_count": str(seat_count),
+                "product_type": "api",
             }
         )
 
@@ -276,6 +280,7 @@ class SubscriptionService:
                 "workspace_id": str(workspace_id),
                 "plan_id": str(plan_id),
                 "seat_count": str(seat_count),
+                "product_type": "api",
             },
             subscription_data=subscription_data,
         )
@@ -366,15 +371,29 @@ class SubscriptionService:
             commit_self=False,
         )
 
-        # Create API subscription context to link subscription to workspace
-        await api_subscription_context_db.create(
-            session,
-            {
-                "subscription_id": subscription.id,
-                "workspace_id": workspace_id,
-            },
-            commit_self=False,
+        # Link subscription to workspace via context
+        # Check if workspace already has a context (from a previous subscription)
+        existing_context = await api_subscription_context_db.get_by_workspace(
+            session, workspace_id
         )
+        if existing_context:
+            # Update existing context to point to new subscription
+            await api_subscription_context_db.update(
+                session,
+                existing_context.id,
+                {"subscription_id": subscription.id},
+                commit_self=False,
+            )
+        else:
+            # Create new API subscription context
+            await api_subscription_context_db.create(
+                session,
+                {
+                    "subscription_id": subscription.id,
+                    "workspace_id": workspace_id,
+                },
+                commit_self=False,
+            )
 
         # Activate workspace
         await workspace_db.update_status(
@@ -390,6 +409,24 @@ class SubscriptionService:
         stripe_logger.info(
             f"Subscription created: {subscription.id} for workspace {workspace_id}"
         )
+
+        # Queue subscription activation email to workspace owner
+        workspace = await workspace_db.get_by_id(session, workspace_id)
+        if workspace:
+            owner = await user_db.get_by_id(session, workspace.owner_id)
+            plan = await plan_db.get_by_id(session, plan_id)
+            if owner and plan:
+                await publish_event(
+                    "subscription_activated_emails",
+                    {
+                        "email": owner.email,
+                        "user_name": owner.full_name,
+                        "plan_name": plan.name,
+                        "workspace_name": workspace.display_name,
+                        "seat_count": seat_count,
+                        "product_name": "Cubex API",
+                    },
+                )
 
         return subscription
 
@@ -456,11 +493,16 @@ class SubscriptionService:
                 new_plan = await plan_db.get_by_stripe_price_id(
                     session, stripe_price_id
                 )
-                if new_plan:
+                if new_plan and new_plan.product_type == ProductType.API:
                     updates["plan_id"] = new_plan.id
                     stripe_logger.info(
                         f"Plan changed for subscription {stripe_subscription_id}: "
                         f"{subscription.plan.name} -> {new_plan.name}"
+                    )
+                elif new_plan:
+                    stripe_logger.warning(
+                        f"Stripe price ID {stripe_price_id} belongs to non-API plan, "
+                        f"ignoring for API subscription {stripe_subscription_id}"
                     )
                 else:
                     stripe_logger.warning(

@@ -87,6 +87,9 @@ class Settings(BaseSettings):
     ## Stripe price settings
     STRIPE_CUBEX_API_PRICE_PROFESSIONAL: str = "price_1NEXAMPLEPROFESSIONAL"
     STRIPE_CUBEX_API_PRICE_BASIC: str = "price_1NEXAMPLEBASIC"
+    ## Stripe price settings - Cubex Career
+    STRIPE_CUBEX_CAREER_PRICE_PLUS: str = "price_1NEXAMPLECAREERPLUS"
+    STRIPE_CUBEX_CAREER_PRICE_PRO: str = "price_1NEXAMPLECAREERPRO"
 
     model_config: SettingsConfigDict = SettingsConfigDict(  # type: ignore
         env_file=".env",

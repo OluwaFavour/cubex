@@ -496,3 +496,59 @@ class EmailManagerService:
             context=context,
             recipient_name=display_name,
         )
+
+    @classmethod
+    async def send_workspace_invitation_email(
+        cls,
+        email: str,
+        inviter_name: str,
+        workspace_name: str,
+        role: str,
+        invitation_link: str,
+        expiry_hours: int = 72,
+    ) -> bool:
+        """
+        Send a workspace invitation email.
+
+        Notifies a user that they've been invited to join a workspace.
+
+        Args:
+            email: Recipient email address (invitee).
+            inviter_name: Name of the person sending the invitation.
+            workspace_name: Name of the workspace.
+            role: Role being offered (e.g., "Admin", "Member").
+            invitation_link: Full URL to accept the invitation.
+            expiry_hours: Hours until invitation expires (default: 72).
+
+        Returns:
+            bool: True if email was sent successfully, False otherwise.
+
+        Example:
+            >>> await EmailManagerService.send_workspace_invitation_email(
+            ...     email="newmember@example.com",
+            ...     inviter_name="John Doe",
+            ...     workspace_name="Acme Corp",
+            ...     role="Member",
+            ...     invitation_link="https://app.cubex.com/invites/accept/abc123",
+            ...     expiry_hours=72,
+            ... )
+            True
+        """
+        context = {
+            "app_name": settings.APP_NAME,
+            "invitee_email": email,
+            "inviter_name": inviter_name,
+            "workspace_name": workspace_name,
+            "role": role,
+            "invitation_link": invitation_link,
+            "expiry_hours": expiry_hours,
+            "year": datetime.now().year,
+        }
+
+        return await cls.send_email(
+            email=email,
+            subject=f"You're invited to join {workspace_name} - {settings.APP_NAME}",
+            html_template="workspace_invitation.html",
+            text_template="workspace_invitation.txt",
+            context=context,
+        )

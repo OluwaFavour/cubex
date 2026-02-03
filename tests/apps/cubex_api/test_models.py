@@ -10,9 +10,8 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-# Import workspace models first to avoid mapper configuration issues
-from app.apps.cubex_api.db.models.workspace import Workspace  # noqa: F401
-
+# Import from shared models which handles the import order correctly
+from app.shared.db.models import Workspace  # noqa: F401
 from app.shared.enums import PlanType, ProductType, SubscriptionStatus
 from app.shared.db.models.plan import Plan, FeatureSchema
 

@@ -9,6 +9,7 @@ from app.infrastructure.messaging.handlers.email_handler import (
     handle_subscription_activated_email,
     handle_subscription_canceled_email,
     handle_payment_failed_email,
+    handle_workspace_invitation_email,
 )
 from app.infrastructure.messaging.handlers.stripe import (
     handle_stripe_checkout_completed,
@@ -118,6 +119,15 @@ QUEUE_CONFIG = [
         "retry_ttl": 30 * 1000,  # 30 seconds
         "max_retries": 3,
         "dead_letter_queue": "payment_failed_emails_dead",
+    },
+    # Workspace Invitation Email Queue
+    {
+        "name": "workspace_invitation_emails",
+        "handler": handle_workspace_invitation_email,
+        "retry_queue": "workspace_invitation_emails_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "workspace_invitation_emails_dead",
     },
     # Stripe Checkout Completed - activates subscription after payment
     {

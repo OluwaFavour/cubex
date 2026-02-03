@@ -44,6 +44,7 @@ from app.shared.exceptions.types import (
     NotFoundException,
 )
 from app.shared.utils import hmac_hash_otp
+from app.infrastructure.messaging.publisher import publish_event
 
 
 # ============================================================================
@@ -712,6 +713,7 @@ class WorkspaceService:
         workspace_id: UUID,
         inviter_id: UUID,
         email: str,
+        callback_url: str,
         role: MemberRole = MemberRole.MEMBER,
         commit_self: bool = True,
     ) -> tuple[WorkspaceInvitation, str]:
@@ -723,6 +725,7 @@ class WorkspaceService:
             workspace_id: Workspace ID.
             inviter_id: User sending the invitation.
             email: Email to invite.
+            callback_url: Frontend URL for accepting the invitation.
             role: Role to assign (cannot be OWNER).
             commit_self: Whether to commit the transaction.
 
@@ -783,6 +786,23 @@ class WorkspaceService:
                 "expires_at": self._calculate_invitation_expiry(),
             },
             commit_self=commit_self,
+        )
+
+        # Queue invitation email
+        inviter = await user_db.get_by_id(session, inviter_id)
+        inviter_name = inviter.full_name if inviter else "A team member"
+        invitation_link = f"{callback_url}?token={raw_token}"
+
+        await publish_event(
+            "workspace_invitation_emails",
+            {
+                "email": email,
+                "inviter_name": inviter_name,
+                "workspace_name": workspace.display_name,
+                "role": role.value.title(),  # e.g., "Member", "Admin"
+                "invitation_link": invitation_link,
+                "expiry_hours": self.INVITATION_EXPIRY_DAYS * 24,
+            },
         )
 
         workspace_logger.info(

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_async_session
-from app.shared.config import request_logger, settings
+from app.shared.config import request_logger
 from app.shared.dependencies.auth import CurrentActiveUser
 from app.apps.cubex_api.db.crud import (
     workspace_member_db,
@@ -50,15 +50,15 @@ from app.apps.cubex_api.services import (
     PermissionDeniedException,
     FreeWorkspaceNoInvitesException,
 )
-from app.shared.enums import MemberRole, MemberStatus
+from app.shared.enums import MemberStatus
+from app.shared.services.oauth.base import OAuthStateManager
 from app.apps.cubex_api.db.models import (
-    Workspace,
     WorkspaceMember,
     WorkspaceInvitation,
 )
 
 
-router = APIRouter(prefix="/workspaces", tags=["Workspaces"])
+router = APIRouter(prefix="/workspaces")
 
 
 # ============================================================================
@@ -1220,6 +1220,14 @@ async def create_invitation(
         f"POST /workspaces/{workspace_id}/invitations "
         f"- user={current_user.id} email={data.email}"
     )
+
+    # Validate callback URL is in allowed CORS origins
+    if not OAuthStateManager.validate_callback_url(data.callback_url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid callback URL. Must be in allowed origins and use HTTPS in production.",
+        )
+
     try:
         async with session.begin():
             invitation, raw_token = await workspace_service.invite_member(
@@ -1228,11 +1236,12 @@ async def create_invitation(
                 inviter_id=current_user.id,
                 email=data.email,
                 role=data.role,
+                callback_url=data.callback_url,
                 commit_self=False,
             )
 
-            # Build invitation URL
-            invitation_url = f"{settings.API_DOMAIN}{settings.ROOT_PATH}/workspaces/invitations/accept?token={raw_token}"
+            # Build invitation URL for the response (frontend URL with token)
+            invitation_url = f"{data.callback_url}?token={raw_token}"
 
             return InvitationCreatedResponse(
                 invitation=_build_invitation_response(invitation),

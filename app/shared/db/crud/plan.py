@@ -21,20 +21,27 @@ class PlanDB(BaseDB[Plan]):
         self,
         session: AsyncSession,
         plan_type: PlanType | None = None,
+        product_type: ProductType | None = None,
     ) -> list[Plan]:
         """
-        Get all active plans, optionally filtered by type.
+        Get all active plans, optionally filtered by type and product.
 
         Args:
             session: Database session.
             plan_type: Optional filter by plan type.
+            product_type: Optional filter by product type (API or CAREER).
 
         Returns:
             List of active plans.
         """
-        filters: dict[str, bool | PlanType] = {"is_active": True, "is_deleted": False}
+        filters: dict[str, bool | PlanType | ProductType] = {
+            "is_active": True,
+            "is_deleted": False,
+        }
         if plan_type:
             filters["type"] = plan_type
+        if product_type:
+            filters["product_type"] = product_type
 
         plans = await self.get_by_filters(session, filters)
         return list(plans)

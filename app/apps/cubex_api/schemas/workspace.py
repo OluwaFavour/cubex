@@ -233,7 +233,11 @@ class InvitationCreate(BaseModel):
 
     model_config = ConfigDict(
         json_schema_extra={
-            "example": {"email": "newmember@example.com", "role": "member"}
+            "example": {
+                "email": "newmember@example.com",
+                "role": "member",
+                "callback_url": "https://app.example.com/invites/accept",
+            }
         }
     )
 
@@ -242,6 +246,13 @@ class InvitationCreate(BaseModel):
         MemberRole,
         Field(description="Role to assign: admin or member"),
     ] = MemberRole.MEMBER
+    callback_url: Annotated[
+        str,
+        Field(
+            description="Frontend URL where user will be redirected to accept invite. "
+            "Token will be appended as query param. Must be in allowed CORS origins."
+        ),
+    ]
 
 
 class InvitationResponse(BaseModel):

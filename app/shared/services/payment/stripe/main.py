@@ -55,6 +55,75 @@ class Stripe:
     _BACKOFF_MAX: float = 60.0  # cap at 60s
     _JITTER: float = 0.2  # +/-20%
 
+    @staticmethod
+    def _flatten_to_payload(
+        payload: dict[str, Any],
+        prefix: str,
+        data: dict[str, Any],
+        *,
+        max_depth: int = 3,
+        _current_depth: int = 0,
+    ) -> None:
+        """
+        Flatten a nested dict into Stripe's form-encoded format.
+
+        Recursively converts nested dictionaries into bracket notation keys
+        that Stripe's API expects for form-encoded requests.
+
+        Example:
+            data = {"metadata": {"user_id": "123", "plan_id": "456"}}
+            prefix = "subscription_data"
+            Result: payload["subscription_data[metadata][user_id]"] = "123"
+                    payload["subscription_data[metadata][plan_id]"] = "456"
+
+        Parameters
+        ----------
+        payload : dict[str, Any]
+            The payload dict to add flattened keys to.
+        prefix : str
+            The base key prefix (e.g., "subscription_data", "metadata").
+        data : dict[str, Any]
+            The dict to flatten.
+        max_depth : int, optional
+            Maximum nesting depth to prevent infinite recursion. Defaults to 3.
+        _current_depth : int
+            Internal counter for recursion depth. Do not set manually.
+        """
+        if _current_depth >= max_depth:
+            # Safety limit reached, convert remaining value to string
+            for key, value in data.items():
+                payload[f"{prefix}[{key}]"] = str(value) if value is not None else ""
+            return
+
+        for key, value in data.items():
+            full_key = f"{prefix}[{key}]"
+            if isinstance(value, dict):
+                # Recurse into nested dict
+                Stripe._flatten_to_payload(
+                    payload,
+                    full_key,
+                    value,
+                    max_depth=max_depth,
+                    _current_depth=_current_depth + 1,
+                )
+            elif isinstance(value, list):
+                # Handle lists (e.g., line_items, tiers)
+                for idx, item in enumerate(value):
+                    if isinstance(item, dict):
+                        Stripe._flatten_to_payload(
+                            payload,
+                            f"{full_key}[{idx}]",
+                            item,
+                            max_depth=max_depth,
+                            _current_depth=_current_depth + 1,
+                        )
+                    else:
+                        payload[f"{full_key}[{idx}]"] = (
+                            str(item) if item is not None else ""
+                        )
+            else:
+                payload[full_key] = str(value) if value is not None else ""
+
     @classmethod
     def _check_api_key(cls) -> None:
         """Validate that a Stripe API key has been configured.
@@ -652,9 +721,7 @@ class Stripe:
         if description is not None:
             payload["description"] = description
         if metadata is not None:
-            # Flatten metadata for form-encoded request: metadata[key]=value
-            for key, value in metadata.items():
-                payload[f"metadata[{key}]"] = str(value)
+            cls._flatten_to_payload(payload, "metadata", metadata)
         if tax_code is not None:
             payload["tax_code"] = tax_code
 
@@ -733,9 +800,7 @@ class Stripe:
         if default_price is not None:
             payload["default_price"] = default_price
         if metadata is not None:
-            # Flatten metadata for form-encoded request: metadata[key]=value
-            for key, value in metadata.items():
-                payload[f"metadata[{key}]"] = str(value)
+            cls._flatten_to_payload(payload, "metadata", metadata)
         if tax_code is not None:
             payload["tax_code"] = tax_code
 
@@ -980,11 +1045,7 @@ class Stripe:
         if product_data is not None:
             if isinstance(product_data, ProductData):
                 product_data = product_data.model_dump(exclude_unset=True)
-            # Flatten product_data for form-encoded request: product_data[key]=value
-            for key, value in product_data.items():
-                payload[f"product_data[{key}]"] = (
-                    str(value) if value is not None else ""
-                )
+            cls._flatten_to_payload(payload, "product_data", product_data)
         if billing_scheme is not None:
             payload["billing_scheme"] = billing_scheme
         if tiers is not None:
@@ -993,12 +1054,8 @@ class Stripe:
                 tier.model_dump(exclude_unset=True) if isinstance(tier, Tier) else tier
                 for tier in tiers
             ]
-            # Flatten tiers for form-encoded request: tiers[0][key]=value, tiers[1][key]=value, etc
             for idx, tier in enumerate(tiers_list):
-                for key, value in tier.items():
-                    payload[f"tiers[{idx}][{key}]"] = (
-                        str(value) if value is not None else ""
-                    )
+                cls._flatten_to_payload(payload, f"tiers[{idx}]", tier)
         if tiers_mode is not None:
             payload["tiers_mode"] = tiers_mode
         if unit_amount is not None:
@@ -1008,23 +1065,15 @@ class Stripe:
         if custom_unit_amount is not None:
             if isinstance(custom_unit_amount, CustomUnitAmountEnabled):
                 custom_unit_amount = custom_unit_amount.model_dump(exclude_unset=True)
-            # Flatten custom_unit_amount for form-encoded request: custom_unit_amount[key]=value
-            for key, value in custom_unit_amount.items():
-                payload[f"custom_unit_amount[{key}]"] = (
-                    str(value) if value is not None else ""
-                )
+            cls._flatten_to_payload(payload, "custom_unit_amount", custom_unit_amount)
         if nickname is not None:
             payload["nickname"] = nickname
         if recurring is not None:
             if isinstance(recurring, Recurring):
                 recurring = recurring.model_dump(exclude_unset=True)
-            # Flatten recurring for form-encoded request: recurring[key]=value
-            for key, value in recurring.items():
-                payload[f"recurring[{key}]"] = str(value) if value is not None else ""
+            cls._flatten_to_payload(payload, "recurring", recurring)
         if metadata is not None:
-            # Flatten metadata for form-encoded request: metadata[key]=value
-            for key, value in metadata.items():
-                payload[f"metadata[{key}]"] = str(value)
+            cls._flatten_to_payload(payload, "metadata", metadata)
         if tax_behavior is not None:
             payload["tax_behavior"] = tax_behavior
 
@@ -1098,13 +1147,11 @@ class Stripe:
         if nickname is not None:
             payload["nickname"] = nickname
         if metadata is not None:
-            # Flatten metadata for form-encoded request: metadata[key]=value
-            for key, value in metadata.items():
-                payload[f"metadata[{key}]"] = str(value)
+            cls._flatten_to_payload(payload, "metadata", metadata)
         if tax_behavior is not None:
             payload["tax_behavior"] = tax_behavior
         if currency_options is not None:
-            # Flatten currency_options for form-encoded request: currency_options[currency][key]=value
+            # Flatten currency_options for form-encoded request
             for currency, options in currency_options.items():
                 options_dict: dict[str, Any]
                 if isinstance(options, CurrencyOptionsCustomUnitAmountEnabled):
@@ -1113,10 +1160,9 @@ class Stripe:
                     options_dict = options
                 else:
                     continue
-                for key, value in options_dict.items():
-                    payload[f"currency_options[{currency}][{key}]"] = (
-                        str(value) if value is not None else ""
-                    )
+                cls._flatten_to_payload(
+                    payload, f"currency_options[{currency}]", options_dict
+                )
 
         headers: dict[str, str] = {}
         if idempotency_key:
@@ -1191,15 +1237,12 @@ class Stripe:
             "mode": mode,
         }
 
-        # Flatten line_items for form-encoded request: line_items[0][key]=value, etc
+        # Flatten line_items for form-encoded request
         for idx, item in enumerate(line_items):
             if isinstance(item, LineItem):
                 item = item.model_dump(exclude_unset=True)
             if isinstance(item, dict):
-                for key, value in item.items():
-                    payload[f"line_items[{idx}][{key}]"] = (
-                        str(value) if value is not None else ""
-                    )
+                cls._flatten_to_payload(payload, f"line_items[{idx}]", item)
 
         if customer is not None:
             payload["customer"] = customer
@@ -1208,25 +1251,15 @@ class Stripe:
         if payment_method_types is not None:
             payload["payment_method_types"] = payment_method_types
         if metadata is not None:
-            # Flatten metadata for form-encoded request: metadata[key]=value
-            for key, value in metadata.items():
-                payload[f"metadata[{key}]"] = str(value)
+            cls._flatten_to_payload(payload, "metadata", metadata)
         if subscription_data is not None:
             if isinstance(subscription_data, SubscriptionData):
                 subscription_data = subscription_data.model_dump(exclude_unset=True)
-            # Flatten subscription_data for form-encoded request: subscription_data[key]=value
-            for key, value in subscription_data.items():
-                payload[f"subscription_data[{key}]"] = (
-                    str(value) if value is not None else ""
-                )
+            cls._flatten_to_payload(payload, "subscription_data", subscription_data)
         if payment_intent_data is not None:
             if isinstance(payment_intent_data, PaymentIntentData):
                 payment_intent_data = payment_intent_data.model_dump(exclude_unset=True)
-            # Flatten payment_intent_data for form-encoded request: payment_intent_data[key]=value
-            for key, value in payment_intent_data.items():
-                payload[f"payment_intent_data[{key}]"] = (
-                    str(value) if value is not None else ""
-                )
+            cls._flatten_to_payload(payload, "payment_intent_data", payment_intent_data)
         headers: dict[str, str] = {}
         if idempotency_key:
             headers["Idempotency-Key"] = idempotency_key
@@ -1633,10 +1666,8 @@ class Stripe:
         if payment_method is not None:
             payload["payment_method"] = payment_method
 
-        # Stripe expects metadata in form-encoded format: metadata[key]=value
         if metadata is not None:
-            for key, value in metadata.items():
-                payload[f"metadata[{key}]"] = value
+            cls._flatten_to_payload(payload, "metadata", metadata)
 
         body = await cls._request("POST", endpoint, data=payload)
         return Customer.model_validate(body)

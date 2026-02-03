@@ -41,7 +41,7 @@ from app.apps.cubex_career.services.subscription import (
 from app.shared.db.models import Plan, Subscription
 
 
-router = APIRouter(prefix="/subscriptions", tags=["Career Subscriptions"])
+router = APIRouter(prefix="/subscriptions")
 
 
 # ============================================================================

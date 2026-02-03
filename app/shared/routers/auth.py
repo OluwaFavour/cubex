@@ -69,7 +69,7 @@ from app.shared.services.oauth import OAuthStateManager
 from app.shared.utils import get_device_info
 
 
-router = APIRouter(tags=["Authentication"])
+router = APIRouter()
 
 # Service instances for product setup
 _workspace_service = WorkspaceService()

@@ -28,6 +28,7 @@ from app.shared.exceptions.types import (
     NotFoundException,
 )
 from app.shared.services.payment.stripe.main import Stripe
+from app.infrastructure.messaging.publisher import publish_event
 from app.shared.services.payment.stripe.types import (
     CheckoutSession,
     Invoice,
@@ -145,10 +146,7 @@ class CareerSubscriptionService:
         Returns:
             List of active Career plans.
         """
-        # Filter by CAREER product type using free plan lookup
-        # Note: get_active_plans filters by plan_type, we need plans for CAREER product
-        plans = await plan_db.get_active_plans(session)
-        return [p for p in plans if p.product_type == ProductType.CAREER]
+        return await plan_db.get_active_plans(session, product_type=ProductType.CAREER)
 
     async def create_free_subscription(
         self,
@@ -373,15 +371,29 @@ class CareerSubscriptionService:
             commit_self=False,
         )
 
-        # Create Career subscription context to link subscription to user
-        await career_subscription_context_db.create(
-            session,
-            {
-                "subscription_id": subscription.id,
-                "user_id": user_id,
-            },
-            commit_self=False,
+        # Link subscription to user via context
+        # Check if user already has a context (from a previous subscription)
+        existing_context = await career_subscription_context_db.get_by_user(
+            session, user_id
         )
+        if existing_context:
+            # Update existing context to point to new subscription
+            await career_subscription_context_db.update(
+                session,
+                existing_context.id,
+                {"subscription_id": subscription.id},
+                commit_self=False,
+            )
+        else:
+            # Create new Career subscription context
+            await career_subscription_context_db.create(
+                session,
+                {
+                    "subscription_id": subscription.id,
+                    "user_id": user_id,
+                },
+                commit_self=False,
+            )
 
         if commit_self:
             await session.commit()
@@ -392,6 +404,22 @@ class CareerSubscriptionService:
         stripe_logger.info(
             f"Career subscription created: {subscription.id} for user {user_id}"
         )
+
+        # Queue subscription activation email to user
+        user = await user_db.get_by_id(session, user_id)
+        plan = await plan_db.get_by_id(session, plan_id)
+        if user and plan:
+            await publish_event(
+                "subscription_activated_emails",
+                {
+                    "email": user.email,
+                    "user_name": user.full_name,
+                    "plan_name": plan.name,
+                    "workspace_name": None,  # Career is user-based
+                    "seat_count": None,  # Career is always single-user
+                    "product_name": "Cubex Career",
+                },
+            )
 
         return subscription
 
@@ -465,11 +493,16 @@ class CareerSubscriptionService:
                 new_plan = await plan_db.get_by_stripe_price_id(
                     session, stripe_price_id
                 )
-                if new_plan:
+                if new_plan and new_plan.product_type == ProductType.CAREER:
                     updates["plan_id"] = new_plan.id
                     stripe_logger.info(
                         f"Career plan changed for subscription {stripe_subscription_id}: "
                         f"{subscription.plan.name} -> {new_plan.name}"
+                    )
+                elif new_plan:
+                    stripe_logger.warning(
+                        f"Stripe price ID {stripe_price_id} belongs to non-Career plan, "
+                        f"ignoring for Career subscription {stripe_subscription_id}"
                     )
                 else:
                     stripe_logger.warning(

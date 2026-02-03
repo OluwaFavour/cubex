@@ -41,9 +41,9 @@ def upgrade() -> None:
         "ck_plans_name_matches_product_type",
         "plans",
         """
-        (product_type = 'api' AND name IN ('Free', 'Basic', 'Professional'))
+        (product_type = 'API' AND name IN ('Free', 'Basic', 'Professional'))
         OR
-        (product_type = 'career' AND name IN ('Free', 'Plus Plan', 'Pro Plan'))
+        (product_type = 'CAREER' AND name IN ('Free', 'Plus Plan', 'Pro Plan'))
         """,
     )
     # ### end Alembic commands ###
