@@ -117,8 +117,8 @@ def setup_test_database(event_loop_policy):
         else:
             print("[TEST] Database migrations completed successfully")
 
-        # Yield control to tests
-        yield
+        # Yield the test database URL for tests that need it
+        yield settings.TEST_DATABASE_URL
 
         # Cleanup: Truncate all tables after tests complete (except seed data tables)
         print("\n[TEST] Cleaning up test database...")
