@@ -215,7 +215,7 @@ class BaseDB(Generic[T]):
     async def get_by_conditions(
         self,
         session: AsyncSession,
-        conditions: list[SQLColumnExpression],
+        conditions: Sequence[SQLColumnExpression],
         options: list[Any] = [],
     ) -> Sequence[T]:
         """
@@ -244,7 +244,7 @@ class BaseDB(Generic[T]):
     async def get_one_by_conditions(
         self,
         session: AsyncSession,
-        conditions: list[SQLColumnExpression],
+        conditions: Sequence[SQLColumnExpression],
         options: list[Any] = [],
     ) -> T | None:
         """

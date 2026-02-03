@@ -20,6 +20,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.apps.cubex_api.services.workspace import WorkspaceService
+from app.apps.cubex_career.services.subscription import CareerSubscriptionService
 from app.core.dependencies import get_async_session
 from app.shared.config import auth_logger, settings
 from app.shared.db.crud import user_db
@@ -69,6 +71,10 @@ from app.shared.utils import get_device_info
 
 router = APIRouter(tags=["Authentication"])
 
+# Service instances for product setup
+_workspace_service = WorkspaceService()
+_career_subscription_service = CareerSubscriptionService()
+
 
 # =============================================================================
 # Helper Functions
@@ -97,6 +103,41 @@ def _build_profile_response(user: User) -> ProfileResponse:
             [acc.provider for acc in user.oauth_accounts] if user.oauth_accounts else []
         ),
     )
+
+
+async def _setup_user_products(session: AsyncSession, user: User) -> None:
+    """
+    Set up product resources for a user (personal workspace + Career subscription).
+
+    This is called after:
+    - Email signup verification
+    - OAuth signup/signin
+
+    The operations are idempotent - they check for existing resources before creating.
+
+    Args:
+        session: Database session (should be within a transaction).
+        user: User to set up products for.
+    """
+    try:
+        # Create personal workspace with free API subscription
+        await _workspace_service.create_personal_workspace(
+            session, user, commit_self=False
+        )
+        auth_logger.debug(f"Personal workspace ensured for user {user.id}")
+    except Exception as e:
+        auth_logger.warning(f"Failed to create personal workspace for {user.id}: {e}")
+        # Don't fail the signup flow - user can manually activate later
+
+    try:
+        # Create free Career subscription
+        await _career_subscription_service.create_free_subscription(
+            session, user, commit_self=False
+        )
+        auth_logger.debug(f"Career subscription ensured for user {user.id}")
+    except Exception as e:
+        auth_logger.warning(f"Failed to create Career subscription for {user.id}: {e}")
+        # Don't fail the signup flow - user can manually activate later
 
 
 # =============================================================================
@@ -377,6 +418,10 @@ async def verify_signup(
                 updates={"email_verified": True},
                 commit_self=False,
             )
+
+            # Set up product resources (workspace + Career subscription)
+            # This is idempotent - safe to call on existing users
+            await _setup_user_products(session, user)
 
             # Generate tokens
             device_info = _get_device_info_from_request(request)
@@ -1397,6 +1442,11 @@ async def oauth_callback(
                 id=user.id,
                 options=[user_db.oauth_accounts_loader],
             )
+
+            # Set up product resources (workspace + Career subscription)
+            # This is idempotent - safe to call on existing users
+            if user:
+                await _setup_user_products(session, user)
 
             # Generate tokens
             device_info = _get_device_info_from_request(request)

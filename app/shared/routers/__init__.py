@@ -6,5 +6,6 @@ included in the main application or app-specific routers.
 """
 
 from app.shared.routers.auth import router as auth_router
+from app.shared.routers.webhook import router as webhook_router
 
-__all__ = ["auth_router"]
+__all__ = ["auth_router", "webhook_router"]

@@ -1,0 +1,21 @@
+{{ product_name }} Subscription Canceled
+
+Hi {{ name }},
+
+We're sorry to see you go. Your {{ product_name }} subscription to {{ plan_name }} has been canceled.
+
+Cancellation Details:
+- Product: {{ product_name }}
+- Plan: {{ plan_name }}
+{% if workspace_name %}- Workspace: {{ workspace_name }}
+{% endif %}
+Your access to premium features will continue until the end of your current billing period. After that, your account will be downgraded to the free tier.
+
+If you canceled by mistake or change your mind, you can resubscribe at any time from your account settings.
+
+We'd love to hear your feedback on why you decided to cancel. It helps us improve our service for everyone.
+
+Best regards,
+The Cubex Team
+
+© 2026 Cubex. All rights reserved.

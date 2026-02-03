@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Subscription Canceled</title>
+  </head>
+  <body
+    style="
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    "
+  >
+    <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px">
+      <h1 style="color: #dc3545; margin-bottom: 20px">
+        {{ product_name }} Subscription Canceled
+      </h1>
+
+      <p>Hi {{ name }},</p>
+
+      <p>
+        We're sorry to see you go. Your {{ product_name }} subscription to
+        <strong>{{ plan_name }}</strong> has been canceled.
+      </p>
+
+      <div
+        style="
+          background-color: #ffffff;
+          padding: 20px;
+          border-radius: 8px;
+          margin: 20px 0;
+          border-left: 4px solid #dc3545;
+        "
+      >
+        <h3 style="margin-top: 0; color: #dc3545">Cancellation Details</h3>
+        <p><strong>Product:</strong> {{ product_name }}</p>
+        <p><strong>Plan:</strong> {{ plan_name }}</p>
+        {% if workspace_name %}
+        <p style="margin-bottom: 0">
+          <strong>Workspace:</strong> {{ workspace_name }}
+        </p>
+        {% endif %}
+      </div>
+
+      <p>
+        Your access to premium features will continue until the end of your
+        current billing period. After that, your account will be downgraded to
+        the free tier.
+      </p>
+
+      <p>
+        If you canceled by mistake or change your mind, you can resubscribe at
+        any time from your account settings.
+      </p>
+
+      <p>
+        We'd love to hear your feedback on why you decided to cancel. It helps
+        us improve our service for everyone.
+      </p>
+
+      <p style="margin-top: 30px">
+        Best regards,<br />
+        <strong>The Cubex Team</strong>
+      </p>
+    </div>
+
+    <div
+      style="
+        text-align: center;
+        margin-top: 20px;
+        color: #6c757d;
+        font-size: 12px;
+      "
+    >
+      <p>© 2026 Cubex. All rights reserved.</p>
+    </div>
+  </body>
+</html>

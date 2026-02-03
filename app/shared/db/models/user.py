@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import Boolean, Enum, ForeignKey, String
+from sqlalchemy.ext.associationproxy import AssociationProxy, association_proxy
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.db.models.base import BaseModel
@@ -9,6 +10,8 @@ from app.shared.enums import OAuthProviders
 
 if TYPE_CHECKING:
     from app.shared.db.models.refresh_token import RefreshToken
+    from app.shared.db.models.subscription import Subscription
+    from app.shared.db.models.subscription_context import CareerSubscriptionContext
 
 
 class User(BaseModel):
@@ -48,6 +51,14 @@ class User(BaseModel):
         nullable=False,
     )
 
+    stripe_customer_id: Mapped[str | None] = mapped_column(
+        String(128),
+        unique=True,
+        index=True,
+        nullable=True,
+        comment="Stripe Customer ID for billing across all products",
+    )
+
     oauth_accounts: Mapped[list["OAuthAccount"]] = relationship(
         "OAuthAccount",
         back_populates="user",
@@ -58,6 +69,23 @@ class User(BaseModel):
         "RefreshToken",
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+
+    # Career subscription context relationship (one-to-one)
+    career_subscription_context: Mapped["CareerSubscriptionContext | None"] = (
+        relationship(
+            "CareerSubscriptionContext",
+            back_populates="user",
+            uselist=False,
+            lazy="selectin",
+            cascade="all, delete-orphan",
+        )
+    )
+
+    # Association proxy for convenient access: user.career_subscription
+    career_subscription: AssociationProxy["Subscription | None"] = association_proxy(
+        "career_subscription_context",
+        "subscription",
     )
 
 

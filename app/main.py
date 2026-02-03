@@ -16,12 +16,17 @@ from app.shared.exceptions.handlers import (
     conflict_exception_handler,
     database_exception_handler,
     exception_schema,
+    forbidden_exception_handler,
     general_exception_handler,
+    idempotency_exception_handler,
     not_found_exception_handler,
     oauth_exception_handler,
     otp_expired_exception_handler,
     otp_invalid_exception_handler,
     rate_limit_exception_handler,
+    stripe_api_exception_handler,
+    stripe_card_exception_handler,
+    stripe_rate_limit_exception_handler,
     too_many_attempts_exception_handler,
 )
 from app.shared.exceptions.types import (
@@ -30,11 +35,16 @@ from app.shared.exceptions.types import (
     BadRequestException,
     ConflictException,
     DatabaseException,
+    ForbiddenException,
+    IdempotencyException,
     NotFoundException,
     OAuthException,
     OTPExpiredException,
     OTPInvalidException,
+    RateLimitException,
     RateLimitExceededException,
+    StripeAPIException,
+    StripeCardException,
     TooManyAttemptsException,
 )
 from app.infrastructure.messaging import start_consumers
@@ -42,7 +52,14 @@ from app.infrastructure.scheduler import scheduler
 from app.shared.services import BrevoService, CloudinaryService, Renderer, RedisService
 from app.shared.services.auth import AuthService
 from app.shared.services.oauth import GoogleOAuthService, GitHubOAuthService
-from app.shared.routers import auth_router
+from app.shared.routers import auth_router, webhook_router
+from app.apps.cubex_api.routers import (
+    workspace_router,
+    subscription_router as api_subscription_router,
+)
+from app.apps.cubex_career.routers import (
+    subscription_router as career_subscription_router,
+)
 from app.shared.utils import generate_openapi_json, write_to_file_async
 
 
@@ -182,10 +199,17 @@ app.add_exception_handler(TooManyAttemptsException, too_many_attempts_exception_
 app.add_exception_handler(RateLimitExceededException, rate_limit_exception_handler)
 app.add_exception_handler(OAuthException, oauth_exception_handler)
 app.add_exception_handler(AuthenticationException, authentication_exception_handler)
+app.add_exception_handler(ForbiddenException, forbidden_exception_handler)
 app.add_exception_handler(NotFoundException, not_found_exception_handler)
 app.add_exception_handler(ConflictException, conflict_exception_handler)
 app.add_exception_handler(BadRequestException, bad_request_exception_handler)
 app.add_exception_handler(DatabaseException, database_exception_handler)
+# Stripe-specific exception handlers
+app.add_exception_handler(StripeCardException, stripe_card_exception_handler)
+app.add_exception_handler(IdempotencyException, idempotency_exception_handler)
+app.add_exception_handler(RateLimitException, stripe_rate_limit_exception_handler)
+app.add_exception_handler(StripeAPIException, stripe_api_exception_handler)
+# Generic fallback
 app.add_exception_handler(AppException, general_exception_handler)
 
 # CORS configuration
@@ -208,6 +232,12 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+app.include_router(webhook_router)
+app.include_router(workspace_router, prefix="/api", tags=["API - Workspaces"])
+app.include_router(api_subscription_router, prefix="/api", tags=["API - Subscriptions"])
+app.include_router(
+    career_subscription_router, prefix="/career", tags=["Career - Subscriptions"]
+)
 
 
 @app.get("/", include_in_schema=False)
