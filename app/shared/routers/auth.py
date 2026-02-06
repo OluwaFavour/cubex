@@ -1264,8 +1264,10 @@ Handle the OAuth provider callback after user authorization. This endpoint:
 
 | Parameter | Type | Source | Description |
 |-----------|------|--------|-------------|
-| `code` | string | Provider | Authorization code from OAuth provider |
+| `code` | string | Provider | Authorization code from OAuth provider (absent on cancel) |
 | `state` | string | Provider | CSRF state from `/oauth/{provider}` init |
+| `error` | string | Provider | Error code if user cancelled or provider error (e.g., `access_denied`) |
+| `error_description` | string | Provider | Human-readable error description (optional) |
 
 ### Response Behavior
 
@@ -1313,8 +1315,14 @@ Redirects to:
 
 When `callback_url` is set and an error occurs:
 ```
-{callback_url}?error=oauth_error
+{callback_url}?error=oauth_error&error_description=...
 ```
+
+### User Cancellation
+
+If the user cancels on the provider's consent page, the provider redirects back
+with an `error` parameter (e.g., `access_denied`). This endpoint detects the
+cancellation and redirects to `callback_url` with the error details passed through.
 
 ### Security Notes
 
@@ -1356,8 +1364,19 @@ async def oauth_callback(
     provider: OAuthProviders,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    code: Annotated[str, Query(description="Authorization code from provider")],
-    state: Annotated[str, Query(description="State parameter for CSRF validation")],
+    code: Annotated[
+        str | None, Query(description="Authorization code from provider")
+    ] = None,
+    state: Annotated[
+        str | None, Query(description="State parameter for CSRF validation")
+    ] = None,
+    error: Annotated[
+        str | None,
+        Query(description="Error code from provider (e.g., access_denied)"),
+    ] = None,
+    error_description: Annotated[
+        str | None, Query(description="Human-readable error description")
+    ] = None,
 ) -> TokenResponse | RedirectResponse:
     """
     Complete OAuth flow by exchanging authorization code for tokens.
@@ -1374,10 +1393,14 @@ async def oauth_callback(
             device information from User-Agent header.
         session (AsyncSession): The async database session injected via
             dependency injection.
-        code (str): The authorization code received from the OAuth provider
-            after user consent.
-        state (str): The signed CSRF protection token that was passed through
+        code (str | None): The authorization code received from the OAuth provider
+            after user consent. None if user cancelled or error occurred.
+        state (str | None): The signed CSRF protection token that was passed through
             the OAuth flow. Contains encoded callback_url and remember_me.
+        error (str | None): Error code from the provider if user cancelled or
+            an error occurred (e.g., "access_denied", "consent_required").
+        error_description (str | None): Human-readable description of the error
+            from the provider. Optional, not all providers include this.
 
     Returns:
         TokenResponse | RedirectResponse: Either:
@@ -1396,6 +1419,34 @@ async def oauth_callback(
         When callback_url is set, tokens are returned in URL fragment (#)
         to prevent server-side logging of sensitive tokens.
     """
+    # Handle provider error or user cancellation (e.g., access_denied)
+    if error:
+        auth_logger.info(
+            f"OAuth callback: provider returned error for {provider.value}: "
+            f"{error} - {error_description}"
+        )
+        # Try to decode state to get callback_url for redirect
+        if state:
+            state_data = OAuthStateManager.decode_state(state)
+            if state_data and state_data.callback_url:
+                # Build error redirect URL with provider error details
+                error_params = {"error": error}
+                if error_description:
+                    error_params["error_description"] = error_description
+                return RedirectResponse(
+                    url=f"{state_data.callback_url}?{urlencode(error_params)}",
+                    status_code=307,
+                )
+        # No valid state or callback_url - raise exception
+        raise BadRequestException(message=f"OAuth error: {error}")
+
+    # Validate required params for success flow
+    if not code or not state:
+        auth_logger.warning(
+            f"OAuth callback: missing code or state for {provider.value}"
+        )
+        raise BadRequestException(message="Missing required OAuth parameters")
+
     # Decode and validate state
     state_data = OAuthStateManager.decode_state(state)
     if not state_data:
@@ -1484,8 +1535,9 @@ async def oauth_callback(
     except OAuthException as e:
         auth_logger.error(f"OAuth callback failed: {e}")
         if callback_url:
+            error_params = {"error": "oauth_error", "error_description": e.message}
             return RedirectResponse(
-                url=f"{callback_url}?error={e.message}",
+                url=f"{callback_url}?{urlencode(error_params)}",
                 status_code=307,
             )
         raise
@@ -1493,8 +1545,12 @@ async def oauth_callback(
     except Exception as e:
         auth_logger.error(f"OAuth callback failed unexpectedly: {e}")
         if callback_url:
+            error_params = {
+                "error": "oauth_error",
+                "error_description": "OAuth authentication failed",
+            }
             return RedirectResponse(
-                url=f"{callback_url}?error=oauth_error",
+                url=f"{callback_url}?{urlencode(error_params)}",
                 status_code=307,
             )
         raise OAuthException(message="OAuth authentication failed")
