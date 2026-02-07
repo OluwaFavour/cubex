@@ -580,6 +580,7 @@ class WorkspaceService:
         self,
         session: AsyncSession,
         user_id: UUID,
+        role: MemberRole | None = None,
     ) -> Sequence[Workspace]:
         """
         Get all workspaces a user has access to.
@@ -587,11 +588,12 @@ class WorkspaceService:
         Args:
             session: Database session.
             user_id: User ID.
+            role: Optional filter by user's role in the workspace.
 
         Returns:
             List of workspaces.
         """
-        return await workspace_db.get_user_workspaces(session, user_id)
+        return await workspace_db.get_user_workspaces(session, user_id, role=role)
 
     async def update_workspace(
         self,

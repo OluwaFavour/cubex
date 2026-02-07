@@ -30,6 +30,7 @@ Example usage:
     await GitHubOAuthService.aclose()
 """
 
+import asyncio
 from urllib.parse import urlencode
 
 import httpx

@@ -891,7 +891,7 @@
                     "Authentication"
                 ],
                 "summary": "OAuth callback",
-                "description": "## OAuth Callback Handler\n\nHandle the OAuth provider callback after user authorization. This endpoint:\n\n1. Validates the CSRF state parameter\n2. Exchanges the authorization code for provider tokens\n3. Retrieves user profile from the provider\n4. Creates or links user account\n5. Issues application tokens\n\n### Query Parameters\n\n| Parameter | Type | Source | Description |\n|-----------|------|--------|-------------|\n| `code` | string | Provider | Authorization code from OAuth provider |\n| `state` | string | Provider | CSRF state from `/oauth/{provider}` init |\n\n### Response Behavior\n\nThe response depends on whether `callback_url` was provided during init:\n\n#### Without `callback_url` \u2192 JSON Response (200)\n\n```json\n{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"refresh_token\": \"dGhpcyBpcyBhIHJlZnJl...\",\n  \"token_type\": \"bearer\",\n  \"expires_in\": 900\n}\n```\n\n#### With `callback_url` \u2192 Redirect (307)\n\nRedirects to:\n```\n{callback_url}#access_token=...&refresh_token=...&token_type=bearer&expires_in=900\n```\n\n> \u26a0\ufe0f **Note:** Tokens are in the **URL fragment** (`#`), not query params (`?`).\n> This prevents tokens from being logged in server access logs.\n\n### User Account Handling\n\n| Scenario | Behavior |\n|----------|----------|\n| New email | Create new user account |\n| Existing email (same provider) | Sign in to existing account |\n| Existing email (different provider) | Link OAuth to existing account |\n| Existing email (has password) | Link OAuth, preserve password |\n\n### Error Responses\n\n| Status | Scenario | Behavior |\n|--------|----------|----------|\n| `400` | Invalid/expired state | JSON error (can't redirect) |\n| `307` | OAuth error + callback_url | Redirect to `{callback_url}?error=...` |\n| `400` | OAuth error, no callback_url | JSON error response |\n\n### Error Redirect Format\n\nWhen `callback_url` is set and an error occurs:\n```\n{callback_url}?error=oauth_error\n```\n\n### Security Notes\n\n- State parameter expires after **10 minutes**\n- State is cryptographically signed to prevent tampering\n- Authorization codes are **single-use** (provider enforced)\n- Email from provider is automatically marked as **verified**",
+                "description": "## OAuth Callback Handler\n\nHandle the OAuth provider callback after user authorization. This endpoint:\n\n1. Validates the CSRF state parameter\n2. Exchanges the authorization code for provider tokens\n3. Retrieves user profile from the provider\n4. Creates or links user account\n5. Issues application tokens\n\n### Query Parameters\n\n| Parameter | Type | Source | Description |\n|-----------|------|--------|-------------|\n| `code` | string | Provider | Authorization code from OAuth provider (absent on cancel) |\n| `state` | string | Provider | CSRF state from `/oauth/{provider}` init |\n| `error` | string | Provider | Error code if user cancelled or provider error (e.g., `access_denied`) |\n| `error_description` | string | Provider | Human-readable error description (optional) |\n\n### Response Behavior\n\nThe response depends on whether `callback_url` was provided during init:\n\n#### Without `callback_url` \u2192 JSON Response (200)\n\n```json\n{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"refresh_token\": \"dGhpcyBpcyBhIHJlZnJl...\",\n  \"token_type\": \"bearer\",\n  \"expires_in\": 900\n}\n```\n\n#### With `callback_url` \u2192 Redirect (307)\n\nRedirects to:\n```\n{callback_url}#access_token=...&refresh_token=...&token_type=bearer&expires_in=900\n```\n\n> \u26a0\ufe0f **Note:** Tokens are in the **URL fragment** (`#`), not query params (`?`).\n> This prevents tokens from being logged in server access logs.\n\n### User Account Handling\n\n| Scenario | Behavior |\n|----------|----------|\n| New email | Create new user account |\n| Existing email (same provider) | Sign in to existing account |\n| Existing email (different provider) | Link OAuth to existing account |\n| Existing email (has password) | Link OAuth, preserve password |\n\n### Error Responses\n\n| Status | Scenario | Behavior |\n|--------|----------|----------|\n| `400` | Invalid/expired state | JSON error (can't redirect) |\n| `307` | OAuth error + callback_url | Redirect to `{callback_url}?error=...` |\n| `400` | OAuth error, no callback_url | JSON error response |\n\n### Error Redirect Format\n\nWhen `callback_url` is set and an error occurs:\n```\n{callback_url}?error=oauth_error&error_description=...\n```\n\n### User Cancellation\n\nIf the user cancels on the provider's consent page, the provider redirects back\nwith an `error` parameter (e.g., `access_denied`). This endpoint detects the\ncancellation and redirects to `callback_url` with the error details passed through.\n\n### Security Notes\n\n- State parameter expires after **10 minutes**\n- State is cryptographically signed to prevent tampering\n- Authorization codes are **single-use** (provider enforced)\n- Email from provider is automatically marked as **verified**",
                 "operationId": "oauth_callback_auth_oauth__provider__callback_get",
                 "parameters": [
                     {
@@ -905,9 +905,16 @@
                     {
                         "name": "code",
                         "in": "query",
-                        "required": true,
+                        "required": false,
                         "schema": {
-                            "type": "string",
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
                             "description": "Authorization code from provider",
                             "title": "Code"
                         },
@@ -916,13 +923,56 @@
                     {
                         "name": "state",
                         "in": "query",
-                        "required": true,
+                        "required": false,
                         "schema": {
-                            "type": "string",
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
                             "description": "State parameter for CSRF validation",
                             "title": "State"
                         },
                         "description": "State parameter for CSRF validation"
+                    },
+                    {
+                        "name": "error",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Error code from provider (e.g., access_denied)",
+                            "title": "Error"
+                        },
+                        "description": "Error code from provider (e.g., access_denied)"
+                    },
+                    {
+                        "name": "error_description",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Human-readable error description",
+                            "title": "Error Description"
+                        },
+                        "description": "Human-readable error description"
                     }
                 ],
                 "responses": {
@@ -1964,8 +2014,31 @@
                     "API - Workspaces"
                 ],
                 "summary": "List user workspaces",
-                "description": "## List User Workspaces\n\nRetrieve all workspaces the authenticated user has access to as a member.\n\n### Authorization\n\n- User must be authenticated\n\n### Response\n\nReturns a list of workspaces with basic information:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `workspaces` | array | List of workspace objects |\n| `workspaces[].id` | UUID | Workspace identifier |\n| `workspaces[].display_name` | string | Workspace name |\n| `workspaces[].slug` | string | URL-friendly identifier |\n| `workspaces[].status` | string | `active` or `frozen` |\n| `workspaces[].is_personal` | boolean | Whether this is a personal workspace |\n| `workspaces[].owner_id` | UUID | Workspace owner's user ID |\n| `workspaces[].enabled_member_count` | integer | Count of enabled members |\n| `workspaces[].total_member_count` | integer | Total member count |\n\n### Notes\n\n- Includes both personal and team workspaces\n- Results include workspaces where user is owner, admin, or member",
+                "description": "## List User Workspaces\n\nRetrieve all workspaces the authenticated user has access to as a member.\n\n### Authorization\n\n- User must be authenticated\n\n### Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `member_role` | string | \u274c | Filter by user's role: `owner`, `admin`, or `member` |\n\n### Response\n\nReturns a list of workspaces with basic information:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `workspaces` | array | List of workspace objects |\n| `workspaces[].id` | UUID | Workspace identifier |\n| `workspaces[].display_name` | string | Workspace name |\n| `workspaces[].slug` | string | URL-friendly identifier |\n| `workspaces[].status` | string | `active` or `frozen` |\n| `workspaces[].is_personal` | boolean | Whether this is a personal workspace |\n| `workspaces[].owner_id` | UUID | Workspace owner's user ID |\n| `workspaces[].enabled_member_count` | integer | Count of enabled members |\n| `workspaces[].total_member_count` | integer | Total member count |\n\n### Notes\n\n- Includes both personal and team workspaces\n- Results include workspaces where user is owner, admin, or member\n- Use `member_role` to filter workspaces by your role in them",
                 "operationId": "list_workspaces_api_workspaces_get",
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "member_role",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/components/schemas/MemberRole"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Member Role"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Successful Response",
@@ -2036,13 +2109,18 @@
                                 }
                             }
                         }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
                     }
-                },
-                "security": [
-                    {
-                        "HTTPBearer": []
-                    }
-                ]
+                }
             },
             "post": {
                 "tags": [
@@ -2051,15 +2129,20 @@
                 "summary": "Create workspace",
                 "description": "## Create New Workspace\n\nCreate a new team workspace. The authenticated user becomes the owner.\n\n### Authorization\n\n- User must be authenticated\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `display_name` | string | \u2705 | Workspace name (2-100 characters) |\n| `description` | string | \u274c | Optional description |\n\n### Response\n\nReturns the created workspace with details:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Workspace identifier |\n| `display_name` | string | Workspace name |\n| `slug` | string | Auto-generated URL-friendly identifier |\n| `status` | string | Always `active` for new workspaces |\n| `is_personal` | boolean | Always `false` for team workspaces |\n| `owner_id` | UUID | Creator's user ID |\n| `members` | array | Empty initially |\n| `seat_count` | integer | 0 until subscription is created |\n| `available_seats` | integer | 0 until subscription is created |\n\n### Workspace Creation Flow\n\n1. Workspace is created with owner as the only member\n2. Subscribe to a paid plan to enable invitations\n3. Invite team members\n4. Manage seats as needed\n\n### Notes\n\n- A subscription is required to invite members\n- Personal workspaces are created automatically at signup\n- Slug is auto-generated from display_name",
                 "operationId": "create_workspace_api_workspaces_post",
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ],
                 "requestBody": {
+                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/WorkspaceCreate"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "responses": {
                     "201": {
@@ -2142,12 +2225,7 @@
                             }
                         }
                     }
-                },
-                "security": [
-                    {
-                        "HTTPBearer": []
-                    }
-                ]
+                }
             }
         },
         "/api/workspaces/{workspace_id}": {

@@ -11,7 +11,6 @@ from uuid import uuid4
 from app.shared.enums import (
     MemberRole,
     MemberStatus,
-    InvitationStatus,
     WorkspaceStatus,
 )
 
@@ -67,6 +66,87 @@ class TestListWorkspaces:
         data = response.json()
         workspace_ids = [w["id"] for w in data["workspaces"]]
         assert str(personal_workspace.id) in workspace_ids
+
+    @pytest.mark.asyncio
+    async def test_list_workspaces_filter_by_owner_role(
+        self, authenticated_client: AsyncClient, test_workspace
+    ):
+        """Should filter workspaces where user is owner."""
+        response = await authenticated_client.get(
+            "/api/workspaces", params={"member_role": "owner"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "workspaces" in data
+        # test_workspace has test_user as owner
+        workspace_ids = [w["id"] for w in data["workspaces"]]
+        assert str(test_workspace.id) in workspace_ids
+
+    @pytest.mark.asyncio
+    async def test_list_workspaces_filter_by_member_role(
+        self, client: AsyncClient, test_workspace, test_workspace_member
+    ):
+        """Should filter workspaces where user is member."""
+        from tests.conftest import create_test_access_token
+
+        member_user, _ = test_workspace_member
+        token = create_test_access_token(member_user)
+        client.headers["Authorization"] = f"Bearer {token}"
+
+        response = await client.get("/api/workspaces", params={"member_role": "member"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "workspaces" in data
+        workspace_ids = [w["id"] for w in data["workspaces"]]
+        assert str(test_workspace.id) in workspace_ids
+
+    @pytest.mark.asyncio
+    async def test_list_workspaces_filter_by_admin_role(
+        self, client: AsyncClient, test_workspace, test_workspace_admin
+    ):
+        """Should filter workspaces where user is admin."""
+        from tests.conftest import create_test_access_token
+
+        admin_user, _ = test_workspace_admin
+        token = create_test_access_token(admin_user)
+        client.headers["Authorization"] = f"Bearer {token}"
+
+        response = await client.get("/api/workspaces", params={"member_role": "admin"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "workspaces" in data
+        workspace_ids = [w["id"] for w in data["workspaces"]]
+        assert str(test_workspace.id) in workspace_ids
+
+    @pytest.mark.asyncio
+    async def test_list_workspaces_filter_excludes_other_roles(
+        self, authenticated_client: AsyncClient, test_workspace
+    ):
+        """Should exclude workspaces where user has different role."""
+        # test_user is owner of test_workspace, filter by member should not include it
+        response = await authenticated_client.get(
+            "/api/workspaces", params={"member_role": "member"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        workspace_ids = [w["id"] for w in data["workspaces"]]
+        # test_workspace should NOT be in results since user is owner, not member
+        assert str(test_workspace.id) not in workspace_ids
+
+    @pytest.mark.asyncio
+    async def test_list_workspaces_filter_invalid_role(
+        self, authenticated_client: AsyncClient
+    ):
+        """Should return 422 for invalid role value."""
+        response = await authenticated_client.get(
+            "/api/workspaces", params={"member_role": "invalid_role"}
+        )
+
+        assert response.status_code == 422
 
 
 # ============================================================================

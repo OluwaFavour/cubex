@@ -133,6 +133,7 @@ class WorkspaceDB(BaseDB[Workspace]):
         session: AsyncSession,
         user_id: UUID,
         include_disabled: bool = False,
+        role: MemberRole | None = None,
     ) -> Sequence[Workspace]:
         """
         Get all workspaces a user is a member of.
@@ -141,6 +142,7 @@ class WorkspaceDB(BaseDB[Workspace]):
             session: Database session.
             user_id: User ID.
             include_disabled: Include workspaces where user is disabled.
+            role: Optional filter by user's role in the workspace.
 
         Returns:
             List of workspaces.
@@ -151,6 +153,8 @@ class WorkspaceDB(BaseDB[Workspace]):
         ]
         if not include_disabled:
             conditions.append(WorkspaceMember.status == MemberStatus.ENABLED)
+        if role is not None:
+            conditions.append(WorkspaceMember.role == role)
 
         stmt = (
             select(Workspace)

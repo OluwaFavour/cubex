@@ -50,7 +50,7 @@ from app.apps.cubex_api.services import (
     PermissionDeniedException,
     FreeWorkspaceNoInvitesException,
 )
-from app.shared.enums import MemberStatus
+from app.shared.enums import MemberRole, MemberStatus
 from app.shared.services.oauth.base import OAuthStateManager
 from app.apps.cubex_api.db.models import (
     WorkspaceMember,
@@ -127,6 +127,12 @@ Retrieve all workspaces the authenticated user has access to as a member.
 
 - User must be authenticated
 
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `member_role` | string | ❌ | Filter by user's role: `owner`, `admin`, or `member` |
+
 ### Response
 
 Returns a list of workspaces with basic information:
@@ -147,17 +153,19 @@ Returns a list of workspaces with basic information:
 
 - Includes both personal and team workspaces
 - Results include workspaces where user is owner, admin, or member
+- Use `member_role` to filter workspaces by your role in them
 """,
 )
 async def list_workspaces(
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    role_filter: Annotated[MemberRole | None, Query(alias="member_role")] = None,
 ) -> WorkspaceListResponse:
     """List all workspaces the current user has access to."""
-    request_logger.info(f"GET /workspaces - user={current_user.id}")
+    request_logger.info(f"GET /workspaces - user={current_user.id} role={role_filter}")
     async with session.begin():
         workspaces = await workspace_service.get_user_workspaces(
-            session, current_user.id
+            session, current_user.id, role=role_filter
         )
         request_logger.info(
             f"GET /workspaces - user={current_user.id} returned {len(workspaces)} workspaces"
