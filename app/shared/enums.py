@@ -101,6 +101,19 @@ class InvitationStatus(str, Enum):
 
 
 # ============================================================================
+# Support Enums
+# ============================================================================
+
+
+class SalesRequestStatus(str, Enum):
+    """Status of a sales request."""
+
+    PENDING = "pending"  # Not yet contacted
+    CONTACTED = "contacted"  # Sales team has reached out
+    CLOSED = "closed"  # Request resolved/closed
+
+
+# ============================================================================
 # API Usage Enums
 # ============================================================================
 
@@ -115,6 +128,7 @@ class AccessStatus(str, Enum):
 __all__ = [
     "AccessStatus",
     "APIPlanName",
+    "SalesRequestStatus",
     "CareerPlanName",
     "InvitationStatus",
     "MemberRole",

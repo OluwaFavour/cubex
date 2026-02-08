@@ -58,6 +58,7 @@ from app.shared.services.oauth import GoogleOAuthService, GitHubOAuthService
 from app.shared.routers import auth_router, webhook_router
 from app.apps.cubex_api.routers import (
     internal_router,
+    support_router,
     workspace_router,
     subscription_router as api_subscription_router,
 )
@@ -232,7 +233,8 @@ app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 app.include_router(webhook_router, tags=["Webhooks"])
 app.include_router(workspace_router, prefix="/api", tags=["API - Workspaces"])
 app.include_router(api_subscription_router, prefix="/api", tags=["API - Subscriptions"])
-app.include_router(internal_router, tags=["Internal API"])
+app.include_router(support_router, prefix="/api", tags=["API - Support"])
+app.include_router(internal_router, prefix="/api", tags=["API - Internal API"])
 app.include_router(
     career_subscription_router, prefix="/career", tags=["Career - Subscriptions"]
 )

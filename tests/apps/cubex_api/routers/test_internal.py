@@ -2,8 +2,8 @@
 Test suite for Internal API Router.
 
 This module contains comprehensive tests for the internal router endpoints:
-- POST /internal/usage/validate - validates API key and logs usage
-- POST /internal/usage/revert - reverts usage (idempotent)
+- POST /api/internal/usage/validate - validates API key and logs usage
+- POST /api/internal/usage/revert - reverts usage (idempotent)
 - X-Internal-API-Key header authentication
 
 Run all tests:
@@ -69,7 +69,7 @@ class TestInternalAPIKeyAuthentication:
     async def test_missing_api_key_header(self, client: AsyncClient):
         """Test that missing API key header returns 401."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123",
                 "client_id": f"ws_{uuid4().hex}",
@@ -84,7 +84,7 @@ class TestInternalAPIKeyAuthentication:
     ):
         """Test that invalid API key header returns 401."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123",
                 "client_id": f"ws_{uuid4().hex}",
@@ -100,7 +100,7 @@ class TestInternalAPIKeyAuthentication:
     ):
         """Test that valid API key header is accepted (may fail for other reasons)."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123",
                 "client_id": f"ws_{uuid4().hex}",
@@ -121,7 +121,7 @@ class TestUsageValidateEndpoint:
     ):
         """Test validation with invalid API key format."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "invalid_key_format",  # Missing cbx_live_ prefix
                 "client_id": f"ws_{uuid4().hex}",
@@ -139,7 +139,7 @@ class TestUsageValidateEndpoint:
     ):
         """Test validation with invalid client_id format."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123abc",
                 "client_id": "invalid_client_id",  # Missing ws_ prefix
@@ -156,7 +156,7 @@ class TestUsageValidateEndpoint:
     ):
         """Test validation with optional cost field."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123abc",
                 "client_id": f"ws_{uuid4().hex}",
@@ -176,7 +176,7 @@ class TestUsageValidateEndpoint:
     ):
         """Test validation with non-existent API key."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_nonexistentkey123456789",
                 "client_id": f"ws_{uuid4().hex}",
@@ -197,7 +197,7 @@ class TestUsageRevertEndpoint:
     async def test_revert_missing_api_key_header(self, client: AsyncClient):
         """Test revert without API key header returns 401."""
         response = await client.post(
-            "/internal/usage/revert",
+            "/api/internal/usage/revert",
             json={
                 "api_key": "cbx_live_test123",
                 "usage_id": str(uuid4()),
@@ -212,7 +212,7 @@ class TestUsageRevertEndpoint:
     ):
         """Test revert with invalid API key header returns 401."""
         response = await client.post(
-            "/internal/usage/revert",
+            "/api/internal/usage/revert",
             json={
                 "api_key": "cbx_live_test123",
                 "usage_id": str(uuid4()),
@@ -228,7 +228,7 @@ class TestUsageRevertEndpoint:
     ):
         """Test revert with valid request format."""
         response = await client.post(
-            "/internal/usage/revert",
+            "/api/internal/usage/revert",
             json={
                 "api_key": "cbx_live_test123abc",
                 "usage_id": str(uuid4()),
@@ -247,7 +247,7 @@ class TestUsageRevertEndpoint:
     ):
         """Test revert with non-existent usage_id."""
         response = await client.post(
-            "/internal/usage/revert",
+            "/api/internal/usage/revert",
             json={
                 "api_key": "cbx_live_test123abc",
                 "usage_id": str(uuid4()),  # Non-existent ID
@@ -270,7 +270,7 @@ class TestRequestValidation:
     ):
         """Test validation with missing api_key field."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "client_id": f"ws_{uuid4().hex}",
             },
@@ -285,7 +285,7 @@ class TestRequestValidation:
     ):
         """Test validation with missing client_id field."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123",
             },
@@ -300,7 +300,7 @@ class TestRequestValidation:
     ):
         """Test revert with missing api_key field."""
         response = await client.post(
-            "/internal/usage/revert",
+            "/api/internal/usage/revert",
             json={
                 "usage_id": str(uuid4()),
             },
@@ -315,7 +315,7 @@ class TestRequestValidation:
     ):
         """Test revert with missing usage_id field."""
         response = await client.post(
-            "/internal/usage/revert",
+            "/api/internal/usage/revert",
             json={
                 "api_key": "cbx_live_test123",
             },
@@ -330,7 +330,7 @@ class TestRequestValidation:
     ):
         """Test revert with invalid UUID format for usage_id."""
         response = await client.post(
-            "/internal/usage/revert",
+            "/api/internal/usage/revert",
             json={
                 "api_key": "cbx_live_test123",
                 "usage_id": "not-a-valid-uuid",
@@ -352,7 +352,7 @@ class TestClientIdPattern:
         valid_client_id = f"ws_{uuid4().hex}"
 
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123abc",
                 "client_id": valid_client_id,
@@ -371,7 +371,7 @@ class TestClientIdPattern:
         invalid_client_id = uuid4().hex
 
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123abc",
                 "client_id": invalid_client_id,
@@ -389,7 +389,7 @@ class TestClientIdPattern:
         invalid_client_id = "ws_not-hex-chars-here!"
 
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123abc",
                 "client_id": invalid_client_id,
@@ -409,7 +409,7 @@ class TestResponseFormat:
     ):
         """Test that validate response includes access field."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123abc",
                 "client_id": f"ws_{uuid4().hex}",
@@ -432,7 +432,7 @@ class TestResponseFormat:
     ):
         """Test that validate response includes message field."""
         response = await client.post(
-            "/internal/usage/validate",
+            "/api/internal/usage/validate",
             json={
                 "api_key": "cbx_live_test123abc",
                 "client_id": f"ws_{uuid4().hex}",
@@ -451,7 +451,7 @@ class TestResponseFormat:
     ):
         """Test that revert response includes success field."""
         response = await client.post(
-            "/internal/usage/revert",
+            "/api/internal/usage/revert",
             json={
                 "api_key": "cbx_live_test123abc",
                 "usage_id": str(uuid4()),

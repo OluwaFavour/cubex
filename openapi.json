@@ -4320,7 +4320,7 @@
                     "API - Workspaces"
                 ],
                 "summary": "List API keys",
-                "description": "## List API Keys\n\nRetrieve all API keys for the workspace.\n\n### Authorization\n\n- User must be an **admin** or **owner** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `api_keys` | array | List of API key objects |\n| `api_keys[].id` | UUID | Key identifier |\n| `api_keys[].name` | string | User-defined label |\n| `api_keys[].key_prefix` | string | Display prefix for identification |\n| `api_keys[].is_active` | boolean | Whether key is active |\n| `api_keys[].created_at` | datetime | Creation timestamp |\n| `api_keys[].expires_at` | datetime | Expiration timestamp (null if never) |\n| `api_keys[].last_used_at` | datetime | Last usage timestamp (null if never used) |\n| `api_keys[].revoked_at` | datetime | Revocation timestamp (null if active) |\n\n### Notes\n\n- Only metadata is returned, never the actual key\n- Includes both active and revoked keys\n- Use `key_prefix` to identify keys (e.g., \"cbx_live_abc12...\")",
+                "description": "## List API Keys\n\nRetrieve all API keys for the workspace.\n\n### Authorization\n\n- User must be a **member** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `api_keys` | array | List of API key objects |\n| `api_keys[].id` | UUID | Key identifier |\n| `api_keys[].name` | string | User-defined label |\n| `api_keys[].key_prefix` | string | Display prefix for identification |\n| `api_keys[].is_active` | boolean | Whether key is active |\n| `api_keys[].created_at` | datetime | Creation timestamp |\n| `api_keys[].expires_at` | datetime | Expiration timestamp (null if never) |\n| `api_keys[].last_used_at` | datetime | Last usage timestamp (null if never used) |\n| `api_keys[].revoked_at` | datetime | Revocation timestamp (null if active) |\n\n### Notes\n\n- Only metadata is returned, never the actual key\n- Includes both active and revoked keys\n- Use `key_prefix` to identify keys (e.g., \"cbx_live_abc12...\")",
                 "operationId": "list_api_keys_api_workspaces__workspace_id__api_keys_get",
                 "security": [
                     {
@@ -4416,16 +4416,6 @@
                             "application/json": {
                                 "example": {
                                     "detail": "This feature is not yet implemented."
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Admin permission required",
-                        "content": {
-                            "application/json": {
-                                "example": {
-                                    "detail": "Admin permission required."
                                 }
                             }
                         }
@@ -5759,15 +5749,127 @@
                 }
             }
         },
-        "/internal/usage/validate": {
+        "/api/support/contact-sales": {
             "post": {
                 "tags": [
-                    "Internal API",
+                    "API - Support"
+                ],
+                "summary": "Submit a sales inquiry",
+                "description": "## Submit Sales Inquiry\n\nSubmit a request to be contacted by the sales team.\n\n### Rate Limiting\n\n- **3 requests per email per hour**\n- Rate limit is based on the email address provided\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `first_name` | string | Yes | First name (1-255 chars) |\n| `last_name` | string | Yes | Last name (1-255 chars) |\n| `email` | string | Yes | Valid email address |\n| `message` | string | No | Optional message (max 5000 chars) |\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Unique request identifier |\n| `message` | string | Confirmation message |\n| `status` | string | Request status (pending) |\n\n### Notes\n\n- No authentication required\n- Sales team will respond via the provided email",
+                "operationId": "contact_sales_api_support_contact_sales_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ContactSalesRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ContactSalesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Try again in 3600 seconds."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/internal/usage/validate": {
+            "post": {
+                "tags": [
+                    "API - Internal API",
                     "Internal API"
                 ],
                 "summary": "Validate API key and log usage",
                 "description": "Validate an API key and log usage for quota tracking.\n    \n    This endpoint is called by the external developer API to:\n    1. Validate the API key is valid, active, and not expired\n    2. Verify the API key belongs to the specified workspace (client_id)\n    3. Log the usage for quota tracking\n    4. Return access granted/denied with a usage_id\n    \n    **Note**: Currently returns DENIED with 501 message as quota system\n    is not yet implemented. The usage is still logged for future quota\n    enforcement.\n    \n    **Security**: Requires X-Internal-API-Key header.",
-                "operationId": "validate_usage_internal_usage_validate_post",
+                "operationId": "validate_usage_api_internal_usage_validate_post",
                 "parameters": [
                     {
                         "name": "x-internal-api-key",
@@ -5907,15 +6009,15 @@
                 }
             }
         },
-        "/internal/usage/revert": {
+        "/api/internal/usage/revert": {
             "post": {
                 "tags": [
-                    "Internal API",
+                    "API - Internal API",
                     "Internal API"
                 ],
                 "summary": "Revert a usage log",
                 "description": "Revert a usage log entry (idempotent).\n    \n    This endpoint is called by the external developer API when an error\n    occurs and the usage should not count against the user's quota.\n    \n    **Idempotent**: This operation is safe to retry. If the usage log\n    is already reverted or doesn't exist, success is still returned.\n    \n    **Security**: Requires X-Internal-API-Key header.",
-                "operationId": "revert_usage_internal_usage_revert_post",
+                "operationId": "revert_usage_api_internal_usage_revert_post",
                 "parameters": [
                     {
                         "name": "x-internal-api-key",
@@ -7796,6 +7898,89 @@
                 "title": "CloudinaryUploadCredentials",
                 "description": "Pydantic model representing the credentials needed for secure client-side uploads to Cloudinary."
             },
+            "ContactSalesRequest": {
+                "properties": {
+                    "first_name": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "title": "First Name",
+                        "description": "First name of the requester"
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "title": "Last Name",
+                        "description": "Last name of the requester"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email",
+                        "description": "Email address for follow-up contact"
+                    },
+                    "message": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "maxLength": 5000
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Message",
+                        "description": "Optional message with details about the inquiry"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "first_name",
+                    "last_name",
+                    "email"
+                ],
+                "title": "ContactSalesRequest",
+                "description": "Request schema for contact-sales endpoint.",
+                "example": {
+                    "email": "john.doe@example.com",
+                    "first_name": "John",
+                    "last_name": "Doe",
+                    "message": "I'm interested in enterprise pricing for my team."
+                }
+            },
+            "ContactSalesResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "title": "Id",
+                        "description": "Unique identifier for the sales request"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message",
+                        "description": "Confirmation message"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/SalesRequestStatus",
+                        "description": "Current status of the request"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "message",
+                    "status"
+                ],
+                "title": "ContactSalesResponse",
+                "description": "Response schema for contact-sales endpoint.",
+                "example": {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "message": "Thank you for your inquiry. Our sales team will contact you shortly.",
+                    "status": "pending"
+                }
+            },
             "FeatureResponse": {
                 "properties": {
                     "title": {
@@ -8630,6 +8815,16 @@
                 "example": {
                     "email": "user@example.com"
                 }
+            },
+            "SalesRequestStatus": {
+                "type": "string",
+                "enum": [
+                    "pending",
+                    "contacted",
+                    "closed"
+                ],
+                "title": "SalesRequestStatus",
+                "description": "Status of a sales request."
             },
             "SeatUpdateRequest": {
                 "properties": {

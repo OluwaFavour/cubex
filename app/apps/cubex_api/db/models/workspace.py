@@ -2,10 +2,15 @@
 Workspace models for cubex_api.
 
 This module provides models for workspace management including
-workspaces, members, and invitations.
+workspaces, members, invitations, API keys, and usage logs.
+These models are designed to support the core functionality of
+cubex_api, including team collaboration, access control, and billing.
+The models use SQLAlchemy ORM and are structured to ensure data
+integrity, efficient queries, and clear relationships between entities.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
@@ -20,6 +25,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.ext.associationproxy import AssociationProxy, association_proxy
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.db.models.base import BaseModel
@@ -29,11 +35,6 @@ from app.shared.enums import (
     MemberStatus,
     WorkspaceStatus,
 )
-
-# Forward references for type hints
-from typing import TYPE_CHECKING
-
-from sqlalchemy.ext.associationproxy import AssociationProxy, association_proxy
 
 if TYPE_CHECKING:
     from app.shared.db.models.user import User
@@ -400,9 +401,8 @@ class WorkspaceInvitation(BaseModel):
         """Check if invitation has expired."""
         if self.status == InvitationStatus.EXPIRED:
             return True
-        from datetime import timezone as tz
 
-        return datetime.now(tz.utc) > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
 
 class APIKey(BaseModel):
@@ -510,9 +510,8 @@ class APIKey(BaseModel):
         """Check if API key has expired."""
         if self.expires_at is None:
             return False
-        from datetime import timezone as tz
 
-        return datetime.now(tz.utc) > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     @property
     def is_revoked(self) -> bool:

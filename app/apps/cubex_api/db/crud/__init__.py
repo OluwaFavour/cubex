@@ -2,6 +2,10 @@
 CRUD operations for cubex_api.
 """
 
+from app.apps.cubex_api.db.crud.support import (
+    SalesRequestDB,
+    sales_request_db,
+)
 from app.apps.cubex_api.db.crud.workspace import (
     APIKeyDB,
     UsageLogDB,
@@ -17,6 +21,9 @@ from app.apps.cubex_api.db.crud.workspace import (
 )
 
 __all__ = [
+    # Support
+    "SalesRequestDB",
+    "sales_request_db",
     # Classes
     "APIKeyDB",
     "UsageLogDB",

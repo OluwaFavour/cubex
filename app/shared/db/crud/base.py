@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import (
     Any,
     TypeVar,
@@ -593,8 +594,6 @@ class BaseDB(Generic[T]):
         Raises:
             DatabaseException: If an error occurs while updating the record or committing the transaction.
         """
-        from datetime import datetime, timezone
-
         try:
             now = datetime.now(timezone.utc)
             stmt: Update = (
@@ -634,8 +633,6 @@ class BaseDB(Generic[T]):
         Raises:
             DatabaseException: If an error occurs while updating the records or committing the transaction.
         """
-        from datetime import datetime, timezone
-
         try:
             now = datetime.now(timezone.utc)
             stmt: Update = (
@@ -678,8 +675,6 @@ class BaseDB(Generic[T]):
         Raises:
             DatabaseException: If an error occurs while updating the records or committing the transaction.
         """
-        from datetime import datetime, timezone
-
         try:
             now = datetime.now(timezone.utc)
             stmt: Update = (

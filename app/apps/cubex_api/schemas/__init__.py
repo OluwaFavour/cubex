@@ -16,6 +16,10 @@ from app.apps.cubex_api.schemas.subscription import (
     UpgradePreviewResponse,
     UpgradeRequest,
 )
+from app.apps.cubex_api.schemas.support import (
+    ContactSalesRequest,
+    ContactSalesResponse,
+)
 from app.apps.cubex_api.schemas.workspace import (
     WorkspaceCreate,
     WorkspaceUpdate,
@@ -51,6 +55,9 @@ __all__ = [
     "UpgradePreviewRequest",
     "UpgradePreviewResponse",
     "UpgradeRequest",
+    # Support schemas
+    "ContactSalesRequest",
+    "ContactSalesResponse",
     # Workspace schemas
     "WorkspaceCreate",
     "WorkspaceUpdate",
