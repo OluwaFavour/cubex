@@ -17,6 +17,8 @@ from sqlalchemy.orm import selectinload
 
 from app.shared.db.crud.base import BaseDB
 from app.apps.cubex_api.db.models.workspace import (
+    APIKey,
+    UsageLog,
     Workspace,
     WorkspaceMember,
     WorkspaceInvitation,
@@ -554,18 +556,300 @@ class WorkspaceInvitationDB(BaseDB[WorkspaceInvitation]):
         )
 
 
+class APIKeyDB(BaseDB[APIKey]):
+    """CRUD operations for APIKey model."""
+
+    def __init__(self):
+        super().__init__(APIKey)
+
+    async def get_by_key_hash(
+        self,
+        session: AsyncSession,
+        key_hash: str,
+    ) -> APIKey | None:
+        """
+        Get API key by its hash.
+
+        Args:
+            session: Database session.
+            key_hash: HMAC-SHA256 hash of the API key.
+
+        Returns:
+            APIKey or None if not found.
+        """
+        return await self.get_one_by_filters(
+            session,
+            {"key_hash": key_hash, "is_deleted": False},
+            options=[selectinload(APIKey.workspace)],
+        )
+
+    async def get_active_by_hash(
+        self,
+        session: AsyncSession,
+        key_hash: str,
+    ) -> APIKey | None:
+        """
+        Get active API key by its hash.
+
+        Checks that the key is active, not deleted, not expired, and not revoked.
+
+        Args:
+            session: Database session.
+            key_hash: HMAC-SHA256 hash of the API key.
+
+        Returns:
+            APIKey or None if not found or not usable.
+        """
+        now = datetime.now(timezone.utc)
+        stmt = (
+            select(APIKey)
+            .where(
+                and_(
+                    APIKey.key_hash == key_hash,
+                    APIKey.is_deleted.is_(False),
+                    APIKey.is_active.is_(True),
+                    APIKey.revoked_at.is_(None),
+                    (APIKey.expires_at.is_(None) | (APIKey.expires_at > now)),
+                )
+            )
+            .options(selectinload(APIKey.workspace))
+        )
+
+        try:
+            result = await session.execute(stmt)
+            return result.scalars().first()
+        except Exception as e:
+            raise DatabaseException(
+                f"Error getting active API key by hash: {str(e)}"
+            ) from e
+
+    async def get_by_workspace(
+        self,
+        session: AsyncSession,
+        workspace_id: UUID,
+        include_inactive: bool = False,
+    ) -> Sequence[APIKey]:
+        """
+        Get all API keys for a workspace.
+
+        Args:
+            session: Database session.
+            workspace_id: Workspace ID.
+            include_inactive: Include inactive/revoked keys.
+
+        Returns:
+            List of API keys.
+        """
+        filters: dict[str, Any] = {
+            "workspace_id": workspace_id,
+            "is_deleted": False,
+        }
+        if not include_inactive:
+            filters["is_active"] = True
+
+        return await self.get_by_filters(session, filters)
+
+    async def update_last_used(
+        self,
+        session: AsyncSession,
+        api_key_id: UUID,
+        commit_self: bool = True,
+    ) -> APIKey | None:
+        """
+        Update the last_used_at timestamp for an API key.
+
+        Args:
+            session: Database session.
+            api_key_id: API key ID.
+            commit_self: Whether to commit the transaction.
+
+        Returns:
+            Updated API key or None if not found.
+        """
+        return await self.update(
+            session,
+            api_key_id,
+            {"last_used_at": datetime.now(timezone.utc)},
+            commit_self=commit_self,
+        )
+
+    async def revoke(
+        self,
+        session: AsyncSession,
+        api_key_id: UUID,
+        commit_self: bool = True,
+    ) -> APIKey | None:
+        """
+        Revoke an API key.
+
+        Args:
+            session: Database session.
+            api_key_id: API key ID.
+            commit_self: Whether to commit the transaction.
+
+        Returns:
+            Updated API key or None if not found.
+        """
+        return await self.update(
+            session,
+            api_key_id,
+            {
+                "is_active": False,
+                "revoked_at": datetime.now(timezone.utc),
+            },
+            commit_self=commit_self,
+        )
+
+
+class UsageLogDB(BaseDB[UsageLog]):
+    """
+    CRUD operations for UsageLog model.
+
+    Note: UsageLog records are immutable after creation.
+    Only the reverted/reverted_at fields can be updated via mark_reverted().
+    """
+
+    def __init__(self):
+        super().__init__(UsageLog)
+
+    async def get_by_workspace(
+        self,
+        session: AsyncSession,
+        workspace_id: UUID,
+        include_reverted: bool = False,
+        limit: int = 100,
+    ) -> Sequence[UsageLog]:
+        """
+        Get usage logs for a workspace.
+
+        Args:
+            session: Database session.
+            workspace_id: Workspace ID.
+            include_reverted: Include reverted usage logs.
+            limit: Maximum number of logs to return.
+
+        Returns:
+            List of usage logs, ordered by created_at descending.
+        """
+        conditions = [
+            UsageLog.workspace_id == workspace_id,
+            UsageLog.is_deleted.is_(False),
+        ]
+        if not include_reverted:
+            conditions.append(UsageLog.reverted.is_(False))
+
+        stmt = (
+            select(UsageLog)
+            .where(and_(*conditions))
+            .order_by(UsageLog.created_at.desc())
+            .limit(limit)
+        )
+
+        try:
+            result = await session.execute(stmt)
+            return result.scalars().all()
+        except Exception as e:
+            raise DatabaseException(
+                f"Error getting usage logs for workspace {workspace_id}: {str(e)}"
+            ) from e
+
+    async def get_by_api_key(
+        self,
+        session: AsyncSession,
+        api_key_id: UUID,
+        include_reverted: bool = False,
+        limit: int = 100,
+    ) -> Sequence[UsageLog]:
+        """
+        Get usage logs for an API key.
+
+        Args:
+            session: Database session.
+            api_key_id: API key ID.
+            include_reverted: Include reverted usage logs.
+            limit: Maximum number of logs to return.
+
+        Returns:
+            List of usage logs, ordered by created_at descending.
+        """
+        conditions = [
+            UsageLog.api_key_id == api_key_id,
+            UsageLog.is_deleted.is_(False),
+        ]
+        if not include_reverted:
+            conditions.append(UsageLog.reverted.is_(False))
+
+        stmt = (
+            select(UsageLog)
+            .where(and_(*conditions))
+            .order_by(UsageLog.created_at.desc())
+            .limit(limit)
+        )
+
+        try:
+            result = await session.execute(stmt)
+            return result.scalars().all()
+        except Exception as e:
+            raise DatabaseException(
+                f"Error getting usage logs for API key {api_key_id}: {str(e)}"
+            ) from e
+
+    async def mark_reverted(
+        self,
+        session: AsyncSession,
+        usage_log_id: UUID,
+        commit_self: bool = True,
+    ) -> UsageLog | None:
+        """
+        Mark a usage log as reverted (idempotent).
+
+        This is the only allowed update operation on usage logs.
+
+        Args:
+            session: Database session.
+            usage_log_id: Usage log ID.
+            commit_self: Whether to commit the transaction.
+
+        Returns:
+            Updated usage log or None if not found.
+        """
+        # First check if already reverted (idempotent)
+        existing = await self.get_by_id(session, usage_log_id)
+        if existing is None or existing.is_deleted:
+            return None
+        if existing.reverted:
+            # Already reverted, return as-is (idempotent)
+            return existing
+
+        return await self.update(
+            session,
+            usage_log_id,
+            {
+                "reverted": True,
+                "reverted_at": datetime.now(timezone.utc),
+            },
+            commit_self=commit_self,
+        )
+
+
 # Global CRUD instances
 workspace_db = WorkspaceDB()
 workspace_member_db = WorkspaceMemberDB()
 workspace_invitation_db = WorkspaceInvitationDB()
+api_key_db = APIKeyDB()
+usage_log_db = UsageLogDB()
 
 
 __all__ = [
     "WorkspaceDB",
     "WorkspaceMemberDB",
     "WorkspaceInvitationDB",
+    "APIKeyDB",
+    "UsageLogDB",
     "workspace_db",
     "workspace_member_db",
     "workspace_invitation_db",
+    "api_key_db",
+    "usage_log_db",
     "slugify",
 ]

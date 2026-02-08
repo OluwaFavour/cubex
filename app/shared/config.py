@@ -91,6 +91,9 @@ class Settings(BaseSettings):
     STRIPE_CUBEX_CAREER_PRICE_PLUS: str = "price_1NEXAMPLECAREERPLUS"
     STRIPE_CUBEX_CAREER_PRICE_PRO: str = "price_1NEXAMPLECAREERPRO"
 
+    # Internal API settings (for external API communication)
+    INTERNAL_API_SECRET: str = "internal_api_secret_change_in_production"
+
     model_config: SettingsConfigDict = SettingsConfigDict(  # type: ignore
         env_file=".env",
         extra="ignore",

@@ -6,9 +6,22 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    StringConstraints,
+    computed_field,
+)
 
-from app.shared.enums import InvitationStatus, MemberRole, MemberStatus, WorkspaceStatus
+from app.shared.enums import (
+    AccessStatus,
+    InvitationStatus,
+    MemberRole,
+    MemberStatus,
+    WorkspaceStatus,
+)
 
 
 # ============================================================================
@@ -114,6 +127,7 @@ class WorkspaceResponse(BaseModel):
                 "owner_id": "550e8400-e29b-41d4-a716-446655440001",
                 "enabled_member_count": 5,
                 "total_member_count": 7,
+                "client_id": "ws_550e8400e29b41d4a716446655440000",
             }
         },
     )
@@ -128,6 +142,12 @@ class WorkspaceResponse(BaseModel):
     owner_id: UUID
     enabled_member_count: int = 0
     total_member_count: int = 0
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def client_id(self) -> str:
+        """Generate client ID from workspace ID (ws_<uuid_hex>)."""
+        return f"ws_{self.id.hex}"
 
 
 class WorkspaceDetailResponse(WorkspaceResponse):
@@ -147,6 +167,7 @@ class WorkspaceDetailResponse(WorkspaceResponse):
                 "owner_id": "550e8400-e29b-41d4-a716-446655440001",
                 "enabled_member_count": 5,
                 "total_member_count": 7,
+                "client_id": "ws_550e8400e29b41d4a716446655440000",
                 "members": [
                     {
                         "id": "550e8400-e29b-41d4-a716-446655440002",
@@ -187,6 +208,7 @@ class WorkspaceListResponse(BaseModel):
                         "owner_id": "550e8400-e29b-41d4-a716-446655440001",
                         "enabled_member_count": 5,
                         "total_member_count": 7,
+                        "client_id": "ws_550e8400e29b41d4a716446655440000",
                     }
                 ]
             }
@@ -358,6 +380,215 @@ class MessageResponse(BaseModel):
     success: bool = True
 
 
+# ============================================================================
+# API Key Schemas
+# ============================================================================
+
+
+class APIKeyCreate(BaseModel):
+    """Schema for creating an API key."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Production API Key",
+                "expires_in_days": 90,
+            }
+        }
+    )
+
+    name: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=128),
+        Field(description="User-defined label for the API key"),
+    ]
+    expires_in_days: Annotated[
+        int,
+        Field(
+            description="Number of days until the key expires. Must be between 1 and 365.",
+            ge=1,
+            le=365,
+        ),
+    ] = 90
+
+
+class APIKeyResponse(BaseModel):
+    """Schema for API key response (without the actual key)."""
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "Production API Key",
+                "key_prefix": "cbx_live_abc12",
+                "is_active": True,
+                "created_at": "2024-01-15T10:30:00Z",
+                "expires_at": "2024-04-15T10:30:00Z",
+                "last_used_at": "2024-02-01T15:45:00Z",
+                "revoked_at": None,
+            }
+        },
+    )
+
+    id: UUID
+    name: str
+    key_prefix: str
+    is_active: bool
+    created_at: datetime
+    expires_at: datetime | None
+    last_used_at: datetime | None
+    revoked_at: datetime | None
+
+
+class APIKeyCreatedResponse(BaseModel):
+    """Schema for newly created API key (includes the full key once)."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
+                "key": {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "name": "Production API Key",
+                    "key_prefix": "cbx_live_abc12",
+                    "is_active": True,
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "expires_at": "2024-04-15T10:30:00Z",
+                    "last_used_at": None,
+                    "revoked_at": None,
+                },
+                "message": "Store this API key securely. It will not be shown again.",
+            }
+        }
+    )
+
+    api_key: Annotated[
+        str,
+        Field(description="The full API key. Store securely - shown only once!"),
+    ]
+    key: APIKeyResponse
+    message: str = "Store this API key securely. It will not be shown again."
+
+
+class APIKeyListResponse(BaseModel):
+    """Schema for list of API keys."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "api_keys": [
+                    {
+                        "id": "550e8400-e29b-41d4-a716-446655440000",
+                        "name": "Production API Key",
+                        "key_prefix": "cbx_live_abc12",
+                        "is_active": True,
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "expires_at": "2024-04-15T10:30:00Z",
+                        "last_used_at": "2024-02-01T15:45:00Z",
+                        "revoked_at": None,
+                    }
+                ]
+            }
+        }
+    )
+
+    api_keys: list[APIKeyResponse]
+
+
+# ============================================================================
+# Usage Validation Schemas (Internal API)
+# ============================================================================
+
+
+class UsageValidateRequest(BaseModel):
+    """Schema for validating API usage (internal endpoint)."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
+                "client_id": "ws_550e8400e29b41d4a716446655440000",
+                "cost": {"credits": 10, "tokens": 1500},
+            }
+        }
+    )
+
+    api_key: Annotated[
+        str,
+        Field(description="The full API key to validate"),
+    ]
+    client_id: Annotated[
+        str,
+        Field(
+            description="Workspace client ID in format ws_<workspace_uuid_hex>",
+            pattern=r"^ws_[a-f0-9]{32}$",
+        ),
+    ]
+    cost: Annotated[
+        float | dict | None,
+        Field(
+            description="Usage cost/credits to consume (structure TBD)",
+        ),
+    ] = None
+
+
+class UsageValidateResponse(BaseModel):
+    """Schema for usage validation response."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "access": "denied",
+                "usage_id": None,
+                "message": "Quota system is not yet implemented. Please try again later.",
+            }
+        }
+    )
+
+    access: AccessStatus
+    usage_id: UUID | None
+    message: str
+
+
+class UsageRevertRequest(BaseModel):
+    """Schema for reverting API usage (internal endpoint)."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
+                "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+            }
+        }
+    )
+
+    api_key: Annotated[
+        str,
+        Field(description="The API key that made the original request"),
+    ]
+    usage_id: Annotated[
+        UUID,
+        Field(description="The usage log ID to revert"),
+    ]
+
+
+class UsageRevertResponse(BaseModel):
+    """Schema for usage revert response."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "success": True,
+                "message": "Usage successfully reverted.",
+            }
+        }
+    )
+
+    success: bool
+    message: str
+
+
 __all__ = [
     "WorkspaceCreate",
     "WorkspaceUpdate",
@@ -373,4 +604,14 @@ __all__ = [
     "InvitationAccept",
     "InvitationCreatedResponse",
     "MessageResponse",
+    # API Key schemas
+    "APIKeyCreate",
+    "APIKeyResponse",
+    "APIKeyCreatedResponse",
+    "APIKeyListResponse",
+    # Usage schemas
+    "UsageValidateRequest",
+    "UsageValidateResponse",
+    "UsageRevertRequest",
+    "UsageRevertResponse",
 ]

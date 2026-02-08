@@ -31,6 +31,10 @@ from app.apps.cubex_api.schemas.workspace import (
     InvitationAccept,
     InvitationCreatedResponse,
     MessageResponse,
+    APIKeyCreate,
+    APIKeyResponse,
+    APIKeyCreatedResponse,
+    APIKeyListResponse,
 )
 
 __all__ = [
@@ -62,4 +66,9 @@ __all__ = [
     "InvitationAccept",
     "InvitationCreatedResponse",
     "MessageResponse",
+    # API Key schemas
+    "APIKeyCreate",
+    "APIKeyResponse",
+    "APIKeyCreatedResponse",
+    "APIKeyListResponse",
 ]

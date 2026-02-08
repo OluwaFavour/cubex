@@ -13,9 +13,11 @@ from app.shared.exceptions.types import (
     ForbiddenException,
     IdempotencyException,
     NotFoundException,
+    NotImplementedException,
     OAuthException,
     OTPExpiredException,
     OTPInvalidException,
+    PaymentRequiredException,
     RateLimitException,
     RateLimitExceededException,
     StripeAPIException,
@@ -257,6 +259,25 @@ async def forbidden_exception_handler(request: Request, exc: Exception):
     )
 
 
+async def payment_required_exception_handler(request: Request, exc: Exception):
+    """
+    Handles payment required exceptions by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (PaymentRequiredException): The payment required exception instance.
+
+    Returns:
+        JSONResponse: A response containing the error message and status code 402.
+    """
+    pay_exc = cast(PaymentRequiredException, exc)
+    request_logger.warning(f"PaymentRequiredException: {exc}")
+    return JSONResponse(
+        status_code=pay_exc.status_code,
+        content={"detail": str(exc)},
+    )
+
+
 async def stripe_api_exception_handler(request: Request, exc: Exception):
     """
     Handles Stripe API exceptions by returning a JSON response.
@@ -352,6 +373,25 @@ async def stripe_rate_limit_exception_handler(request: Request, exc: Exception):
     )
 
 
+async def not_implemented_exception_handler(request: Request, exc: Exception):
+    """
+    Handles not implemented exceptions by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (NotImplementedException): The not implemented exception instance.
+
+    Returns:
+        JSONResponse: A response containing the error message and status code 501.
+    """
+    not_impl_exc = cast(NotImplementedException, exc)
+    request_logger.info(f"NotImplementedException: {exc}")
+    return JSONResponse(
+        status_code=not_impl_exc.status_code,
+        content={"detail": str(exc)},
+    )
+
+
 exception_schema: dict[int | str, dict[str, Any]] = {
     status.HTTP_400_BAD_REQUEST: {
         "description": "Bad Request",
@@ -401,6 +441,14 @@ exception_schema: dict[int | str, dict[str, Any]] = {
             }
         },
     },
+    status.HTTP_501_NOT_IMPLEMENTED: {
+        "description": "Not Implemented",
+        "content": {
+            "application/json": {
+                "example": {"detail": "This feature is not yet implemented."},
+            }
+        },
+    },
 }
 
 
@@ -417,9 +465,11 @@ __all__ = [
     "conflict_exception_handler",
     "bad_request_exception_handler",
     "forbidden_exception_handler",
+    "payment_required_exception_handler",
     "stripe_api_exception_handler",
     "stripe_card_exception_handler",
     "idempotency_exception_handler",
     "stripe_rate_limit_exception_handler",
+    "not_implemented_exception_handler",
     "exception_schema",
 ]

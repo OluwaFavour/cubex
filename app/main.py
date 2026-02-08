@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_async_session
 from app.shared.config import settings, app_logger
-from app.shared.db import init_db, dispose_db
 from app.shared.exceptions.handlers import (
     authentication_exception_handler,
     bad_request_exception_handler,
@@ -20,9 +19,11 @@ from app.shared.exceptions.handlers import (
     general_exception_handler,
     idempotency_exception_handler,
     not_found_exception_handler,
+    not_implemented_exception_handler,
     oauth_exception_handler,
     otp_expired_exception_handler,
     otp_invalid_exception_handler,
+    payment_required_exception_handler,
     rate_limit_exception_handler,
     stripe_api_exception_handler,
     stripe_card_exception_handler,
@@ -38,9 +39,11 @@ from app.shared.exceptions.types import (
     ForbiddenException,
     IdempotencyException,
     NotFoundException,
+    NotImplementedException,
     OAuthException,
     OTPExpiredException,
     OTPInvalidException,
+    PaymentRequiredException,
     RateLimitException,
     RateLimitExceededException,
     StripeAPIException,
@@ -54,6 +57,7 @@ from app.shared.services.auth import AuthService
 from app.shared.services.oauth import GoogleOAuthService, GitHubOAuthService
 from app.shared.routers import auth_router, webhook_router
 from app.apps.cubex_api.routers import (
+    internal_router,
     workspace_router,
     subscription_router as api_subscription_router,
 )
@@ -67,11 +71,6 @@ from app.shared.utils import generate_openapi_json, write_to_file_async
 async def lifespan(app: FastAPI):
     app_logger.info("Starting application...")
     consumer_connection = None
-
-    # Initialize the database
-    app_logger.info("Initializing database...")
-    await init_db()
-    app_logger.info("Database initialized successfully.")
 
     # Initialize Redis service
     app_logger.info("Initializing Redis service...")
@@ -168,11 +167,6 @@ async def lifespan(app: FastAPI):
     await RedisService.aclose()
     app_logger.info("Redis service closed successfully.")
 
-    app_logger.info("Disposing database...")
-    await dispose_db()
-    app_logger.info("Database disposed successfully.")
-    app_logger.info("Application shutdown complete.")
-
 
 app = FastAPI(
     lifespan=lifespan,
@@ -200,6 +194,7 @@ app.add_exception_handler(RateLimitExceededException, rate_limit_exception_handl
 app.add_exception_handler(OAuthException, oauth_exception_handler)
 app.add_exception_handler(AuthenticationException, authentication_exception_handler)
 app.add_exception_handler(ForbiddenException, forbidden_exception_handler)
+app.add_exception_handler(PaymentRequiredException, payment_required_exception_handler)
 app.add_exception_handler(NotFoundException, not_found_exception_handler)
 app.add_exception_handler(ConflictException, conflict_exception_handler)
 app.add_exception_handler(BadRequestException, bad_request_exception_handler)
@@ -209,6 +204,8 @@ app.add_exception_handler(StripeCardException, stripe_card_exception_handler)
 app.add_exception_handler(IdempotencyException, idempotency_exception_handler)
 app.add_exception_handler(RateLimitException, stripe_rate_limit_exception_handler)
 app.add_exception_handler(StripeAPIException, stripe_api_exception_handler)
+# Not implemented exception handler
+app.add_exception_handler(NotImplementedException, not_implemented_exception_handler)
 # Generic fallback
 app.add_exception_handler(AppException, general_exception_handler)
 
@@ -235,6 +232,7 @@ app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 app.include_router(webhook_router, tags=["Webhooks"])
 app.include_router(workspace_router, prefix="/api", tags=["API - Workspaces"])
 app.include_router(api_subscription_router, prefix="/api", tags=["API - Subscriptions"])
+app.include_router(internal_router, tags=["Internal API"])
 app.include_router(
     career_subscription_router, prefix="/career", tags=["Career - Subscriptions"]
 )

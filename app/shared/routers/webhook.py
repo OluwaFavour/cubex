@@ -10,9 +10,10 @@ Business logic is NOT handled here - only signature verification and event routi
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Request, status
 
 from app.shared.config import webhook_logger
+from app.shared.exceptions.types import BadRequestException
 from app.shared.services.payment.stripe.main import Stripe
 from app.infrastructure.messaging.publisher import publish_event
 
@@ -132,10 +133,7 @@ async def handle_stripe_webhook(request: Request) -> dict[str, str]:
 
     if not sig_header:
         webhook_logger.warning("Webhook received without Stripe-Signature header")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing Stripe-Signature header",
-        )
+        raise BadRequestException("Missing Stripe-Signature header")
 
     # Verify signature and construct event
     try:
@@ -144,10 +142,7 @@ async def handle_stripe_webhook(request: Request) -> dict[str, str]:
         )
     except Exception as e:
         webhook_logger.error(f"Webhook signature verification failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid signature",
-        )
+        raise BadRequestException("Invalid signature") from e
 
     event_id: str | None = event.get("id")
     event_type: str | None = event.get("type")
@@ -157,10 +152,7 @@ async def handle_stripe_webhook(request: Request) -> dict[str, str]:
     # Validate required fields
     if not event_id or not event_type:
         webhook_logger.warning("Webhook missing event id or type")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing event id or type",
-        )
+        raise BadRequestException("Missing event id or type")
 
     # Get queue name for this event type
     queue_name = EVENT_QUEUE_MAPPING.get(event_type)

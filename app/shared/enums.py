@@ -100,7 +100,20 @@ class InvitationStatus(str, Enum):
     REVOKED = "revoked"
 
 
+# ============================================================================
+# API Usage Enums
+# ============================================================================
+
+
+class AccessStatus(str, Enum):
+    """Status of API usage access validation."""
+
+    GRANTED = "granted"
+    DENIED = "denied"
+
+
 __all__ = [
+    "AccessStatus",
     "APIPlanName",
     "CareerPlanName",
     "InvitationStatus",

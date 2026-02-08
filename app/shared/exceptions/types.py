@@ -119,6 +119,13 @@ class ForbiddenException(AppException):
         super().__init__(message, status.HTTP_403_FORBIDDEN)
 
 
+class PaymentRequiredException(AppException):
+    """Exception raised when payment is required."""
+
+    def __init__(self, message: str = "Payment required."):
+        super().__init__(message, status.HTTP_402_PAYMENT_REQUIRED)
+
+
 class InvalidStateException(BadRequestException):
     """Exception raised when OAuth state parameter is invalid."""
 
@@ -194,6 +201,17 @@ class RateLimitException(AppException):
         super().__init__(message, status.HTTP_429_TOO_MANY_REQUESTS, details)
 
 
+class NotImplementedException(AppException):
+    """Exception raised when a feature is not yet implemented."""
+
+    def __init__(
+        self,
+        message: str = "This feature is not yet implemented.",
+        details: dict | None = None,
+    ):
+        super().__init__(message, status.HTTP_501_NOT_IMPLEMENTED, details)
+
+
 __all__ = [
     "AppException",
     "DatabaseException",
@@ -210,9 +228,11 @@ __all__ = [
     "UserAlreadyExistsException",
     "BadRequestException",
     "ForbiddenException",
+    "PaymentRequiredException",
     "InvalidStateException",
     "StripeAPIException",
     "StripeCardException",
     "IdempotencyException",
     "RateLimitException",
+    "NotImplementedException",
 ]

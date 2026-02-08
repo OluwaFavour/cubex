@@ -10,12 +10,19 @@ This module provides endpoints for:
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_async_session
 from app.shared.config import request_logger
 from app.shared.dependencies.auth import CurrentActiveUser
+from app.shared.exceptions.types import (
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+    PaymentRequiredException,
+)
 from app.apps.cubex_api.db.crud import (
     workspace_member_db,
     workspace_invitation_db,
@@ -35,10 +42,15 @@ from app.apps.cubex_api.schemas import (
     InvitationAccept,
     InvitationCreatedResponse,
     MessageResponse,
+    APIKeyCreate,
+    APIKeyResponse,
+    APIKeyCreatedResponse,
+    APIKeyListResponse,
 )
 from app.apps.cubex_api.services import (
     workspace_service,
     subscription_service,
+    quota_service,
     WorkspaceNotFoundException,
     WorkspaceFrozenException,
     InsufficientSeatsException,
@@ -49,6 +61,7 @@ from app.apps.cubex_api.services import (
     CannotInviteOwnerException,
     PermissionDeniedException,
     FreeWorkspaceNoInvitesException,
+    APIKeyNotFoundException,
 )
 from app.shared.enums import MemberRole, MemberStatus
 from app.shared.services.oauth.base import OAuthStateManager
@@ -336,10 +349,7 @@ async def get_workspace(
             session, workspace_id, current_user.id
         )
         if not member:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Workspace not found or access denied.",
-            )
+            raise NotFoundException("Workspace not found or access denied.")
 
         workspace = await workspace_service.get_workspace(session, workspace_id)
         members = await workspace_member_db.get_workspace_members(session, workspace_id)
@@ -447,13 +457,9 @@ async def update_workspace(
             )
             return _build_workspace_response(workspace)
     except PermissionDeniedException as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=str(e.message)
-        )
+        raise ForbiddenException(str(e.message)) from e
     except WorkspaceNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e.message)
-        )
+        raise NotFoundException(str(e.message)) from e
 
 
 # ============================================================================
@@ -538,10 +544,7 @@ async def list_members(
             session, workspace_id, current_user.id
         )
         if not member:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Workspace not found or access denied.",
-            )
+            raise NotFoundException("Workspace not found or access denied.")
 
         members = await workspace_member_db.get_workspace_members(
             session, workspace_id, status=status_filter
@@ -655,17 +658,11 @@ async def update_member_status(
             )
             return _build_member_response(member)
     except PermissionDeniedException as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=str(e.message)
-        )
+        raise ForbiddenException(str(e.message)) from e
     except MemberNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e.message)
-        )
+        raise NotFoundException(str(e.message)) from e
     except InsufficientSeatsException as e:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(e.message)
-        )
+        raise PaymentRequiredException(str(e.message)) from e
 
 
 @router.patch(
@@ -756,13 +753,9 @@ async def update_member_role(
             )
             return _build_member_response(member)
     except PermissionDeniedException as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=str(e.message)
-        )
+        raise ForbiddenException(str(e.message)) from e
     except MemberNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e.message)
-        )
+        raise NotFoundException(str(e.message)) from e
 
 
 @router.delete(
@@ -847,13 +840,9 @@ async def remove_member(
             )
             return MessageResponse(message="Member removed successfully.")
     except PermissionDeniedException as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=str(e.message)
-        )
+        raise ForbiddenException(str(e.message)) from e
     except MemberNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e.message)
-        )
+        raise NotFoundException(str(e.message)) from e
 
 
 @router.post(
@@ -936,13 +925,9 @@ async def leave_workspace(
             )
             return MessageResponse(message="Successfully left workspace.")
     except PermissionDeniedException as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=str(e.message)
-        )
+        raise ForbiddenException(str(e.message)) from e
     except MemberNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e.message)
-        )
+        raise NotFoundException(str(e.message)) from e
 
 
 @router.post(
@@ -1039,13 +1024,9 @@ async def transfer_ownership(
             )
             return _build_workspace_response(workspace)
     except PermissionDeniedException as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=str(e.message)
-        )
+        raise ForbiddenException(str(e.message)) from e
     except MemberNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e.message)
-        )
+        raise NotFoundException(str(e.message)) from e
 
 
 # ============================================================================
@@ -1121,10 +1102,7 @@ async def list_invitations(
             session, workspace_id, current_user.id
         )
         if not member or not member.is_admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin permission required.",
-            )
+            raise ForbiddenException("Admin permission required.")
 
         invitations = await workspace_invitation_db.get_workspace_invitations(
             session, workspace_id
@@ -1231,9 +1209,8 @@ async def create_invitation(
 
     # Validate callback URL is in allowed CORS origins
     if not OAuthStateManager.validate_callback_url(data.callback_url):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid callback URL. Must be in allowed origins and use HTTPS in production.",
+        raise BadRequestException(
+            "Invalid callback URL. Must be in allowed origins and use HTTPS in production."
         )
 
     try:
@@ -1256,29 +1233,19 @@ async def create_invitation(
                 invitation_url=invitation_url,
             )
     except PermissionDeniedException as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=str(e.message)
-        )
+        raise ForbiddenException(str(e.message)) from e
     except CannotInviteOwnerException as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e.message)
-        )
+        raise BadRequestException(str(e.message)) from e
     except MemberAlreadyExistsException as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e.message))
+        raise ConflictException(str(e.message)) from e
     except InvitationAlreadyExistsException as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e.message))
+        raise ConflictException(str(e.message)) from e
     except FreeWorkspaceNoInvitesException as e:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(e.message)
-        )
+        raise PaymentRequiredException(str(e.message)) from e
     except InsufficientSeatsException as e:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(e.message)
-        )
+        raise PaymentRequiredException(str(e.message)) from e
     except WorkspaceFrozenException as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=str(e.message)
-        )
+        raise ForbiddenException(str(e.message)) from e
 
 
 @router.delete(
@@ -1360,13 +1327,9 @@ async def revoke_invitation(
             )
             return MessageResponse(message="Invitation revoked.")
     except PermissionDeniedException as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=str(e.message)
-        )
+        raise ForbiddenException(str(e.message)) from e
     except InvitationNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e.message)
-        )
+        raise NotFoundException(str(e.message)) from e
 
 
 # ============================================================================
@@ -1463,15 +1426,11 @@ async def accept_invitation(
             )
             return _build_member_response(member)
     except InvitationNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e.message)
-        )
+        raise NotFoundException(str(e.message)) from e
     except MemberAlreadyExistsException as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e.message))
+        raise ConflictException(str(e.message)) from e
     except InsufficientSeatsException as e:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(e.message)
-        )
+        raise PaymentRequiredException(str(e.message)) from e
 
 
 # ============================================================================
@@ -1540,6 +1499,316 @@ async def activate_personal_workspace(
         f"POST /workspaces/activate - workspace={workspace.id} for user={current_user.id}"
     )
     return _build_workspace_response(workspace)
+
+
+# ============================================================================
+# API Key Endpoints
+# ============================================================================
+
+
+def _build_api_key_response(api_key) -> APIKeyResponse:
+    """Build APIKeyResponse from APIKey model."""
+    return APIKeyResponse(
+        id=api_key.id,
+        name=api_key.name,
+        key_prefix=api_key.key_prefix,
+        is_active=api_key.is_active,
+        created_at=api_key.created_at,
+        expires_at=api_key.expires_at,
+        last_used_at=api_key.last_used_at,
+        revoked_at=api_key.revoked_at,
+    )
+
+
+@router.post(
+    "/{workspace_id}/api-keys",
+    response_model=APIKeyCreatedResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create API key",
+    description="""
+## Create API Key
+
+Generate a new API key for the workspace. The key is used to authenticate
+requests to the external developer API.
+
+### Authorization
+
+- User must be an **admin** or **owner** of the workspace
+
+### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `workspace_id` | UUID | The workspace identifier |
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✅ | User-defined label for the key (1-128 characters) |
+| `expires_in_days` | integer | ❌ | Days until expiry (1-365). Default: 90. Null for never. |
+
+### Response
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `api_key` | string | The full API key. **Store securely - shown only once!** |
+| `key` | object | API key metadata |
+| `key.id` | UUID | Key identifier |
+| `key.name` | string | User-defined label |
+| `key.key_prefix` | string | Display prefix for identification |
+| `key.is_active` | boolean | Whether key is active |
+| `key.expires_at` | datetime | Expiration timestamp (null if never) |
+| `message` | string | Security reminder |
+
+### Security Notes
+
+- The full API key is shown **only once** in this response
+- Store the key securely (e.g., environment variable, secrets manager)
+- The key cannot be retrieved again - if lost, revoke and create a new one
+- Keys are hashed with HMAC-SHA256 before storage
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `403 Forbidden` | User is not an admin of the workspace |
+| `404 Not Found` | Workspace not found |
+""",
+    responses={
+        201: {"description": "API key created successfully"},
+        403: {
+            "description": "Admin permission required",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Admin permission required."}
+                }
+            },
+        },
+        404: {
+            "description": "Workspace not found",
+            "content": {
+                "application/json": {"example": {"detail": "Workspace not found."}}
+            },
+        },
+    },
+)
+async def create_api_key(
+    workspace_id: UUID,
+    data: APIKeyCreate,
+    current_user: CurrentActiveUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> APIKeyCreatedResponse:
+    """Create a new API key for the workspace."""
+    request_logger.info(
+        f"POST /workspaces/{workspace_id}/api-keys - user={current_user.id}"
+    )
+
+    async with session.begin():
+        # Get member and verify admin permission
+        member = await workspace_member_db.get_member(
+            session, workspace_id, current_user.id
+        )
+        if not member:
+            raise NotFoundException("Workspace not found or access denied.")
+        if member.role not in [MemberRole.ADMIN, MemberRole.OWNER]:
+            raise ForbiddenException("Admin permission required.")
+        api_key, raw_key = await quota_service.create_api_key(
+            session=session,
+            workspace_id=workspace_id,
+            name=data.name,
+            expires_in_days=data.expires_in_days,
+            commit_self=False,
+        )
+
+    request_logger.info(
+        f"POST /workspaces/{workspace_id}/api-keys - created key={api_key.id}"
+    )
+
+    return APIKeyCreatedResponse(
+        api_key=raw_key,
+        key=_build_api_key_response(api_key),
+    )
+
+
+@router.get(
+    "/{workspace_id}/api-keys",
+    response_model=APIKeyListResponse,
+    summary="List API keys",
+    description="""
+## List API Keys
+
+Retrieve all API keys for the workspace.
+
+### Authorization
+
+- User must be an **admin** or **owner** of the workspace
+
+### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `workspace_id` | UUID | The workspace identifier |
+
+### Response
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `api_keys` | array | List of API key objects |
+| `api_keys[].id` | UUID | Key identifier |
+| `api_keys[].name` | string | User-defined label |
+| `api_keys[].key_prefix` | string | Display prefix for identification |
+| `api_keys[].is_active` | boolean | Whether key is active |
+| `api_keys[].created_at` | datetime | Creation timestamp |
+| `api_keys[].expires_at` | datetime | Expiration timestamp (null if never) |
+| `api_keys[].last_used_at` | datetime | Last usage timestamp (null if never used) |
+| `api_keys[].revoked_at` | datetime | Revocation timestamp (null if active) |
+
+### Notes
+
+- Only metadata is returned, never the actual key
+- Includes both active and revoked keys
+- Use `key_prefix` to identify keys (e.g., "cbx_live_abc12...")
+""",
+    responses={
+        403: {
+            "description": "Admin permission required",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Admin permission required."}
+                }
+            },
+        },
+        404: {
+            "description": "Workspace not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Workspace not found or access denied."}
+                }
+            },
+        },
+    },
+)
+async def list_api_keys(
+    workspace_id: UUID,
+    current_user: CurrentActiveUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> APIKeyListResponse:
+    """List all API keys for the workspace."""
+    request_logger.info(
+        f"GET /workspaces/{workspace_id}/api-keys - user={current_user.id}"
+    )
+
+    async with session.begin():
+        # Get member and verify admin permission
+        member = await workspace_member_db.get_member(
+            session, workspace_id, current_user.id
+        )
+        if not member:
+            raise NotFoundException("Workspace not found or access denied.")
+        if member.role not in [MemberRole.ADMIN, MemberRole.OWNER]:
+            raise ForbiddenException("Admin permission required.")
+
+        api_keys = await quota_service.list_api_keys(session, workspace_id)
+
+    return APIKeyListResponse(
+        api_keys=[_build_api_key_response(key) for key in api_keys],
+    )
+
+
+@router.delete(
+    "/{workspace_id}/api-keys/{api_key_id}",
+    response_model=MessageResponse,
+    summary="Revoke API key",
+    description="""
+## Revoke API Key
+
+Revoke an API key. The key will immediately stop working.
+
+### Authorization
+
+- User must be an **admin** or **owner** of the workspace
+
+### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `workspace_id` | UUID | The workspace identifier |
+| `api_key_id` | UUID | The API key identifier |
+
+### Response
+
+```json
+{
+  "message": "API key revoked."
+}
+```
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `403 Forbidden` | User is not an admin of the workspace |
+| `404 Not Found` | API key not found |
+
+### Notes
+
+- Revocation is immediate and permanent
+- Revoked keys are kept in the list for audit purposes
+- Create a new key if needed after revocation
+""",
+    responses={
+        403: {
+            "description": "Admin permission required",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Admin permission required."}
+                }
+            },
+        },
+        404: {
+            "description": "API key not found",
+            "content": {
+                "application/json": {"example": {"detail": "API key not found."}}
+            },
+        },
+    },
+)
+async def revoke_api_key(
+    workspace_id: UUID,
+    api_key_id: UUID,
+    current_user: CurrentActiveUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> MessageResponse:
+    """Revoke an API key."""
+    request_logger.info(
+        f"DELETE /workspaces/{workspace_id}/api-keys/{api_key_id} - user={current_user.id}"
+    )
+
+    try:
+        async with session.begin():
+            # Get member and verify admin permission
+            member = await workspace_member_db.get_member(
+                session, workspace_id, current_user.id
+            )
+            if not member:
+                raise NotFoundException("Workspace not found or access denied.")
+            if member.role not in [MemberRole.ADMIN, MemberRole.OWNER]:
+                raise ForbiddenException("Admin permission required.")
+            await quota_service.revoke_api_key(
+                session=session,
+                workspace_id=workspace_id,
+                api_key_id=api_key_id,
+                commit_self=False,
+            )
+    except APIKeyNotFoundException as e:
+        raise NotFoundException(str(e.message)) from e
+
+    request_logger.info(
+        f"DELETE /workspaces/{workspace_id}/api-keys/{api_key_id} - revoked"
+    )
+
+    return MessageResponse(message="API key revoked.")
 
 
 __all__ = ["router"]

@@ -100,6 +100,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -202,6 +212,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -300,6 +320,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -423,6 +453,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -542,6 +582,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -644,6 +694,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -732,6 +792,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -859,6 +929,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -1057,6 +1137,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "307": {
                         "description": "Redirect to frontend callback URL with tokens in fragment",
                         "headers": {
@@ -1170,6 +1260,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -1268,6 +1368,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Too many verification attempts. Please request a new code."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -1385,6 +1495,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -1481,6 +1601,16 @@
                                 }
                             }
                         }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -1563,6 +1693,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -1662,6 +1802,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -1755,6 +1905,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -1862,6 +2022,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -2004,6 +2174,16 @@
                                 }
                             }
                         }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2106,6 +2286,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -2215,6 +2405,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -2320,6 +2520,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -2437,6 +2647,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -2580,6 +2800,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -2705,6 +2935,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -2858,6 +3098,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Owner permission required",
                         "content": {
@@ -2987,6 +3237,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Admin permission required",
                         "content": {
@@ -3102,6 +3362,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -3235,6 +3505,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Owner permission required",
                         "content": {
@@ -3350,6 +3630,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -3477,6 +3767,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -3620,6 +3920,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Admin permission required",
                         "content": {
@@ -3732,6 +4042,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "402": {
                         "description": "No available seats",
                         "content": {
@@ -3838,6 +4158,16 @@
                                 }
                             }
                         }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -3845,6 +4175,411 @@
                         "HTTPBearer": []
                     }
                 ]
+            }
+        },
+        "/api/workspaces/{workspace_id}/api-keys": {
+            "post": {
+                "tags": [
+                    "API - Workspaces"
+                ],
+                "summary": "Create API key",
+                "description": "## Create API Key\n\nGenerate a new API key for the workspace. The key is used to authenticate\nrequests to the external developer API.\n\n### Authorization\n\n- User must be an **admin** or **owner** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `name` | string | \u2705 | User-defined label for the key (1-128 characters) |\n| `expires_in_days` | integer | \u274c | Days until expiry (1-365). Default: 90. Null for never. |\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `api_key` | string | The full API key. **Store securely - shown only once!** |\n| `key` | object | API key metadata |\n| `key.id` | UUID | Key identifier |\n| `key.name` | string | User-defined label |\n| `key.key_prefix` | string | Display prefix for identification |\n| `key.is_active` | boolean | Whether key is active |\n| `key.expires_at` | datetime | Expiration timestamp (null if never) |\n| `message` | string | Security reminder |\n\n### Security Notes\n\n- The full API key is shown **only once** in this response\n- Store the key securely (e.g., environment variable, secrets manager)\n- The key cannot be retrieved again - if lost, revoke and create a new one\n- Keys are hashed with HMAC-SHA256 before storage\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `403 Forbidden` | User is not an admin of the workspace |\n| `404 Not Found` | Workspace not found |",
+                "operationId": "create_api_key_api_workspaces__workspace_id__api_keys_post",
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "workspace_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "title": "Workspace Id"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/APIKeyCreate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "API key created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/APIKeyCreatedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Workspace not found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Workspace not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Admin permission required",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Admin permission required."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "tags": [
+                    "API - Workspaces"
+                ],
+                "summary": "List API keys",
+                "description": "## List API Keys\n\nRetrieve all API keys for the workspace.\n\n### Authorization\n\n- User must be an **admin** or **owner** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `api_keys` | array | List of API key objects |\n| `api_keys[].id` | UUID | Key identifier |\n| `api_keys[].name` | string | User-defined label |\n| `api_keys[].key_prefix` | string | Display prefix for identification |\n| `api_keys[].is_active` | boolean | Whether key is active |\n| `api_keys[].created_at` | datetime | Creation timestamp |\n| `api_keys[].expires_at` | datetime | Expiration timestamp (null if never) |\n| `api_keys[].last_used_at` | datetime | Last usage timestamp (null if never used) |\n| `api_keys[].revoked_at` | datetime | Revocation timestamp (null if active) |\n\n### Notes\n\n- Only metadata is returned, never the actual key\n- Includes both active and revoked keys\n- Use `key_prefix` to identify keys (e.g., \"cbx_live_abc12...\")",
+                "operationId": "list_api_keys_api_workspaces__workspace_id__api_keys_get",
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "workspace_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "title": "Workspace Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/APIKeyListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Workspace not found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Workspace not found or access denied."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Admin permission required",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Admin permission required."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/workspaces/{workspace_id}/api-keys/{api_key_id}": {
+            "delete": {
+                "tags": [
+                    "API - Workspaces"
+                ],
+                "summary": "Revoke API key",
+                "description": "## Revoke API Key\n\nRevoke an API key. The key will immediately stop working.\n\n### Authorization\n\n- User must be an **admin** or **owner** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n| `api_key_id` | UUID | The API key identifier |\n\n### Response\n\n```json\n{\n  \"message\": \"API key revoked.\"\n}\n```\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `403 Forbidden` | User is not an admin of the workspace |\n| `404 Not Found` | API key not found |\n\n### Notes\n\n- Revocation is immediate and permanent\n- Revoked keys are kept in the list for audit purposes\n- Create a new key if needed after revocation",
+                "operationId": "revoke_api_key_api_workspaces__workspace_id__api_keys__api_key_id__delete",
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "workspace_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "title": "Workspace Id"
+                        }
+                    },
+                    {
+                        "name": "api_key_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "title": "Api Key Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "API key not found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "API key not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Admin permission required",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Admin permission required."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/subscriptions/plans": {
@@ -3922,6 +4657,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -4016,6 +4761,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -4133,6 +4888,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -4266,6 +5031,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Admin permission required",
                         "content": {
@@ -4391,6 +5166,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -4524,6 +5309,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Owner permission required",
                         "content": {
@@ -4649,6 +5444,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -4782,6 +5587,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Admin permission required",
                         "content": {
@@ -4911,12 +5726,317 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Admin permission required",
                         "content": {
                             "application/json": {
                                 "example": {
                                     "detail": "Admin permission required."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/usage/validate": {
+            "post": {
+                "tags": [
+                    "Internal API",
+                    "Internal API"
+                ],
+                "summary": "Validate API key and log usage",
+                "description": "Validate an API key and log usage for quota tracking.\n    \n    This endpoint is called by the external developer API to:\n    1. Validate the API key is valid, active, and not expired\n    2. Verify the API key belongs to the specified workspace (client_id)\n    3. Log the usage for quota tracking\n    4. Return access granted/denied with a usage_id\n    \n    **Note**: Currently returns DENIED with 501 message as quota system\n    is not yet implemented. The usage is still logged for future quota\n    enforcement.\n    \n    **Security**: Requires X-Internal-API-Key header.",
+                "operationId": "validate_usage_internal_usage_validate_post",
+                "parameters": [
+                    {
+                        "name": "x-internal-api-key",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "X-Internal-Api-Key"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UsageValidateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Validation result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsageValidateResponse"
+                                },
+                                "examples": {
+                                    "denied_not_implemented": {
+                                        "summary": "Denied - Not Implemented",
+                                        "value": {
+                                            "access": "denied",
+                                            "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "message": "Quota system is not yet implemented."
+                                        }
+                                    },
+                                    "denied_invalid_key": {
+                                        "summary": "Denied - Invalid Key",
+                                        "value": {
+                                            "access": "denied",
+                                            "message": "API key not found, expired, or revoked."
+                                        }
+                                    },
+                                    "denied_invalid_client_id": {
+                                        "summary": "Denied - Invalid Client ID",
+                                        "value": {
+                                            "access": "denied",
+                                            "message": "Invalid client_id format."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing internal API key"
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/usage/revert": {
+            "post": {
+                "tags": [
+                    "Internal API",
+                    "Internal API"
+                ],
+                "summary": "Revert a usage log",
+                "description": "Revert a usage log entry (idempotent).\n    \n    This endpoint is called by the external developer API when an error\n    occurs and the usage should not count against the user's quota.\n    \n    **Idempotent**: This operation is safe to retry. If the usage log\n    is already reverted or doesn't exist, success is still returned.\n    \n    **Security**: Requires X-Internal-API-Key header.",
+                "operationId": "revert_usage_internal_usage_revert_post",
+                "parameters": [
+                    {
+                        "name": "x-internal-api-key",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "X-Internal-Api-Key"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UsageRevertRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Revert result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsageRevertResponse"
+                                },
+                                "examples": {
+                                    "success": {
+                                        "summary": "Successfully Reverted",
+                                        "value": {
+                                            "success": true,
+                                            "message": "Usage successfully reverted."
+                                        }
+                                    },
+                                    "already_reverted": {
+                                        "summary": "Already Reverted (Idempotent)",
+                                        "value": {
+                                            "success": true,
+                                            "message": "Usage log not found, but operation is idempotent."
+                                        }
+                                    },
+                                    "ownership_mismatch": {
+                                        "summary": "Ownership Mismatch",
+                                        "value": {
+                                            "success": false,
+                                            "message": "API key does not own this usage log."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing internal API key"
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -5012,6 +6132,16 @@
                                 }
                             }
                         }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -5103,6 +6233,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -5206,6 +6346,16 @@
                                 }
                             }
                         }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -5300,6 +6450,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -5411,6 +6571,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -5514,6 +6684,16 @@
                             "application/json": {
                                 "example": {
                                     "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
                                 }
                             }
                         }
@@ -5625,6 +6805,16 @@
                             }
                         }
                     },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation Error",
                         "content": {
@@ -5721,6 +6911,16 @@
                                 }
                             }
                         }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -5803,6 +7003,16 @@
                                 }
                             }
                         }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -5810,6 +7020,194 @@
     },
     "components": {
         "schemas": {
+            "APIKeyCreate": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "title": "Name",
+                        "description": "User-defined label for the API key"
+                    },
+                    "expires_in_days": {
+                        "type": "integer",
+                        "maximum": 365.0,
+                        "minimum": 1.0,
+                        "title": "Expires In Days",
+                        "description": "Number of days until the key expires. Must be between 1 and 365.",
+                        "default": 90
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "title": "APIKeyCreate",
+                "description": "Schema for creating an API key.",
+                "example": {
+                    "expires_in_days": 90,
+                    "name": "Production API Key"
+                }
+            },
+            "APIKeyCreatedResponse": {
+                "properties": {
+                    "api_key": {
+                        "type": "string",
+                        "title": "Api Key",
+                        "description": "The full API key. Store securely - shown only once!"
+                    },
+                    "key": {
+                        "$ref": "#/components/schemas/APIKeyResponse"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message",
+                        "default": "Store this API key securely. It will not be shown again."
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "api_key",
+                    "key"
+                ],
+                "title": "APIKeyCreatedResponse",
+                "description": "Schema for newly created API key (includes the full key once).",
+                "example": {
+                    "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
+                    "key": {
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "expires_at": "2024-04-15T10:30:00Z",
+                        "id": "550e8400-e29b-41d4-a716-446655440000",
+                        "is_active": true,
+                        "key_prefix": "cbx_live_abc12",
+                        "name": "Production API Key"
+                    },
+                    "message": "Store this API key securely. It will not be shown again."
+                }
+            },
+            "APIKeyListResponse": {
+                "properties": {
+                    "api_keys": {
+                        "items": {
+                            "$ref": "#/components/schemas/APIKeyResponse"
+                        },
+                        "type": "array",
+                        "title": "Api Keys"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "api_keys"
+                ],
+                "title": "APIKeyListResponse",
+                "description": "Schema for list of API keys.",
+                "example": {
+                    "api_keys": [
+                        {
+                            "created_at": "2024-01-15T10:30:00Z",
+                            "expires_at": "2024-04-15T10:30:00Z",
+                            "id": "550e8400-e29b-41d4-a716-446655440000",
+                            "is_active": true,
+                            "key_prefix": "cbx_live_abc12",
+                            "last_used_at": "2024-02-01T15:45:00Z",
+                            "name": "Production API Key"
+                        }
+                    ]
+                }
+            },
+            "APIKeyResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "title": "Id"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "key_prefix": {
+                        "type": "string",
+                        "title": "Key Prefix"
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "title": "Is Active"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Created At"
+                    },
+                    "expires_at": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Expires At"
+                    },
+                    "last_used_at": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Last Used At"
+                    },
+                    "revoked_at": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Revoked At"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "key_prefix",
+                    "is_active",
+                    "created_at",
+                    "expires_at",
+                    "last_used_at",
+                    "revoked_at"
+                ],
+                "title": "APIKeyResponse",
+                "description": "Schema for API key response (without the actual key).",
+                "example": {
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "expires_at": "2024-04-15T10:30:00Z",
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "is_active": true,
+                    "key_prefix": "cbx_live_abc12",
+                    "last_used_at": "2024-02-01T15:45:00Z",
+                    "name": "Production API Key"
+                }
+            },
+            "AccessStatus": {
+                "type": "string",
+                "enum": [
+                    "granted",
+                    "denied"
+                ],
+                "title": "AccessStatus",
+                "description": "Status of API usage access validation."
+            },
             "AccessTokenResponse": {
                 "properties": {
                     "access_token": {
@@ -7576,6 +8974,136 @@
                     "new_plan_id": "550e8400-e29b-41d4-a716-446655440000"
                 }
             },
+            "UsageRevertRequest": {
+                "properties": {
+                    "api_key": {
+                        "type": "string",
+                        "title": "Api Key",
+                        "description": "The API key that made the original request"
+                    },
+                    "usage_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "title": "Usage Id",
+                        "description": "The usage log ID to revert"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "api_key",
+                    "usage_id"
+                ],
+                "title": "UsageRevertRequest",
+                "description": "Schema for reverting API usage (internal endpoint).",
+                "example": {
+                    "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
+                    "usage_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            },
+            "UsageRevertResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "title": "Success"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "success",
+                    "message"
+                ],
+                "title": "UsageRevertResponse",
+                "description": "Schema for usage revert response.",
+                "example": {
+                    "message": "Usage successfully reverted.",
+                    "success": true
+                }
+            },
+            "UsageValidateRequest": {
+                "properties": {
+                    "api_key": {
+                        "type": "string",
+                        "title": "Api Key",
+                        "description": "The full API key to validate"
+                    },
+                    "client_id": {
+                        "type": "string",
+                        "pattern": "^ws_[a-f0-9]{32}$",
+                        "title": "Client Id",
+                        "description": "Workspace client ID in format ws_<workspace_uuid_hex>"
+                    },
+                    "cost": {
+                        "anyOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Cost",
+                        "description": "Usage cost/credits to consume (structure TBD)"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "api_key",
+                    "client_id"
+                ],
+                "title": "UsageValidateRequest",
+                "description": "Schema for validating API usage (internal endpoint).",
+                "example": {
+                    "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
+                    "client_id": "ws_550e8400e29b41d4a716446655440000",
+                    "cost": {
+                        "credits": 10,
+                        "tokens": 1500
+                    }
+                }
+            },
+            "UsageValidateResponse": {
+                "properties": {
+                    "access": {
+                        "$ref": "#/components/schemas/AccessStatus"
+                    },
+                    "usage_id": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Usage Id"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "access",
+                    "usage_id",
+                    "message"
+                ],
+                "title": "UsageValidateResponse",
+                "description": "Schema for usage validation response.",
+                "example": {
+                    "access": "denied",
+                    "message": "Quota system is not yet implemented. Please try again later."
+                }
+            },
             "ValidationError": {
                 "properties": {
                     "loc": {
@@ -7713,6 +9241,12 @@
                         "type": "integer",
                         "title": "Available Seats",
                         "default": 0
+                    },
+                    "client_id": {
+                        "type": "string",
+                        "title": "Client Id",
+                        "description": "Generate client ID from workspace ID (ws_<uuid_hex>).",
+                        "readOnly": true
                     }
                 },
                 "type": "object",
@@ -7724,12 +9258,14 @@
                     "is_personal",
                     "description",
                     "created_at",
-                    "owner_id"
+                    "owner_id",
+                    "client_id"
                 ],
                 "title": "WorkspaceDetailResponse",
                 "description": "Schema for detailed workspace response with members.",
                 "example": {
                     "available_seats": 3,
+                    "client_id": "ws_550e8400e29b41d4a716446655440000",
                     "created_at": "2024-01-15T10:30:00Z",
                     "description": "Workspace for our startup team",
                     "display_name": "My Startup",
@@ -7773,6 +9309,7 @@
                 "example": {
                     "workspaces": [
                         {
+                            "client_id": "ws_550e8400e29b41d4a716446655440000",
                             "created_at": "2024-01-15T10:30:00Z",
                             "description": "Workspace for our startup team",
                             "display_name": "My Startup",
@@ -7905,6 +9442,12 @@
                         "type": "integer",
                         "title": "Total Member Count",
                         "default": 0
+                    },
+                    "client_id": {
+                        "type": "string",
+                        "title": "Client Id",
+                        "description": "Generate client ID from workspace ID (ws_<uuid_hex>).",
+                        "readOnly": true
                     }
                 },
                 "type": "object",
@@ -7916,11 +9459,13 @@
                     "is_personal",
                     "description",
                     "created_at",
-                    "owner_id"
+                    "owner_id",
+                    "client_id"
                 ],
                 "title": "WorkspaceResponse",
                 "description": "Schema for workspace response.",
                 "example": {
+                    "client_id": "ws_550e8400e29b41d4a716446655440000",
                     "created_at": "2024-01-15T10:30:00Z",
                     "description": "Workspace for our startup team",
                     "display_name": "My Startup",

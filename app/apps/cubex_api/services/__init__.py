@@ -31,6 +31,15 @@ from app.apps.cubex_api.services.workspace import (
     PermissionDeniedException,
     FreeWorkspaceNoInvitesException,
 )
+from app.apps.cubex_api.services.quota import (
+    QuotaService,
+    quota_service,
+    APIKeyNotFoundException,
+    APIKeyInvalidException,
+    UsageLogNotFoundException,
+    API_KEY_PREFIX,
+    CLIENT_ID_PREFIX,
+)
 
 __all__ = [
     # Subscription service
@@ -60,4 +69,12 @@ __all__ = [
     "CannotInviteOwnerException",
     "PermissionDeniedException",
     "FreeWorkspaceNoInvitesException",
+    # Quota service
+    "QuotaService",
+    "quota_service",
+    "APIKeyNotFoundException",
+    "APIKeyInvalidException",
+    "UsageLogNotFoundException",
+    "API_KEY_PREFIX",
+    "CLIENT_ID_PREFIX",
 ]

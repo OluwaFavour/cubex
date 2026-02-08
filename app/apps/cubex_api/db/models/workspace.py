@@ -14,6 +14,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -118,6 +119,18 @@ class Workspace(BaseModel):
 
     invitations: Mapped[list["WorkspaceInvitation"]] = relationship(
         "WorkspaceInvitation",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+    )
+
+    api_keys: Mapped[list["APIKey"]] = relationship(
+        "APIKey",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+    )
+
+    usage_logs: Mapped[list["UsageLog"]] = relationship(
+        "UsageLog",
         back_populates="workspace",
         cascade="all, delete-orphan",
     )
@@ -392,4 +405,201 @@ class WorkspaceInvitation(BaseModel):
         return datetime.now(tz.utc) > self.expires_at
 
 
-__all__ = ["Workspace", "WorkspaceMember", "WorkspaceInvitation"]
+class APIKey(BaseModel):
+    """
+    Model for API keys used by external developer APIs.
+
+    API keys authenticate requests to external APIs and are tied to workspaces.
+    Each key has a unique HMAC-SHA256 hash stored for secure lookup. The raw key
+    is only shown once upon creation and cannot be retrieved afterwards.
+
+    Key format: cbx_live_{random_token}
+    Display format: cbx_live_xxxxx***...*** (prefix + first 5 chars of token)
+
+    Attributes:
+        workspace_id: Foreign key to the workspace owning this key.
+        name: User-defined label for the key.
+        key_hash: HMAC-SHA256 hash of the full API key for lookup.
+        key_prefix: First portion of key for display (cbx_live_ + 5 chars).
+        expires_at: When the key expires (null = never).
+        revoked_at: When the key was revoked (null = not revoked).
+        is_active: Whether the key is active and usable.
+        last_used_at: Last time the key was used.
+        scopes: Optional JSON field for future permission scopes.
+    """
+
+    __tablename__ = "api_keys"
+
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    name: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        comment="User-defined label for the API key",
+    )
+
+    key_hash: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        index=True,
+        unique=True,
+        comment="HMAC-SHA256 hash of the API key for secure lookup",
+    )
+
+    key_prefix: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        comment="Display prefix: cbx_live_ + first 5 chars of token",
+    )
+
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When the key expires (null = never expires)",
+    )
+
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When the key was revoked (null = not revoked)",
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        index=True,
+        comment="Whether the key is active and can be used",
+    )
+
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Last time the key was used for a request",
+    )
+
+    scopes: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="Optional permission scopes for future use",
+    )
+
+    # Relationships
+    workspace: Mapped["Workspace"] = relationship(
+        "Workspace",
+        back_populates="api_keys",
+    )
+
+    usage_logs: Mapped[list["UsageLog"]] = relationship(
+        "UsageLog",
+        back_populates="api_key",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index("ix_api_keys_workspace_active", "workspace_id", "is_active"),
+    )
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if API key has expired."""
+        if self.expires_at is None:
+            return False
+        from datetime import timezone as tz
+
+        return datetime.now(tz.utc) > self.expires_at
+
+    @property
+    def is_revoked(self) -> bool:
+        """Check if API key has been revoked."""
+        return self.revoked_at is not None
+
+    @property
+    def is_usable(self) -> bool:
+        """Check if API key can be used (active, not expired, not revoked)."""
+        return self.is_active and not self.is_expired and not self.is_revoked
+
+    def get_masked_display(self) -> str:
+        """Get masked display version of the key for UI."""
+        return f"{self.key_prefix}***...***"
+
+
+class UsageLog(BaseModel):
+    """
+    Model for API usage logs.
+
+    Tracks each API usage event for quota management and billing.
+    Usage logs are IMMUTABLE - once created, only the reverted flag
+    can be updated via the revert endpoint. This ensures audit trail integrity.
+
+    Note: Quota tracking is per-workspace (via APISubscriptionContext),
+    not per-key. Multiple API keys share the workspace's quota.
+
+    Attributes:
+        api_key_id: Foreign key to the API key used.
+        workspace_id: Foreign key to the workspace (denormalized for efficient queries).
+        cost: JSON field storing usage cost/credits consumed.
+        reverted: Whether this usage has been reverted (refunded).
+        reverted_at: When the usage was reverted.
+    """
+
+    __tablename__ = "usage_logs"
+    __table_args__ = (
+        Index("ix_usage_logs_workspace_created", "workspace_id", "created_at"),
+        Index("ix_usage_logs_api_key_created", "api_key_id", "created_at"),
+        {"comment": "Immutable usage log. Only reverted/reverted_at can be updated."},
+    )
+
+    api_key_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("api_keys.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Denormalized for efficient workspace-level quota queries",
+    )
+
+    cost: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="Usage cost/credits consumed (structure TBD by quota system)",
+    )
+
+    reverted: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        index=True,
+        comment="Whether this usage has been reverted/refunded",
+    )
+
+    reverted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When the usage was reverted",
+    )
+
+    # Relationships
+    api_key: Mapped["APIKey"] = relationship(
+        "APIKey",
+        back_populates="usage_logs",
+    )
+
+    workspace: Mapped["Workspace"] = relationship(
+        "Workspace",
+        back_populates="usage_logs",
+    )
+
+
+__all__ = ["Workspace", "WorkspaceMember", "WorkspaceInvitation", "APIKey", "UsageLog"]
