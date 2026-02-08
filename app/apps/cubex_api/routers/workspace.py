@@ -1642,7 +1642,7 @@ Retrieve all API keys for the workspace.
 
 ### Authorization
 
-- User must be an **admin** or **owner** of the workspace
+- User must be a **member** of the workspace
 
 ### Path Parameters
 
@@ -1671,14 +1671,6 @@ Retrieve all API keys for the workspace.
 - Use `key_prefix` to identify keys (e.g., "cbx_live_abc12...")
 """,
     responses={
-        403: {
-            "description": "Admin permission required",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Admin permission required."}
-                }
-            },
-        },
         404: {
             "description": "Workspace not found",
             "content": {
@@ -1700,14 +1692,12 @@ async def list_api_keys(
     )
 
     async with session.begin():
-        # Get member and verify admin permission
+        # Verify user is a member of the workspace
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
         if not member:
             raise NotFoundException("Workspace not found or access denied.")
-        if member.role not in [MemberRole.ADMIN, MemberRole.OWNER]:
-            raise ForbiddenException("Admin permission required.")
 
         api_keys = await quota_service.list_api_keys(session, workspace_id)
 
