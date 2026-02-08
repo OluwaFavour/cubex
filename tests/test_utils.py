@@ -348,8 +348,23 @@ class TestDecodeJwtToken:
 
     def test_decode_jwt_token_tampered(self, sample_jwt_token):
         """Test decoding tampered token."""
-        # Tamper with the token by changing a character
-        tampered_token = sample_jwt_token[:-10] + "X" + sample_jwt_token[-9:]
+        # Split the token into header, payload, and signature
+        parts = sample_jwt_token.split(".")
+        assert len(parts) == 3, "JWT should have 3 parts"
+
+        # Tamper with the payload (middle part) by replacing it entirely
+        # This guarantees signature mismatch since we keep original signature
+        import base64
+
+        # Create a different payload
+        tampered_payload = (
+            base64.urlsafe_b64encode(b'{"user_id":"hacked","exp":9999999999}')
+            .rstrip(b"=")
+            .decode()
+        )
+
+        # Reconstruct token with original header, tampered payload, original signature
+        tampered_token = f"{parts[0]}.{tampered_payload}.{parts[2]}"
 
         result = decode_jwt_token(tampered_token)
         assert result is None
@@ -860,6 +875,7 @@ class TestGetDeviceInfoEdgeCases:
         # Should return the original user agent (< 100 chars)
         assert result == ua
 
+
 # ============================================================================
 # Tests for HMAC OTP Hashing
 # ============================================================================
@@ -1074,4 +1090,6 @@ class TestHmacVerifyOtp:
         # Times should be similar (within reasonable margin)
         # This is a soft test - timing attacks prevention
         ratio = max(correct_time, wrong_time) / min(correct_time, wrong_time)
-        assert ratio < 3.0  # Allow up to 3x difference (conservative for CI environments)
+        assert (
+            ratio < 3.0
+        )  # Allow up to 3x difference (conservative for CI environments)
