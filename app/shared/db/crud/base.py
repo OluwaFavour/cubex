@@ -694,3 +694,57 @@ class BaseDB(Generic[T]):
             raise DatabaseException(
                 f"Error soft-deleting {self.model.__name__} with conditions {conditions}: {str(e)}"
             ) from e
+
+    async def permanently_delete_soft_deleted(
+        self,
+        session: AsyncSession,
+        cutoff_date: datetime,
+        commit_self: bool = True,
+    ) -> int:
+        """
+        Permanently deletes records that were soft-deleted before the cutoff date.
+
+        This method performs a hard delete on records where `is_deleted=True` and
+        `deleted_at` is earlier than the specified cutoff date. Used for cleanup
+        of soft-deleted records after a retention period.
+
+        Args:
+            session (AsyncSession): The SQLAlchemy asynchronous session to use for the operation.
+            cutoff_date (datetime): Records soft-deleted before this date will be permanently deleted.
+            commit_self (bool, optional): If True, commits the transaction after the delete;
+                if False, only flushes the session. Defaults to True.
+
+        Returns:
+            int: The number of records permanently deleted.
+
+        Raises:
+            DatabaseException: If an error occurs while deleting records or committing the transaction.
+        """
+        try:
+            # Ensure model has soft-delete fields
+            if not hasattr(self.model, "is_deleted") or not hasattr(
+                self.model, "deleted_at"
+            ):
+                return 0
+
+            is_deleted_col = getattr(self.model, "is_deleted")
+            deleted_at_col = getattr(self.model, "deleted_at")
+
+            stmt: Delete = sa_delete(self.model).where(
+                and_(
+                    is_deleted_col == True,  # noqa: E712
+                    deleted_at_col < cutoff_date,
+                )
+            )
+            result = await session.execute(stmt)
+
+            if commit_self:
+                await session.commit()
+            else:
+                await session.flush()
+
+            return result.rowcount  # type: ignore[attr-defined]
+        except SQLAlchemyError as e:
+            raise DatabaseException(
+                f"Error permanently deleting soft-deleted {self.model.__name__} records: {str(e)}"
+            ) from e

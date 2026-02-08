@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     ROOT_PATH: str = "/v1"
 
+    # Cleanup settings
+    USER_SOFT_DELETE_RETENTION_DAYS: int = 30
+
     # CORS settings
     CORS_ALLOW_ORIGINS: list[str] = ["http://localhost:3000"]
     CORS_ALLOW_CREDENTIALS: bool = True

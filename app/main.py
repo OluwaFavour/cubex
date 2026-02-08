@@ -51,7 +51,7 @@ from app.shared.exceptions.types import (
     TooManyAttemptsException,
 )
 from app.infrastructure.messaging import start_consumers
-from app.infrastructure.scheduler import scheduler
+from app.infrastructure.scheduler import scheduler, initialize_scheduler
 from app.shared.services import BrevoService, CloudinaryService, Renderer, RedisService
 from app.shared.services.auth import AuthService
 from app.shared.services.oauth import GoogleOAuthService, GitHubOAuthService
@@ -100,6 +100,7 @@ async def lifespan(app: FastAPI):
         app_logger.info("Starting scheduler...")
         scheduler.start()
         app_logger.info("Scheduler started successfully.")
+        initialize_scheduler()  # Schedule jobs after starting the scheduler
     else:
         app_logger.info("Scheduler disabled via ENABLE_SCHEDULER setting.")
 
