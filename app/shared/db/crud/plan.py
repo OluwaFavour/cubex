@@ -43,7 +43,9 @@ class PlanDB(BaseDB[Plan]):
         if product_type:
             filters["product_type"] = product_type
 
-        plans = await self.get_by_filters(session, filters)
+        plans = await self.get_by_filters(
+            session, filters, order_by=[self.model.price.asc()]
+        )
         return list(plans)
 
     async def get_free_plan(
