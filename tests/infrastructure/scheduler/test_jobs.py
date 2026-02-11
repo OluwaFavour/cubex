@@ -208,7 +208,7 @@ class TestScheduleCleanupSoftDeletedUsersJob:
 
     def test_schedule_job_with_default_parameters(self):
         """Test that job is scheduled with default parameters."""
-        with patch("app.infrastructure.scheduler.jobs.scheduler") as mock_scheduler:
+        with patch("app.infrastructure.scheduler.main.scheduler") as mock_scheduler:
             schedule_cleanup_soft_deleted_users_job()
 
             mock_scheduler.add_job.assert_called_once()
@@ -219,13 +219,12 @@ class TestScheduleCleanupSoftDeletedUsersJob:
             assert call_kwargs["id"] == "cleanup_soft_deleted_users_job"
             assert call_kwargs["misfire_grace_time"] == 60 * 60  # 1 hour
             assert call_kwargs["kwargs"] == {"days_threshold": 30}
+            assert call_kwargs["jobstore"] == "cleanups"
 
     def test_schedule_job_with_custom_parameters(self):
-        """Test that job is scheduled with custom parameters."""
-        with patch("app.infrastructure.scheduler.jobs.scheduler") as mock_scheduler:
-            schedule_cleanup_soft_deleted_users_job(
-                days_threshold=60, hour=5, minute=30
-            )
+        """Test that job is scheduled with custom days_threshold."""
+        with patch("app.infrastructure.scheduler.main.scheduler") as mock_scheduler:
+            schedule_cleanup_soft_deleted_users_job(days_threshold=60)
 
             mock_scheduler.add_job.assert_called_once()
             call_kwargs = mock_scheduler.add_job.call_args[1]
@@ -235,7 +234,7 @@ class TestScheduleCleanupSoftDeletedUsersJob:
 
     def test_schedule_job_registers_correct_function(self):
         """Test that the correct function is registered."""
-        with patch("app.infrastructure.scheduler.jobs.scheduler") as mock_scheduler:
+        with patch("app.infrastructure.scheduler.main.scheduler") as mock_scheduler:
             schedule_cleanup_soft_deleted_users_job()
 
             # First positional arg should be the job function
@@ -244,11 +243,11 @@ class TestScheduleCleanupSoftDeletedUsersJob:
 
     def test_schedule_job_logs_scheduling(self):
         """Test that scheduling is logged."""
-        with patch("app.infrastructure.scheduler.jobs.scheduler"):
+        with patch("app.infrastructure.scheduler.main.scheduler"):
             with patch(
-                "app.infrastructure.scheduler.jobs.scheduler_logger"
+                "app.infrastructure.scheduler.main.scheduler_logger"
             ) as mock_logger:
-                schedule_cleanup_soft_deleted_users_job(hour=3, minute=0)
+                schedule_cleanup_soft_deleted_users_job()
 
                 # Should log start and completion
                 assert mock_logger.info.call_count == 2
@@ -256,5 +255,5 @@ class TestScheduleCleanupSoftDeletedUsersJob:
                 second_call = mock_logger.info.call_args_list[1][0][0]
 
                 assert "Scheduling" in first_call
-                assert "03:00" in first_call
+                assert "3:00 AM UTC" in first_call
                 assert "scheduled successfully" in second_call
