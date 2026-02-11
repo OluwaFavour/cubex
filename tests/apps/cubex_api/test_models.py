@@ -96,6 +96,64 @@ class TestPlanModel:
         assert plan.stripe_price_id == "price_test123"
         assert plan.is_active is True
 
+    def test_plan_seat_pricing_attributes(self):
+        """Test Plan model has seat pricing attributes."""
+        plan = Plan(
+            name="Professional",
+            type=PlanType.PAID,
+            product_type=ProductType.API,
+            price=4900,  # $49.00 base price
+            stripe_price_id="price_base_123",
+            seat_price=500,  # $5.00 per seat
+            seat_display_price="$5/seat/month",
+            seat_stripe_price_id="price_seat_123",
+            features=[{"title": "Unlimited seats"}],
+            is_active=True,
+        )
+
+        assert plan.seat_price == 500
+        assert plan.seat_display_price == "$5/seat/month"
+        assert plan.seat_stripe_price_id == "price_seat_123"
+
+    def test_plan_has_seat_pricing_property(self):
+        """Test Plan has_seat_pricing property."""
+        # Plan with seat pricing
+        plan_with_seats = Plan(
+            name="Professional",
+            type=PlanType.PAID,
+            product_type=ProductType.API,
+            price=4900,
+            stripe_price_id="price_base_123",
+            seat_stripe_price_id="price_seat_123",
+        )
+        assert plan_with_seats.has_seat_pricing is True
+
+        # Plan without seat pricing
+        plan_without_seats = Plan(
+            name="Basic",
+            type=PlanType.PAID,
+            product_type=ProductType.API,
+            price=1900,
+            stripe_price_id="price_base_456",
+            seat_stripe_price_id=None,
+        )
+        assert plan_without_seats.has_seat_pricing is False
+
+    def test_plan_can_be_purchased_with_seat_pricing_only(self):
+        """Test Plan can_be_purchased works with seat pricing only."""
+        # Plan with only seat stripe ID (no base stripe ID)
+        plan = Plan(
+            name="Seat Only",
+            type=PlanType.PAID,
+            product_type=ProductType.API,
+            price=0,  # No base price
+            stripe_price_id=None,
+            seat_price=500,
+            seat_stripe_price_id="price_seat_only",
+            is_active=True,
+        )
+        assert plan.can_be_purchased is True
+
     def test_plan_free_tier_defaults(self):
         """Test Plan model for free tier has appropriate defaults."""
         plan = Plan(

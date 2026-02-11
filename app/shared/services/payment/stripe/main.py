@@ -1357,6 +1357,7 @@ class Stripe:
         idempotency_key: str | None = None,
         new_price_id: str | None = None,
         quantity: int | None = None,
+        seat_price_id: str | None = None,
         metadata: dict[str, str] | None = None,
         default_payment_method: str | None = None,
         trial_end: int | Literal["now"] | None = None,
@@ -1382,7 +1383,12 @@ class Stripe:
             This will update the subscription items to use the new price.
         quantity : int, optional
             New quantity (seat count) for the subscription item.
-            Updates the quantity on the first subscription item.
+            Updates the quantity on the seat item if seat_price_id is provided,
+            otherwise updates the first subscription item.
+        seat_price_id : str, optional
+            Price ID of the seat item to update quantity for.
+            Use this for subscriptions with base + seat pricing (dual line items).
+            If provided, quantity updates will target the item matching this price ID.
         metadata : dict[str, str], optional
             Custom key-value pairs to attach to the subscription.
         default_payment_method : str, optional
@@ -1417,8 +1423,22 @@ class Stripe:
             items = subscription.items
             items_data = items.data
 
-            # Get the first item (most subscriptions have only one item)
-            subscription_item_id = items_data[0].id
+            # Find the target item based on seat_price_id or default to first item
+            target_item = None
+            if seat_price_id is not None and quantity is not None:
+                # Look for the item matching the seat price ID
+                for item in items_data:
+                    if item.price.id == seat_price_id:
+                        target_item = item
+                        break
+                if target_item is None:
+                    # Seat price item not found, fall back to first item
+                    target_item = items_data[0]
+            else:
+                # Default: use the first item
+                target_item = items_data[0]
+
+            subscription_item_id = target_item.id
 
             # Update the subscription with new price/quantity -> Flattened for form-encoded request
             payload: dict[str, Any] = {

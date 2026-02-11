@@ -253,13 +253,23 @@ class SubscriptionService:
         # Ensure user has Stripe customer ID
         stripe_customer_id = await self._ensure_stripe_customer(session, user)
 
-        # Create Stripe checkout session
-        line_items = [
+        # Create Stripe checkout session with dual line items (base + seats)
+        line_items: list[LineItem] = [
+            # Base price line item (always 1 unit)
             LineItem(
                 price=plan.stripe_price_id,  # type: ignore
-                quantity=seat_count,
+                quantity=1,
             )
         ]
+
+        # Add seat price line item if plan has seat pricing
+        if plan.has_seat_pricing:
+            line_items.append(
+                LineItem(
+                    price=plan.seat_stripe_price_id,  # type: ignore
+                    quantity=seat_count,
+                )
+            )
 
         subscription_data = SubscriptionData(
             metadata={
@@ -341,19 +351,26 @@ class SubscriptionService:
             )
 
         # Create new subscription
-        # Get billing period and amount from first subscription item (per Stripe API structure)
+        # Get billing period and amount from subscription items
         current_period_start = None
         current_period_end = None
         amount = None
         if stripe_sub.items and stripe_sub.items.data:
-            first_item = stripe_sub.items.data[0]
+            items_data = stripe_sub.items.data
+            first_item = items_data[0]
             current_period_start = first_item.current_period_start
             current_period_end = first_item.current_period_end
-            # Calculate amount from price * quantity (convert cents to dollars)
-            if first_item.price and first_item.price.unit_amount is not None:
-                quantity = first_item.quantity or seat_count
-                amount_cents = first_item.price.unit_amount * quantity
-                amount = Decimal(amount_cents) / Decimal(100)
+
+            # Calculate total amount from all line items
+            # For dual-line-item subscriptions: base_price + (seat_price * seat_count)
+            # For single-line-item subscriptions: price * quantity
+            total_amount_cents = 0
+            for item in items_data:
+                if item.price and item.price.unit_amount is not None:
+                    item_quantity = item.quantity or 1
+                    total_amount_cents += item.price.unit_amount * item_quantity
+            if total_amount_cents > 0:
+                amount = Decimal(total_amount_cents) / Decimal(100)
 
         subscription = await subscription_db.create(
             session,
@@ -481,54 +498,109 @@ class SubscriptionService:
             "cancel_at_period_end": stripe_sub.cancel_at_period_end or False,
         }
 
-        # Get billing period and price from first subscription item
+        # Get billing period and price from subscription items
         if stripe_sub.items and stripe_sub.items.data:
-            first_item = stripe_sub.items.data[0]
+            items_data = stripe_sub.items.data
+            first_item = items_data[0]
+
+            # Update billing period from first item
             updates["current_period_start"] = first_item.current_period_start
             updates["current_period_end"] = first_item.current_period_end
 
-            # Sync plan if price changed (handles upgrades, external changes)
-            stripe_price_id = first_item.price.id if first_item.price else None
-            if stripe_price_id and subscription.plan.stripe_price_id != stripe_price_id:
-                new_plan = await plan_db.get_by_stripe_price_id(
-                    session, stripe_price_id
-                )
-                if new_plan and new_plan.product_type == ProductType.API:
-                    updates["plan_id"] = new_plan.id
+            # Determine subscription structure:
+            # - Old: 1 item with base price, quantity = seat_count
+            # - New: 2 items (base @ qty=1, seats @ qty=seat_count)
+            is_dual_item = len(items_data) >= 2
+
+            if is_dual_item:
+                # New dual-line-item subscription
+                # Find seat item by matching plan's seat_stripe_price_id
+                seat_item = None
+                base_item = None
+                for item in items_data:
+                    item_price_id = item.price.id if item.price else None
+                    if (
+                        subscription.plan.seat_stripe_price_id
+                        and item_price_id == subscription.plan.seat_stripe_price_id
+                    ):
+                        seat_item = item
+                    elif item_price_id == subscription.plan.stripe_price_id:
+                        base_item = item
+
+                # Sync seat count from seat item
+                if seat_item and seat_item.quantity != subscription.seat_count:
+                    updates["seat_count"] = seat_item.quantity
                     stripe_logger.info(
-                        f"Plan changed for subscription {stripe_subscription_id}: "
-                        f"{subscription.plan.name} -> {new_plan.name}"
-                    )
-                elif new_plan:
-                    stripe_logger.warning(
-                        f"Stripe price ID {stripe_price_id} belongs to non-API plan, "
-                        f"ignoring for API subscription {stripe_subscription_id}"
-                    )
-                else:
-                    stripe_logger.warning(
-                        f"Unknown Stripe price ID {stripe_price_id} for subscription "
-                        f"{stripe_subscription_id}, plan not updated"
+                        f"Seat count changed for subscription {stripe_subscription_id}: "
+                        f"{subscription.seat_count} -> {seat_item.quantity}"
                     )
 
-            # Sync seat count if quantity changed
-            if first_item.quantity and first_item.quantity != subscription.seat_count:
-                updates["seat_count"] = first_item.quantity
-                stripe_logger.info(
-                    f"Seat count changed for subscription {stripe_subscription_id}: "
-                    f"{subscription.seat_count} -> {first_item.quantity}"
-                )
+                # Calculate total amount (base + seats)
+                total_amount_cents = 0
+                if base_item and base_item.price and base_item.price.unit_amount:
+                    base_qty = base_item.quantity or 1
+                    total_amount_cents += base_item.price.unit_amount * base_qty
+                if seat_item and seat_item.price and seat_item.price.unit_amount:
+                    seat_qty = seat_item.quantity or 0
+                    total_amount_cents += seat_item.price.unit_amount * seat_qty
 
-            # Sync billing amount (price * quantity, converted from cents to dollars)
-            if first_item.price and first_item.price.unit_amount is not None:
-                quantity = first_item.quantity or 1
-                amount_cents = first_item.price.unit_amount * quantity
-                amount_dollars = Decimal(amount_cents) / Decimal(100)
+                amount_dollars = Decimal(total_amount_cents) / Decimal(100)
                 if subscription.amount != amount_dollars:
                     updates["amount"] = amount_dollars
                     stripe_logger.info(
                         f"Amount updated for subscription {stripe_subscription_id}: "
                         f"${amount_dollars}"
                     )
+            else:
+                # Old single-item subscription (legacy)
+                # Sync plan if price changed (handles upgrades, external changes)
+                stripe_price_id = first_item.price.id if first_item.price else None
+                if (
+                    stripe_price_id
+                    and subscription.plan.stripe_price_id != stripe_price_id
+                ):
+                    new_plan = await plan_db.get_by_stripe_price_id(
+                        session, stripe_price_id
+                    )
+                    if new_plan and new_plan.product_type == ProductType.API:
+                        updates["plan_id"] = new_plan.id
+                        stripe_logger.info(
+                            f"Plan changed for subscription {stripe_subscription_id}: "
+                            f"{subscription.plan.name} -> {new_plan.name}"
+                        )
+                    elif new_plan:
+                        stripe_logger.warning(
+                            f"Stripe price ID {stripe_price_id} belongs to non-API plan, "
+                            f"ignoring for API subscription {stripe_subscription_id}"
+                        )
+                    else:
+                        stripe_logger.warning(
+                            f"Unknown Stripe price ID {stripe_price_id} for subscription "
+                            f"{stripe_subscription_id}, plan not updated"
+                        )
+
+                # Sync seat count from quantity (legacy behavior)
+                if (
+                    first_item.quantity
+                    and first_item.quantity != subscription.seat_count
+                ):
+                    updates["seat_count"] = first_item.quantity
+                    stripe_logger.info(
+                        f"Seat count changed for subscription {stripe_subscription_id}: "
+                        f"{subscription.seat_count} -> {first_item.quantity}"
+                    )
+
+                # Sync billing amount (price * quantity)
+                if first_item.price and first_item.price.unit_amount is not None:
+                    quantity = first_item.quantity or 1
+                    amount_cents = first_item.price.unit_amount * quantity
+                    amount_dollars = Decimal(amount_cents) / Decimal(100)
+                    if subscription.amount != amount_dollars:
+                        updates["amount"] = amount_dollars
+                        stripe_logger.info(
+                            f"Amount updated for subscription {stripe_subscription_id}: "
+                            f"${amount_dollars}"
+                        )
 
         if stripe_sub.canceled_at:
             updates["canceled_at"] = stripe_sub.canceled_at
@@ -754,6 +826,7 @@ class SubscriptionService:
             await Stripe.update_subscription(
                 subscription.stripe_subscription_id,
                 quantity=new_seat_count,
+                seat_price_id=plan.seat_stripe_price_id,
                 proration_behavior=proration_behavior,  # type: ignore[arg-type]
             )
 

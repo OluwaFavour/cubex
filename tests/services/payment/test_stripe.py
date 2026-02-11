@@ -259,3 +259,151 @@ class TestFlattenToPayload:
         assert payload == {
             "metadata[workspace_id]": "12345678-1234-5678-1234-567812345678",
         }
+
+
+class TestUpdateSubscriptionWithSeatPriceId:
+    """Tests for update_subscription with seat_price_id parameter."""
+
+    @pytest.fixture
+    def mock_subscription_items(self):
+        """Create mock subscription items for testing."""
+        from unittest.mock import MagicMock
+
+        # Create mock price objects
+        base_price = MagicMock()
+        base_price.id = "price_base_123"
+
+        seat_price = MagicMock()
+        seat_price.id = "price_seat_456"
+
+        # Create mock subscription items
+        base_item = MagicMock()
+        base_item.id = "si_base_item"
+        base_item.price = base_price
+        base_item.quantity = 1
+
+        seat_item = MagicMock()
+        seat_item.id = "si_seat_item"
+        seat_item.price = seat_price
+        seat_item.quantity = 5
+
+        # Create mock items container
+        items = MagicMock()
+        items.data = [base_item, seat_item]
+
+        # Create mock subscription
+        subscription = MagicMock()
+        subscription.id = "sub_test123"
+        subscription.items = items
+
+        return subscription
+
+    @pytest.mark.asyncio
+    async def test_update_subscription_finds_seat_item_by_price_id(
+        self, mock_subscription_items
+    ):
+        """Test that update_subscription finds the correct item by seat_price_id."""
+        from unittest.mock import patch, AsyncMock
+
+        with patch.object(
+            Stripe, "get_subscription", new_callable=AsyncMock
+        ) as mock_get_sub, patch.object(
+            Stripe, "_request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_get_sub.return_value = mock_subscription_items
+            # Return a valid subscription response for the update
+            mock_request.return_value = {"id": "sub_test123", "object": "subscription"}
+
+            # Patch model_validate to skip validation for the update response
+            with patch(
+                "app.shared.services.payment.stripe.main.Subscription.model_validate"
+            ) as mock_validate:
+                mock_validate.return_value = mock_subscription_items
+
+                await Stripe.update_subscription(
+                    "sub_test123",
+                    quantity=10,
+                    seat_price_id="price_seat_456",
+                )
+
+                # Verify get_subscription was called
+                mock_get_sub.assert_called_once_with("sub_test123")
+
+                # Verify _request was called for the update
+                mock_request.assert_called_once()
+                call_args = mock_request.call_args
+                payload = call_args.kwargs.get("data", {})
+
+                # Should update the seat item (si_seat_item), not the base item
+                assert payload.get("items[0][id]") == "si_seat_item"
+                assert payload.get("items[0][quantity]") == 10
+
+    @pytest.mark.asyncio
+    async def test_update_subscription_falls_back_to_first_item(
+        self, mock_subscription_items
+    ):
+        """Test that update_subscription falls back to first item if seat_price_id not found."""
+        from unittest.mock import patch, AsyncMock
+
+        with patch.object(
+            Stripe, "get_subscription", new_callable=AsyncMock
+        ) as mock_get_sub, patch.object(
+            Stripe, "_request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_get_sub.return_value = mock_subscription_items
+            mock_request.return_value = {"id": "sub_test123", "object": "subscription"}
+
+            with patch(
+                "app.shared.services.payment.stripe.main.Subscription.model_validate"
+            ) as mock_validate:
+                mock_validate.return_value = mock_subscription_items
+
+                await Stripe.update_subscription(
+                    "sub_test123",
+                    quantity=10,
+                    seat_price_id="price_nonexistent",  # Won't be found
+                )
+
+                # Verify _request was called for the update
+                mock_request.assert_called_once()
+                call_args = mock_request.call_args
+                payload = call_args.kwargs.get("data", {})
+
+                # Should fall back to first item (si_base_item)
+                assert payload.get("items[0][id]") == "si_base_item"
+                assert payload.get("items[0][quantity]") == 10
+
+    @pytest.mark.asyncio
+    async def test_update_subscription_without_seat_price_id_uses_first_item(
+        self, mock_subscription_items
+    ):
+        """Test that update_subscription without seat_price_id uses first item."""
+        from unittest.mock import patch, AsyncMock
+
+        with patch.object(
+            Stripe, "get_subscription", new_callable=AsyncMock
+        ) as mock_get_sub, patch.object(
+            Stripe, "_request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_get_sub.return_value = mock_subscription_items
+            mock_request.return_value = {"id": "sub_test123", "object": "subscription"}
+
+            with patch(
+                "app.shared.services.payment.stripe.main.Subscription.model_validate"
+            ) as mock_validate:
+                mock_validate.return_value = mock_subscription_items
+
+                await Stripe.update_subscription(
+                    "sub_test123",
+                    quantity=10,
+                    # No seat_price_id provided
+                )
+
+                # Verify _request was called for the update
+                mock_request.assert_called_once()
+                call_args = mock_request.call_args
+                payload = call_args.kwargs.get("data", {})
+
+                # Should use first item (si_base_item)
+                assert payload.get("items[0][id]") == "si_base_item"
+                assert payload.get("items[0][quantity]") == 10

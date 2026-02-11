@@ -17,6 +17,7 @@ from sqlalchemy import (
     update as sa_update,
     delete as sa_delete,
 )
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql.expression import asc, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -550,6 +551,108 @@ class BaseDB(Generic[T]):
         except (SQLAlchemyError, ValueError) as e:
             raise DatabaseException(
                 f"Error getting or creating {self.model.__name__}: {str(e)}"
+            ) from e
+
+    async def upsert(
+        self,
+        session: AsyncSession,
+        data: dict[str, Any],
+        unique_fields: list[str],
+        exclude_from_update: list[str] | None = None,
+        commit_self: bool = True,
+    ) -> tuple[T, bool]:
+        """
+        Upsert a record using PostgreSQL's INSERT ... ON CONFLICT ... DO UPDATE.
+
+        Performs an atomic upsert operation: inserts a new record if it doesn't exist,
+        or updates the existing record if there's a conflict on the unique fields.
+
+        Args:
+            session: Database session.
+            data: Dictionary of all fields to set on the record.
+            unique_fields: List of field names that form the unique constraint
+                          for conflict detection (e.g., ["name", "product_type"]).
+            exclude_from_update: Fields to exclude from updates on conflict.
+                                 Defaults to ["id", "created_at"] plus the unique_fields.
+            commit_self: Whether to commit after the operation.
+
+        Returns:
+            A tuple of (instance, created) where created is True if a new record
+            was inserted, False if an existing record was updated.
+
+        Raises:
+            DatabaseException: If an error occurs during the operation.
+            ValueError: If any unique_field is missing from data.
+        """
+        # Validate that all unique fields are in data
+        for field in unique_fields:
+            if field not in data:
+                raise ValueError(
+                    f"Unique field '{field}' must be present in data for upsert"
+                )
+
+        try:
+            # Build exclusion list for updates
+            default_exclude = {"id", "created_at", *unique_fields}
+            if exclude_from_update:
+                default_exclude.update(exclude_from_update)
+
+            # Prepare insert data (exclude 'id' to let DB generate it)
+            insert_data = {k: v for k, v in data.items() if k != "id"}
+
+            # Add timestamps for new records
+            now = datetime.now(timezone.utc)
+            if hasattr(self.model, "created_at") and "created_at" not in insert_data:
+                insert_data["created_at"] = now
+            if hasattr(self.model, "updated_at") and "updated_at" not in insert_data:
+                insert_data["updated_at"] = now
+            if hasattr(self.model, "is_deleted") and "is_deleted" not in insert_data:
+                insert_data["is_deleted"] = False
+
+            # Build the update set (fields to update on conflict)
+            update_set = {
+                k: v for k, v in insert_data.items() if k not in default_exclude
+            }
+            # Always update updated_at on conflict
+            if hasattr(self.model, "updated_at"):
+                update_set["updated_at"] = now
+
+            # Build the INSERT ... ON CONFLICT ... DO UPDATE statement
+            stmt = (
+                pg_insert(self.model)
+                .values(**insert_data)
+                .on_conflict_do_update(
+                    index_elements=unique_fields,
+                    set_=update_set,
+                )
+                .returning(self.model)
+            )
+
+            result = await session.execute(stmt)
+            instance = result.scalar_one()
+
+            if commit_self:
+                await session.commit()
+            else:
+                await session.flush()
+
+            await session.refresh(instance)
+
+            # Determine if this was an insert or update by checking created_at vs updated_at
+            # If they're equal (within a small margin), it was likely an insert
+            created = False
+            if hasattr(instance, "created_at") and hasattr(instance, "updated_at"):
+                created_at = getattr(instance, "created_at")
+                updated_at = getattr(instance, "updated_at")
+                if created_at and updated_at:
+                    # If created_at and updated_at are the same (set in this operation), it's a new record
+                    created = created_at == updated_at
+
+            return instance, created
+
+        except SQLAlchemyError as e:
+            raise DatabaseException(
+                f"Error upserting {self.model.__name__}: {str(e)}"
             ) from e
 
     async def exists(self, session: AsyncSession, filters: dict) -> bool:

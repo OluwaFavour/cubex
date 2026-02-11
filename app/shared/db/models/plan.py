@@ -57,9 +57,12 @@ class Plan(BaseModel):
     Attributes:
         name: Unique plan name (e.g., "Professional", "Basic").
         description: Optional plan description.
-        price: Monthly price (0.00 for free plans).
-        display_price: Human-readable price (e.g., "$19/month").
-        stripe_price_id: Stripe Price ID for billing.
+        price: Base monthly price (0.00 for free plans or seat-only pricing).
+        display_price: Human-readable base price (e.g., "$19/month").
+        stripe_price_id: Stripe Price ID for base subscription billing.
+        seat_price: Per-seat monthly price (0.00 for unlimited seats or flat-rate plans).
+        seat_display_price: Human-readable seat price (e.g., "$5/seat/month").
+        seat_stripe_price_id: Stripe Price ID for per-seat billing.
         is_active: Whether plan is available for purchase.
         trial_days: Optional trial period in days.
         type: Plan type (FREE or PAID).
@@ -100,6 +103,29 @@ class Plan(BaseModel):
         String(128),
         nullable=True,
         index=True,
+        comment="Stripe Price ID for base subscription",
+    )
+
+    # Per-seat pricing (for workspace-based plans)
+    seat_price: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        nullable=False,
+        default=Decimal("0.00"),
+        server_default="0.00",
+        comment="Per-seat monthly price",
+    )
+
+    seat_display_price: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="Human-readable seat price (e.g., '$5/seat/month')",
+    )
+
+    seat_stripe_price_id: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
+        index=True,
+        comment="Stripe Price ID for per-seat billing",
     )
 
     is_active: Mapped[bool] = mapped_column(
@@ -153,6 +179,7 @@ class Plan(BaseModel):
 
     __table_args__ = (
         CheckConstraint("price >= 0", name="ck_plans_price_non_negative"),
+        CheckConstraint("seat_price >= 0", name="ck_plans_seat_price_non_negative"),
         CheckConstraint("min_seats >= 1", name="ck_plans_min_seats_positive"),
         CheckConstraint(
             "max_seats IS NULL OR max_seats >= min_seats",
@@ -167,6 +194,14 @@ class Plan(BaseModel):
             """,
             name="ck_plans_name_matches_product_type",
         ),
+        # PAID plans must have at least one Stripe price ID for billing
+        CheckConstraint(
+            """
+            type = 'FREE'
+            OR (type = 'PAID' AND (stripe_price_id IS NOT NULL OR seat_stripe_price_id IS NOT NULL))
+            """,
+            name="ck_plans_paid_has_stripe_id",
+        ),
         # Unique per product_type (allows "Free" for both API and Career)
         UniqueConstraint("name", "product_type", name="uq_plans_name_product_type"),
     )
@@ -174,36 +209,48 @@ class Plan(BaseModel):
     def __str__(self) -> str:
         return self.name
 
-    @validates("type", "price", "stripe_price_id")
+    @validates("type", "price", "stripe_price_id", "seat_price", "seat_stripe_price_id")
     def _validate_type_price_and_stripe(self, key: str, value: Any) -> Any:
         """
-        Ensure consistency between plan type, price, and Stripe IDs.
+        Ensure consistency between plan type, prices, and Stripe IDs.
 
-        FREE plans must have price=0 and no Stripe IDs.
-        PAID plans should have Stripe IDs for billing operations.
+        FREE plans must have price=0, seat_price=0, and no Stripe IDs.
+        PAID plans can have base price and/or seat price (at least one Stripe ID required).
         """
         prospective_type = value if key == "type" else getattr(self, "type", None)
         prospective_price = value if key == "price" else getattr(self, "price", None)
+        prospective_seat_price = (
+            value if key == "seat_price" else getattr(self, "seat_price", None)
+        )
         prospective_price_id = (
             value
             if key == "stripe_price_id"
             else getattr(self, "stripe_price_id", None)
         )
+        prospective_seat_price_id = (
+            value
+            if key == "seat_stripe_price_id"
+            else getattr(self, "seat_stripe_price_id", None)
+        )
 
-        try:
-            has_positive_price = (
-                prospective_price is not None and float(prospective_price) > 0
-            )
-        except (TypeError, ValueError):
-            has_positive_price = False
+        def _has_positive_value(val: Any) -> bool:
+            try:
+                return val is not None and float(val) > 0
+            except (TypeError, ValueError):
+                return False
 
+        has_positive_price = _has_positive_value(prospective_price)
+        has_positive_seat_price = _has_positive_value(prospective_seat_price)
         has_stripe_id = bool(prospective_price_id)
+        has_seat_stripe_id = bool(prospective_seat_price_id)
 
         if prospective_type == PlanType.FREE:
-            if has_positive_price or has_stripe_id:
+            if has_positive_price or has_positive_seat_price:
                 raise ValueError(
-                    "Plan declared as FREE but has a non-zero price or Stripe ID"
+                    "Plan declared as FREE but has a non-zero price or seat price"
                 )
+            if has_stripe_id or has_seat_stripe_id:
+                raise ValueError("Plan declared as FREE but has a Stripe ID")
 
         return value
 
@@ -234,7 +281,15 @@ class Plan(BaseModel):
         """Check if plan can be purchased via Stripe."""
         if not self.is_active:
             return False
-        return self.is_paid and self.stripe_price_id is not None
+        # PAID plans need at least one Stripe price ID
+        return self.is_paid and (
+            self.stripe_price_id is not None or self.seat_stripe_price_id is not None
+        )
+
+    @property
+    def has_seat_pricing(self) -> bool:
+        """Check if plan uses per-seat pricing."""
+        return self.seat_stripe_price_id is not None
 
 
 __all__ = ["Plan", "FeatureSchema"]
