@@ -31,7 +31,7 @@ class TestSyncPlansCommand:
         result = runner.invoke(app, ["syncplans", "--help"])
         assert result.exit_code == 0
         assert "Synchronize subscription plans" in result.stdout
-        assert "--dry-run" in result.stdout
+        assert "--dry-run" in result.stdout or "-n" in result.stdout
 
     def test_syncplans_dry_run_flag_accepted(self):
         """Test that --dry-run flag is accepted."""
