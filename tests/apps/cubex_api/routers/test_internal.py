@@ -3,7 +3,7 @@ Test suite for Internal API Router.
 
 This module contains comprehensive tests for the internal router endpoints:
 - POST /api/internal/usage/validate - validates API key and logs usage
-- POST /api/internal/usage/revert - reverts usage (idempotent)
+- POST /api/internal/usage/commit - commits usage as success or failure
 - X-Internal-API-Key header authentication
 
 Run all tests:
@@ -190,32 +190,34 @@ class TestUsageValidateEndpoint:
         assert data["access"] == AccessStatus.DENIED.value
 
 
-class TestUsageRevertEndpoint:
-    """Test POST /internal/usage/revert endpoint."""
+class TestUsageCommitEndpoint:
+    """Test POST /internal/usage/commit endpoint."""
 
     @pytest.mark.asyncio
-    async def test_revert_missing_api_key_header(self, client: AsyncClient):
-        """Test revert without API key header returns 401."""
+    async def test_commit_missing_api_key_header(self, client: AsyncClient):
+        """Test commit without API key header returns 401."""
         response = await client.post(
-            "/api/internal/usage/revert",
+            "/api/internal/usage/commit",
             json={
                 "api_key": "cbx_live_test123",
                 "usage_id": str(uuid4()),
+                "success": True,
             },
         )
 
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_revert_invalid_api_key_header(
+    async def test_commit_invalid_api_key_header(
         self, client: AsyncClient, invalid_internal_api_headers: dict[str, str]
     ):
-        """Test revert with invalid API key header returns 401."""
+        """Test commit with invalid API key header returns 401."""
         response = await client.post(
-            "/api/internal/usage/revert",
+            "/api/internal/usage/commit",
             json={
                 "api_key": "cbx_live_test123",
                 "usage_id": str(uuid4()),
+                "success": True,
             },
             headers=invalid_internal_api_headers,
         )
@@ -223,15 +225,16 @@ class TestUsageRevertEndpoint:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_revert_valid_request_format(
+    async def test_commit_valid_request_format(
         self, client: AsyncClient, internal_api_headers: dict[str, str]
     ):
-        """Test revert with valid request format."""
+        """Test commit with valid request format."""
         response = await client.post(
-            "/api/internal/usage/revert",
+            "/api/internal/usage/commit",
             json={
                 "api_key": "cbx_live_test123abc",
                 "usage_id": str(uuid4()),
+                "success": True,
             },
             headers=internal_api_headers,
         )
@@ -242,15 +245,16 @@ class TestUsageRevertEndpoint:
         assert "success" in data
 
     @pytest.mark.asyncio
-    async def test_revert_nonexistent_usage(
+    async def test_commit_nonexistent_usage(
         self, client: AsyncClient, internal_api_headers: dict[str, str]
     ):
-        """Test revert with non-existent usage_id."""
+        """Test commit with non-existent usage_id."""
         response = await client.post(
-            "/api/internal/usage/revert",
+            "/api/internal/usage/commit",
             json={
                 "api_key": "cbx_live_test123abc",
                 "usage_id": str(uuid4()),  # Non-existent ID
+                "success": True,
             },
             headers=internal_api_headers,
         )
@@ -295,14 +299,15 @@ class TestRequestValidation:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_revert_missing_api_key_field(
+    async def test_commit_missing_api_key_field(
         self, client: AsyncClient, internal_api_headers: dict[str, str]
     ):
-        """Test revert with missing api_key field."""
+        """Test commit with missing api_key field."""
         response = await client.post(
-            "/api/internal/usage/revert",
+            "/api/internal/usage/commit",
             json={
                 "usage_id": str(uuid4()),
+                "success": True,
             },
             headers=internal_api_headers,
         )
@@ -310,14 +315,15 @@ class TestRequestValidation:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_revert_missing_usage_id_field(
+    async def test_commit_missing_usage_id_field(
         self, client: AsyncClient, internal_api_headers: dict[str, str]
     ):
-        """Test revert with missing usage_id field."""
+        """Test commit with missing usage_id field."""
         response = await client.post(
-            "/api/internal/usage/revert",
+            "/api/internal/usage/commit",
             json={
                 "api_key": "cbx_live_test123",
+                "success": True,
             },
             headers=internal_api_headers,
         )
@@ -325,15 +331,16 @@ class TestRequestValidation:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_validate_invalid_uuid_usage_id(
+    async def test_commit_invalid_uuid_usage_id(
         self, client: AsyncClient, internal_api_headers: dict[str, str]
     ):
-        """Test revert with invalid UUID format for usage_id."""
+        """Test commit with invalid UUID format for usage_id."""
         response = await client.post(
-            "/api/internal/usage/revert",
+            "/api/internal/usage/commit",
             json={
                 "api_key": "cbx_live_test123",
                 "usage_id": "not-a-valid-uuid",
+                "success": True,
             },
             headers=internal_api_headers,
         )
@@ -446,15 +453,16 @@ class TestResponseFormat:
             assert "message" in data
 
     @pytest.mark.asyncio
-    async def test_revert_response_has_success_field(
+    async def test_commit_response_has_success_field(
         self, client: AsyncClient, internal_api_headers: dict[str, str]
     ):
-        """Test that revert response includes success field."""
+        """Test that commit response includes success field."""
         response = await client.post(
-            "/api/internal/usage/revert",
+            "/api/internal/usage/commit",
             json={
                 "api_key": "cbx_live_test123abc",
                 "usage_id": str(uuid4()),
+                "success": True,
             },
             headers=internal_api_headers,
         )
