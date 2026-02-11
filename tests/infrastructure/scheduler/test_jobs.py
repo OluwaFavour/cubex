@@ -16,10 +16,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.infrastructure.scheduler.jobs import (
-    cleanup_soft_deleted_users,
-    schedule_cleanup_soft_deleted_users_job,
-)
+from app.infrastructure.scheduler.jobs import cleanup_soft_deleted_users
+from app.infrastructure.scheduler.main import schedule_cleanup_soft_deleted_users_job
 from app.shared.db.crud import user_db
 from app.shared.db.models import User
 
