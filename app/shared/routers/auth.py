@@ -29,6 +29,7 @@ from app.shared.db.models import User
 from app.shared.dependencies.auth import (
     CurrentActiveUser,
 )
+from app.shared.services.rate_limit import rate_limit_by_email, rate_limit_by_ip
 from app.shared.enums import OAuthProviders, OTPPurpose
 from app.shared.exceptions.types import (
     AuthenticationException,
@@ -75,6 +76,31 @@ router = APIRouter()
 # Service instances for product setup
 _workspace_service = WorkspaceService()
 _career_subscription_service = CareerSubscriptionService()
+
+# =============================================================================
+# Rate Limiters
+# =============================================================================
+
+# Signup: 5 requests per hour per IP (prevent mass account creation)
+_signup_rate_limit = rate_limit_by_ip(limit=5, window=3600)
+
+# OTP verification: 10 requests per minute per IP (prevent brute-force)
+_verify_rate_limit = rate_limit_by_ip(limit=10, window=60)
+
+# OTP resend: 3 requests per hour per email (prevent OTP spam)
+_resend_rate_limit = rate_limit_by_email(limit=3, window=3600)
+
+# Signin: 10 requests per minute per IP (prevent credential stuffing)
+_signin_rate_limit = rate_limit_by_ip(limit=10, window=60)
+
+# Password reset request: 3 requests per hour per email (prevent email bombing)
+_password_reset_rate_limit = rate_limit_by_email(limit=3, window=3600)
+
+# Password reset confirm: 10 requests per minute per IP (prevent OTP brute-force)
+_password_reset_confirm_rate_limit = rate_limit_by_ip(limit=10, window=60)
+
+# OAuth: 20 requests per minute per IP (prevent abuse)
+_oauth_rate_limit = rate_limit_by_ip(limit=20, window=60)
 
 
 # =============================================================================
@@ -217,8 +243,10 @@ Returns confirmation that verification code was sent:
     },
 )
 async def signup(
+    request: Request,
     request_data: SignupRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: None = Depends(_signup_rate_limit),
 ) -> SignupResponse:
     """
     Handle user signup and send email verification OTP.
@@ -355,9 +383,10 @@ Returns JWT tokens for authentication:
     },
 )
 async def verify_signup(
-    request_data: OTPVerifyRequest,
     request: Request,
+    request_data: OTPVerifyRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: None = Depends(_verify_rate_limit),
 ) -> TokenResponse:
     """
     Verify user email with OTP code and return authentication tokens.
@@ -498,6 +527,7 @@ This prevents email enumeration attacks.
 """,
 )
 async def resend_verification(
+    request: Request,
     request_data: ResendOTPRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> MessageResponse:
@@ -509,6 +539,7 @@ async def resend_verification(
     any previous OTP codes for security.
 
     Args:
+        request (Request): The FastAPI request object.
         request_data (ResendOTPRequest): The resend request containing:
             - email: The email address to resend verification to
         session (AsyncSession): The async database session injected via
@@ -528,6 +559,9 @@ async def resend_verification(
         even if the email doesn't exist, preventing email enumeration attacks.
         Previous OTP codes are invalidated when a new one is generated.
     """
+    # Apply email-based rate limiting
+    await _resend_rate_limit(request_data.email, request.url.path)
+
     async with session.begin():
         user = await user_db.get_one_by_conditions(
             session=session,
@@ -649,9 +683,10 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
     },
 )
 async def signin(
-    request_data: LoginRequest,
     request: Request,
+    request_data: LoginRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: None = Depends(_signin_rate_limit),
 ) -> TokenResponse:
     """
     Authenticate user with email and password credentials.
@@ -661,12 +696,12 @@ async def signin(
     is captured from the request headers.
 
     Args:
+        request (Request): The FastAPI request object used to extract
+            device information from User-Agent header for session tracking.
         request_data (LoginRequest): The signin request containing:
             - email: The user's registered email address
             - password: The user's password
             - remember_me: Optional flag for extended token lifetime (30 days)
-        request (Request): The FastAPI request object used to extract
-            device information from User-Agent header for session tracking.
         session (AsyncSession): The async database session injected via
             dependency injection.
 
@@ -1177,13 +1212,14 @@ If `callback_url` is provided:
     },
 )
 async def oauth_init(
-    provider: OAuthProviders,
     request: Request,
+    provider: OAuthProviders,
     remember_me: bool = Query(False, description="Extend session to 30 days"),
     callback_url: str | None = Query(
         None,
         description="Frontend callback URL for redirect after OAuth. Must be in CORS origins.",
     ),
+    _: None = Depends(_oauth_rate_limit),
 ) -> OAuthInitResponse:
     """
     Generate the OAuth authorization URL for the specified provider.
@@ -1362,8 +1398,8 @@ cancellation and redirects to `callback_url` with the error details passed throu
     },
 )
 async def oauth_callback(
-    provider: OAuthProviders,
     request: Request,
+    provider: OAuthProviders,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     code: Annotated[
         str | None, Query(description="Authorization code from provider")
@@ -1378,6 +1414,7 @@ async def oauth_callback(
     error_description: Annotated[
         str | None, Query(description="Human-readable error description")
     ] = None,
+    _: None = Depends(_oauth_rate_limit),
 ) -> TokenResponse | RedirectResponse:
     """
     Complete OAuth flow by exchanging authorization code for tokens.
@@ -1388,10 +1425,10 @@ async def oauth_callback(
     user or links to an existing account.
 
     Args:
-        provider (OAuthProviders): The OAuth provider that initiated the callback.
-            Must match the provider used in oauth_init.
         request (Request): The FastAPI request object used to extract
             device information from User-Agent header.
+        provider (OAuthProviders): The OAuth provider that initiated the callback.
+            Must match the provider used in oauth_init.
         session (AsyncSession): The async database session injected via
             dependency injection.
         code (str | None): The authorization code received from the OAuth provider
@@ -1618,6 +1655,7 @@ discover which emails are registered.
 """,
 )
 async def request_password_reset(
+    request: Request,
     request_data: PasswordResetRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> MessageResponse:
@@ -1629,6 +1667,7 @@ async def request_password_reset(
     intentionally vague to prevent email enumeration attacks.
 
     Args:
+        request (Request): The FastAPI request object.
         request_data (PasswordResetRequest): The reset request containing:
             - email: The email address associated with the account
         session (AsyncSession): The async database session injected via
@@ -1648,6 +1687,9 @@ async def request_password_reset(
         OTP is only sent if the email exists AND the user has a password
         (not OAuth-only). The OTP is valid for 10 minutes.
     """
+    # Apply email-based rate limiting
+    await _password_reset_rate_limit(request_data.email, request.url.path)
+
     async with session.begin():
         user = await user_db.get_one_by_conditions(
             session=session,
@@ -1747,8 +1789,10 @@ a new password. All existing sessions are revoked for security.
     },
 )
 async def confirm_password_reset(
+    request: Request,
     request_data: PasswordResetConfirmRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: None = Depends(_password_reset_confirm_rate_limit),
 ) -> MessageResponse:
     """
     Verify OTP and set a new password, revoking all existing sessions.
@@ -1758,6 +1802,7 @@ async def confirm_password_reset(
     tokens for security.
 
     Args:
+        request (Request): The FastAPI request object.
         request_data (PasswordResetConfirmRequest): The confirmation request
             containing:
             - email: The email address for the account
