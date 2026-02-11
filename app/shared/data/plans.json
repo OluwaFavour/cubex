@@ -1,0 +1,364 @@
+{
+    "api_plans": [
+        {
+            "name": "Free",
+            "description": "For developers or small teams exploring the AI recruitment engine.",
+            "price": "0.00",
+            "display_price": "$0/month",
+            "stripe_price_id_env": null,
+            "seat_price": "0.00",
+            "seat_display_price": null,
+            "seat_stripe_price_id_env": null,
+            "is_active": true,
+            "trial_days": null,
+            "type": "FREE",
+            "product_type": "API",
+            "min_seats": 1,
+            "max_seats": 1,
+            "features": [
+                {
+                    "title": "Limited API calls",
+                    "description": "Limited API calls per month",
+                    "category": "Usage"
+                },
+                {
+                    "title": "Basic feedback endpoints",
+                    "description": "Access to basic candidate feedback endpoints",
+                    "category": "Features"
+                },
+                {
+                    "title": "Standard AI scoring",
+                    "description": "Standard AI scoring and ranking for up to 10 candidates per request",
+                    "category": "AI"
+                },
+                {
+                    "title": "Basic recommendation model",
+                    "description": "Basic recommendation model (general matching only)",
+                    "category": "AI"
+                },
+                {
+                    "title": "Sandbox environment",
+                    "description": "Access to test/sandbox environment",
+                    "category": "Development"
+                },
+                {
+                    "title": "Basic documentation",
+                    "description": "Basic API documentation access",
+                    "category": "Support"
+                },
+                {
+                    "title": "Standard rate limit",
+                    "description": "Standard response time and rate limit",
+                    "category": "Performance"
+                },
+                {
+                    "title": "Basic model accuracy",
+                    "description": "Basic model accuracy with limited learning data",
+                    "category": "AI"
+                }
+            ]
+        },
+        {
+            "name": "Basic",
+            "description": "For growing companies and recruitment startups integrating AI insights into their hiring flow.",
+            "price": "19.00",
+            "display_price": "$19/month",
+            "stripe_price_id_env": "STRIPE_CUBEX_API_PRICE_BASIC",
+            "seat_price": "2.00",
+            "seat_display_price": "$2/seat/month",
+            "seat_stripe_price_id_env": "STRIPE_CUBEX_API_SEAT_PRICE_BASIC",
+            "is_active": true,
+            "trial_days": 7,
+            "type": "PAID",
+            "product_type": "API",
+            "min_seats": 1,
+            "max_seats": 5,
+            "features": [
+                {
+                    "title": "10,000 API calls/month",
+                    "description": "Up to 10,000 API calls per month",
+                    "category": "Usage"
+                },
+                {
+                    "title": "Full feedback endpoints",
+                    "description": "Full access to candidate feedback endpoints",
+                    "category": "Features"
+                },
+                {
+                    "title": "AI scoring up to 50 candidates",
+                    "description": "AI scoring for up to 50 candidates per request",
+                    "category": "AI"
+                },
+                {
+                    "title": "AI-powered summaries",
+                    "description": "AI-powered interview summaries and highlights",
+                    "category": "AI"
+                },
+                {
+                    "title": "Industry-specific recommendation",
+                    "description": "Industry-specific recommendation model for your hiring needs",
+                    "category": "AI"
+                },
+                {
+                    "title": "Sandbox & Production environments",
+                    "description": "Access to both sandbox and production environments",
+                    "category": "Development"
+                },
+                {
+                    "title": "Full API documentation",
+                    "description": "Full API documentation and guides access",
+                    "category": "Support"
+                },
+                {
+                    "title": "Email support",
+                    "description": "Email support with standard response time",
+                    "category": "Support"
+                },
+                {
+                    "title": "Improved response time",
+                    "description": "Improved response time with standard rate limit",
+                    "category": "Performance"
+                },
+                {
+                    "title": "Enhanced model accuracy",
+                    "description": "Enhanced model accuracy with additional learning data",
+                    "category": "AI"
+                }
+            ]
+        },
+        {
+            "name": "Professional",
+            "description": "Built for high-volume recruiters, agencies, and enterprises with advanced AI-powered hiring needs.",
+            "price": "49.00",
+            "display_price": "$49/month",
+            "stripe_price_id_env": "STRIPE_CUBEX_API_PRICE_PROFESSIONAL",
+            "seat_price": "5.00",
+            "seat_display_price": "$5/seat/month",
+            "seat_stripe_price_id_env": "STRIPE_CUBEX_API_SEAT_PRICE_PROFESSIONAL",
+            "is_active": true,
+            "trial_days": 7,
+            "type": "PAID",
+            "product_type": "API",
+            "min_seats": 1,
+            "max_seats": null,
+            "features": [
+                {
+                    "title": "Unlimited API calls",
+                    "description": "Unlimited API calls per month with fair use policy",
+                    "category": "Usage"
+                },
+                {
+                    "title": "All feedback endpoints",
+                    "description": "Access to all candidate feedback endpoints including advanced analytics",
+                    "category": "Features"
+                },
+                {
+                    "title": "Unlimited AI scoring",
+                    "description": "AI scoring for unlimited candidates per request",
+                    "category": "AI"
+                },
+                {
+                    "title": "Advanced AI summaries",
+                    "description": "Advanced AI interview summaries with detailed insights",
+                    "category": "AI"
+                },
+                {
+                    "title": "Custom recommendation model",
+                    "description": "Fully customizable recommendation model with training options",
+                    "category": "AI"
+                },
+                {
+                    "title": "Priority environments",
+                    "description": "Priority access to sandbox and production environments",
+                    "category": "Development"
+                },
+                {
+                    "title": "Premium documentation",
+                    "description": "Premium API documentation with code samples and tutorials",
+                    "category": "Support"
+                },
+                {
+                    "title": "Priority support",
+                    "description": "Priority email and chat support with dedicated account manager",
+                    "category": "Support"
+                },
+                {
+                    "title": "Fastest response time",
+                    "description": "Fastest response time with elevated rate limits",
+                    "category": "Performance"
+                },
+                {
+                    "title": "Maximum model accuracy",
+                    "description": "Maximum model accuracy with continuous learning",
+                    "category": "AI"
+                },
+                {
+                    "title": "Custom webhooks",
+                    "description": "Custom webhooks for real-time event notifications",
+                    "category": "Features"
+                },
+                {
+                    "title": "Advanced analytics",
+                    "description": "Advanced analytics dashboard with custom reports",
+                    "category": "Features"
+                }
+            ]
+        }
+    ],
+    "career_plans": [
+        {
+            "name": "Free",
+            "description": "Perfect for individuals exploring basic AI-powered career guidance.",
+            "price": "0.00",
+            "display_price": "$0/month",
+            "stripe_price_id_env": null,
+            "seat_price": "0.00",
+            "seat_display_price": null,
+            "seat_stripe_price_id_env": null,
+            "is_active": true,
+            "trial_days": null,
+            "type": "FREE",
+            "product_type": "CAREER",
+            "min_seats": 1,
+            "max_seats": 1,
+            "features": [
+                {
+                    "title": "Limited AI career chats",
+                    "description": "Limited AI career guidance conversations per month",
+                    "category": "Usage"
+                },
+                {
+                    "title": "Basic resume feedback",
+                    "description": "Basic AI-powered resume review and suggestions",
+                    "category": "Features"
+                },
+                {
+                    "title": "General career tips",
+                    "description": "Access to general career advice and tips",
+                    "category": "Guidance"
+                },
+                {
+                    "title": "Standard response time",
+                    "description": "Standard AI response time",
+                    "category": "Performance"
+                }
+            ]
+        },
+        {
+            "name": "Plus Plan",
+            "description": "For professionals who want deeper insight, personalized guidance, and faster responses.",
+            "price": "20.00",
+            "display_price": "$20/month",
+            "stripe_price_id_env": "STRIPE_CUBEX_CAREER_PRICE_PLUS",
+            "seat_price": "0.00",
+            "seat_display_price": null,
+            "seat_stripe_price_id_env": null,
+            "is_active": true,
+            "trial_days": 7,
+            "type": "PAID",
+            "product_type": "CAREER",
+            "min_seats": 1,
+            "max_seats": 1,
+            "features": [
+                {
+                    "title": "Extended AI career chats",
+                    "description": "Extended AI career guidance conversations per month",
+                    "category": "Usage"
+                },
+                {
+                    "title": "Detailed resume feedback",
+                    "description": "Detailed AI-powered resume review with actionable suggestions",
+                    "category": "Features"
+                },
+                {
+                    "title": "Interview preparation",
+                    "description": "AI-powered mock interview practice and feedback",
+                    "category": "Features"
+                },
+                {
+                    "title": "Personalized career paths",
+                    "description": "Personalized career path recommendations based on your profile",
+                    "category": "Guidance"
+                },
+                {
+                    "title": "Skill gap analysis",
+                    "description": "AI analysis of skill gaps and learning recommendations",
+                    "category": "Guidance"
+                },
+                {
+                    "title": "Priority response time",
+                    "description": "Priority AI response time",
+                    "category": "Performance"
+                },
+                {
+                    "title": "Email support",
+                    "description": "Email support for account and billing issues",
+                    "category": "Support"
+                }
+            ]
+        },
+        {
+            "name": "Pro Plan",
+            "description": "Built for serious career transitions, upskillers, and job seekers who want comprehensive guidance.",
+            "price": "40.00",
+            "display_price": "$40/month",
+            "stripe_price_id_env": "STRIPE_CUBEX_CAREER_PRICE_PRO",
+            "seat_price": "0.00",
+            "seat_display_price": null,
+            "seat_stripe_price_id_env": null,
+            "is_active": true,
+            "trial_days": 7,
+            "type": "PAID",
+            "product_type": "CAREER",
+            "min_seats": 1,
+            "max_seats": 1,
+            "features": [
+                {
+                    "title": "Unlimited AI career chats",
+                    "description": "Unlimited AI career guidance conversations",
+                    "category": "Usage"
+                },
+                {
+                    "title": "Premium resume optimization",
+                    "description": "Premium AI resume optimization with ATS compatibility checks",
+                    "category": "Features"
+                },
+                {
+                    "title": "Advanced interview coaching",
+                    "description": "Advanced AI interview coaching with industry-specific questions",
+                    "category": "Features"
+                },
+                {
+                    "title": "Cover letter generation",
+                    "description": "AI-powered cover letter generation tailored to job descriptions",
+                    "category": "Features"
+                },
+                {
+                    "title": "Career strategy planning",
+                    "description": "Comprehensive AI career strategy and goal setting",
+                    "category": "Guidance"
+                },
+                {
+                    "title": "Salary negotiation tips",
+                    "description": "AI-powered salary negotiation strategies and market insights",
+                    "category": "Guidance"
+                },
+                {
+                    "title": "Industry insights",
+                    "description": "Access to AI-curated industry trends and opportunities",
+                    "category": "Guidance"
+                },
+                {
+                    "title": "Fastest response time",
+                    "description": "Fastest AI response time with priority processing",
+                    "category": "Performance"
+                },
+                {
+                    "title": "Priority support",
+                    "description": "Priority email and chat support",
+                    "category": "Support"
+                }
+            ]
+        }
+    ]
+}
