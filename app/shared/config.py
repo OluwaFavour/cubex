@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Cleanup settings
     USER_SOFT_DELETE_RETENTION_DAYS: int = 30
 
+    # Usage log settings
+    USAGE_LOG_PENDING_TIMEOUT_MINUTES: int = 15  # Expire pending logs after this
+
     # CORS settings
     CORS_ALLOW_ORIGINS: list[str] = ["http://localhost:3000"]
     CORS_ALLOW_CREDENTIALS: bool = True

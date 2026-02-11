@@ -357,7 +357,7 @@ class QuotaService:
         # Update last_used_at
         await api_key_db.update_last_used(session, api_key_record.id, commit_self=False)
 
-        # Create usage log
+        # Create usage log with PENDING status
         cost_data = None
         if cost is not None:
             if isinstance(cost, dict):
@@ -371,13 +371,12 @@ class QuotaService:
                 "api_key_id": api_key_record.id,
                 "workspace_id": workspace_id,
                 "cost": cost_data,
-                "reverted": False,
             },
             commit_self=False,  # Defer commit to allow quota check before finalizing log
         )
 
         workspace_logger.info(
-            f"Usage logged: workspace={workspace_id}, "
+            f"Usage logged (PENDING): workspace={workspace_id}, "
             f"api_key={api_key_record.key_prefix}***, "
             f"usage_id={usage_log.id}, cost={cost_data}"
         )
@@ -401,23 +400,26 @@ class QuotaService:
             "Quota system is not yet implemented. Please try again later.",
         )
 
-    async def revert_usage(
+    async def commit_usage(
         self,
         session: AsyncSession,
         api_key: str,
         usage_id: UUID,
+        success: bool,
         commit_self: bool = True,
     ) -> tuple[bool, str]:
         """
-        Revert a usage log (idempotent).
+        Commit a pending usage log (idempotent).
 
-        Called by the external developer API when an error occurs
-        and the usage should not count against quota.
+        Called by the external developer API after a request completes
+        to mark the usage as SUCCESS (counts toward quota) or FAILED
+        (does not count toward quota).
 
         Args:
             session: Database session.
             api_key: The API key that made the original request.
-            usage_id: The usage log ID to revert.
+            usage_id: The usage log ID to commit.
+            success: True if request succeeded, False if failed.
             commit_self: Whether to commit the transaction.
 
         Returns:
@@ -445,7 +447,7 @@ class QuotaService:
         # Verify ownership
         if usage_log.api_key_id != api_key_record.id:
             workspace_logger.warning(
-                f"Usage revert ownership mismatch: "
+                f"Usage commit ownership mismatch: "
                 f"usage_log.api_key_id={usage_log.api_key_id}, "
                 f"api_key.id={api_key_record.id}"
             )
@@ -454,17 +456,18 @@ class QuotaService:
                 "API key does not own this usage log.",
             )
 
-        # Mark as reverted (idempotent - mark_reverted handles already-reverted case)
-        reverted_log = await usage_log_db.mark_reverted(
-            session, usage_id, commit_self=commit_self
+        # Commit the usage log (idempotent - commit handles already-committed case)
+        committed_log = await usage_log_db.commit(
+            session, usage_id, success=success, commit_self=commit_self
         )
 
-        if reverted_log:
+        if committed_log:
+            status_str = "SUCCESS" if success else "FAILED"
             workspace_logger.info(
-                f"Usage reverted: usage_id={usage_id}, "
+                f"Usage committed as {status_str}: usage_id={usage_id}, "
                 f"api_key={api_key_record.key_prefix}***"
             )
-            return (True, "Usage successfully reverted.")
+            return (True, f"Usage committed as {status_str}.")
 
         # Shouldn't happen, but handle gracefully
         return (True, "Usage log not found, but operation is idempotent.")

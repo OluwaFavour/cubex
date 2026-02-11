@@ -551,14 +551,15 @@ class UsageValidateResponse(BaseModel):
     message: str
 
 
-class UsageRevertRequest(BaseModel):
-    """Schema for reverting API usage (internal endpoint)."""
+class UsageCommitRequest(BaseModel):
+    """Schema for committing API usage (internal endpoint)."""
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
                 "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                "success": True,
             }
         }
     )
@@ -569,18 +570,22 @@ class UsageRevertRequest(BaseModel):
     ]
     usage_id: Annotated[
         UUID,
-        Field(description="The usage log ID to revert"),
+        Field(description="The usage log ID to commit"),
+    ]
+    success: Annotated[
+        bool,
+        Field(description="True if request succeeded, False if failed"),
     ]
 
 
-class UsageRevertResponse(BaseModel):
-    """Schema for usage revert response."""
+class UsageCommitResponse(BaseModel):
+    """Schema for usage commit response."""
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "success": True,
-                "message": "Usage successfully reverted.",
+                "message": "Usage committed as SUCCESS.",
             }
         }
     )
@@ -612,6 +617,6 @@ __all__ = [
     # Usage schemas
     "UsageValidateRequest",
     "UsageValidateResponse",
-    "UsageRevertRequest",
-    "UsageRevertResponse",
+    "UsageCommitRequest",
+    "UsageCommitResponse",
 ]

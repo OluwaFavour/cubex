@@ -2,8 +2,8 @@
 Internal API router for external developer API communication.
 
 This module provides endpoints for:
-- Usage validation and logging
-- Usage reverting (for error recovery)
+- Usage validation and logging (creates PENDING usage logs)
+- Usage committing (marks usage as SUCCESS or FAILED)
 
 These endpoints are protected by internal API key authentication
 (X-Internal-API-Key header) and are not meant for public consumption.
@@ -21,8 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apps.cubex_api.dependencies import InternalAPIKeyDep
 from app.apps.cubex_api.schemas.workspace import (
-    UsageRevertRequest,
-    UsageRevertResponse,
+    UsageCommitRequest,
+    UsageCommitResponse,
     UsageValidateRequest,
     UsageValidateResponse,
 )
@@ -44,8 +44,12 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     This endpoint is called by the external developer API to:
     1. Validate the API key is valid, active, and not expired
     2. Verify the API key belongs to the specified workspace (client_id)
-    3. Log the usage for quota tracking
+    3. Create a PENDING usage log for quota tracking
     4. Return access granted/denied with a usage_id
+    
+    The caller must then call /usage/commit to mark the usage as SUCCESS
+    or FAILED after the request completes. PENDING logs that are not
+    committed will be expired by a scheduled job.
     
     **Note**: Currently returns DENIED with 501 message as quota system
     is not yet implemented. The usage is still logged for future quota
@@ -118,36 +122,44 @@ async def validate_usage(
 
 
 @router.post(
-    "/usage/revert",
-    response_model=UsageRevertResponse,
+    "/usage/commit",
+    response_model=UsageCommitResponse,
     status_code=status.HTTP_200_OK,
-    summary="Revert a usage log",
+    summary="Commit a usage log",
     description="""
-    Revert a usage log entry (idempotent).
+    Commit a pending usage log entry (idempotent).
     
-    This endpoint is called by the external developer API when an error
-    occurs and the usage should not count against the user's quota.
+    This endpoint is called by the external developer API after a request
+    completes to mark the usage as SUCCESS (counts toward quota) or FAILED
+    (does not count toward quota).
     
     **Idempotent**: This operation is safe to retry. If the usage log
-    is already reverted or doesn't exist, success is still returned.
+    is already committed or doesn't exist, success is still returned.
     
     **Security**: Requires X-Internal-API-Key header.
     """,
     responses={
         200: {
-            "description": "Revert result",
+            "description": "Commit result",
             "content": {
                 "application/json": {
                     "examples": {
-                        "success": {
-                            "summary": "Successfully Reverted",
+                        "success_committed": {
+                            "summary": "Successfully Committed (Success)",
                             "value": {
                                 "success": True,
-                                "message": "Usage successfully reverted.",
+                                "message": "Usage committed as SUCCESS.",
                             },
                         },
-                        "already_reverted": {
-                            "summary": "Already Reverted (Idempotent)",
+                        "failed_committed": {
+                            "summary": "Successfully Committed (Failed)",
+                            "value": {
+                                "success": True,
+                                "message": "Usage committed as FAILED.",
+                            },
+                        },
+                        "already_committed": {
+                            "summary": "Already Committed (Idempotent)",
                             "value": {
                                 "success": True,
                                 "message": "Usage log not found, but operation is idempotent.",
@@ -167,26 +179,27 @@ async def validate_usage(
         401: {"description": "Invalid or missing internal API key"},
     },
 )
-async def revert_usage(
-    request: UsageRevertRequest,
+async def commit_usage(
+    request: UsageCommitRequest,
     _: InternalAPIKeyDep,  # Validates X-Internal-API-Key header
     session: Annotated[AsyncSession, Depends(get_async_session)],
-) -> UsageRevertResponse:
+) -> UsageCommitResponse:
     """
-    Revert a usage log entry.
+    Commit a pending usage log entry.
 
-    This is idempotent - if the log is already reverted or doesn't exist,
+    This is idempotent - if the log is already committed or doesn't exist,
     success is still returned.
     """
     async with session.begin():
-        success, message = await quota_service.revert_usage(
+        success, message = await quota_service.commit_usage(
             session=session,
             api_key=request.api_key,
             usage_id=request.usage_id,
+            success=request.success,
             commit_self=False,
         )
 
-    return UsageRevertResponse(
+    return UsageCommitResponse(
         success=success,
         message=message,
     )

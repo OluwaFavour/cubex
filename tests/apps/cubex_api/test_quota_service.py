@@ -120,10 +120,10 @@ class TestQuotaServiceMethods:
         assert hasattr(service, "validate_and_log_usage")
         assert callable(service.validate_and_log_usage)
 
-    def test_has_revert_usage_method(self, service):
-        """Test that revert_usage method exists."""
-        assert hasattr(service, "revert_usage")
-        assert callable(service.revert_usage)
+    def test_has_commit_usage_method(self, service):
+        """Test that commit_usage method exists."""
+        assert hasattr(service, "commit_usage")
+        assert callable(service.commit_usage)
 
 
 class TestAPIKeyGeneration:

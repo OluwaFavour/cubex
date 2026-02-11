@@ -125,10 +125,18 @@ class AccessStatus(str, Enum):
     DENIED = "denied"
 
 
+class UsageLogStatus(str, Enum):
+    """Status of a usage log entry."""
+
+    PENDING = "pending"  # Request in progress, awaiting commit
+    SUCCESS = "success"  # Request completed successfully, counts toward quota
+    FAILED = "failed"  # Request failed, does not count toward quota
+    EXPIRED = "expired"  # Pending too long, expired by scheduler
+
+
 __all__ = [
     "AccessStatus",
     "APIPlanName",
-    "SalesRequestStatus",
     "CareerPlanName",
     "InvitationStatus",
     "MemberRole",
@@ -137,6 +145,8 @@ __all__ = [
     "OTPPurpose",
     "PlanType",
     "ProductType",
+    "SalesRequestStatus",
     "SubscriptionStatus",
+    "UsageLogStatus",
     "WorkspaceStatus",
 ]

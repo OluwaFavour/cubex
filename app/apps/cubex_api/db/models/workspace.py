@@ -33,6 +33,7 @@ from app.shared.enums import (
     InvitationStatus,
     MemberRole,
     MemberStatus,
+    UsageLogStatus,
     WorkspaceStatus,
 )
 
@@ -533,25 +534,31 @@ class UsageLog(BaseModel):
     Model for API usage logs.
 
     Tracks each API usage event for quota management and billing.
-    Usage logs are IMMUTABLE - once created, only the reverted flag
-    can be updated via the revert endpoint. This ensures audit trail integrity.
+    Usage logs are IMMUTABLE - once created, only the status field
+    can be updated via the commit endpoint. This ensures audit trail integrity.
 
     Note: Quota tracking is per-workspace (via APISubscriptionContext),
     not per-key. Multiple API keys share the workspace's quota.
+
+    Status lifecycle:
+        PENDING -> SUCCESS (request completed successfully)
+        PENDING -> FAILED (request failed, does not count toward quota)
+        PENDING -> EXPIRED (pending too long, expired by scheduler)
 
     Attributes:
         api_key_id: Foreign key to the API key used.
         workspace_id: Foreign key to the workspace (denormalized for efficient queries).
         cost: JSON field storing usage cost/credits consumed.
-        reverted: Whether this usage has been reverted (refunded).
-        reverted_at: When the usage was reverted.
+        status: Current status of this usage log entry.
+        committed_at: When the status changed from PENDING.
     """
 
     __tablename__ = "usage_logs"
     __table_args__ = (
         Index("ix_usage_logs_workspace_created", "workspace_id", "created_at"),
         Index("ix_usage_logs_api_key_created", "api_key_id", "created_at"),
-        {"comment": "Immutable usage log. Only reverted/reverted_at can be updated."},
+        Index("ix_usage_logs_status", "status"),
+        {"comment": "Immutable usage log. Only status/committed_at can be updated."},
     )
 
     api_key_id: Mapped[UUID] = mapped_column(
@@ -575,18 +582,17 @@ class UsageLog(BaseModel):
         comment="Usage cost/credits consumed (structure TBD by quota system)",
     )
 
-    reverted: Mapped[bool] = mapped_column(
-        Boolean,
+    status: Mapped[UsageLogStatus] = mapped_column(
+        Enum(UsageLogStatus),
         nullable=False,
-        default=False,
-        index=True,
-        comment="Whether this usage has been reverted/refunded",
+        default=UsageLogStatus.PENDING,
+        comment="Status of this usage log entry",
     )
 
-    reverted_at: Mapped[datetime | None] = mapped_column(
+    committed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
-        comment="When the usage was reverted",
+        comment="When the status changed from PENDING",
     )
 
     # Relationships

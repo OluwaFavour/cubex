@@ -35,6 +35,10 @@ scheduler = AsyncIOScheduler(
             url=settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql"),
             tablename="scheduler_cleanup_jobs",
         ),
+        "usage_logs": SQLAlchemyJobStore(
+            url=settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql"),
+            tablename="scheduler_usage_log_jobs",
+        ),
     },
     # jobstores={
     timezone=timezone.utc,
@@ -63,6 +67,29 @@ def schedule_cleanup_soft_deleted_users_job(days_threshold: int = 30) -> None:
     scheduler_logger.info("'cleanup_soft_deleted_users' job scheduled successfully.")
 
 
+def schedule_expire_pending_usage_logs_job(interval_minutes: int = 5) -> None:
+    """
+    Schedule the expire_pending_usage_logs job to run at specified intervals.
+    """
+    # Import here to avoid circular import issues
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    from app.infrastructure.scheduler.jobs import expire_pending_usage_logs
+
+    scheduler_logger.info(
+        f"Scheduling 'expire_pending_usage_logs' job to run every {interval_minutes} minutes"
+    )
+    scheduler.add_job(
+        expire_pending_usage_logs,
+        trigger=IntervalTrigger(minutes=interval_minutes, timezone=timezone.utc),
+        replace_existing=True,
+        id="expire_pending_usage_logs_job",
+        jobstore="usage_logs",
+        misfire_grace_time=60 * 5,  # 5 minutes grace time
+    )
+    scheduler_logger.info("'expire_pending_usage_logs' job scheduled successfully.")
+
+
 def initialize_scheduler() -> None:
     """
     Initialize the scheduler by scheduling all required jobs.
@@ -73,6 +100,7 @@ def initialize_scheduler() -> None:
     schedule_cleanup_soft_deleted_users_job(
         days_threshold=settings.USER_SOFT_DELETE_RETENTION_DAYS
     )
+    schedule_expire_pending_usage_logs_job(interval_minutes=5)
 
 
 async def main() -> None:

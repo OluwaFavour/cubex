@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta, timezone
 
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from app.infrastructure.scheduler.main import scheduler
-from app.shared.config import scheduler_logger
+from app.shared.config import scheduler_logger, settings
 from app.shared.db import AsyncSessionLocal
 from app.shared.db.crud import user_db
+from app.apps.cubex_api.db.crud import usage_log_db
 
 
 async def cleanup_soft_deleted_users(days_threshold: int = 30) -> None:
@@ -29,29 +31,24 @@ async def cleanup_soft_deleted_users(days_threshold: int = 30) -> None:
         )
 
 
-def schedule_cleanup_soft_deleted_users_job(
-    days_threshold: int = 30, hour: int = 3, minute: int = 0
-) -> None:
+async def expire_pending_usage_logs() -> None:
     """
-    Schedule a daily job to permanently delete soft-deleted users.
+    Periodic task to expire usage logs that have been in PENDING status
+    for longer than the configured timeout.
 
-    The job runs at the specified time (default: 3:00 AM UTC) and removes
-    users that have been soft-deleted for longer than the days_threshold.
-
-    Args:
-        days_threshold (int): Number of days after soft-delete before permanent removal. Defaults to 30.
-        hour (int): Hour of day to run the job (0-23, UTC). Defaults to 3.
-        minute (int): Minute of hour to run the job (0-59). Defaults to 0.
+    This ensures that usage logs from abandoned operations don't remain
+    in PENDING state indefinitely.
     """
-    scheduler_logger.info(
-        f"Scheduling 'cleanup_soft_deleted_users' job to run daily at {hour:02d}:{minute:02d} UTC"
-    )
-    scheduler.add_job(
-        cleanup_soft_deleted_users,
-        trigger=CronTrigger(hour=hour, minute=minute, timezone=timezone.utc),
-        replace_existing=True,
-        id="cleanup_soft_deleted_users_job",
-        misfire_grace_time=60 * 60,  # 1 hour grace time
-        kwargs={"days_threshold": days_threshold},
-    )
-    scheduler_logger.info("'cleanup_soft_deleted_users' job scheduled successfully.")
+    timeout_minutes = settings.USAGE_LOG_PENDING_TIMEOUT_MINUTES
+    cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
+
+    async with AsyncSessionLocal.begin() as session:
+        scheduler_logger.info(
+            f"Starting expiration of pending usage logs older than {timeout_minutes} minutes (cutoff: {cutoff_time})"
+        )
+        expired_count = await usage_log_db.expire_pending(
+            session, older_than=cutoff_time, commit_self=False
+        )
+        scheduler_logger.info(
+            f"Completed expiration of pending usage logs. Expired {expired_count} record(s)."
+        )

@@ -27,6 +27,7 @@ from app.shared.enums import (
     InvitationStatus,
     MemberRole,
     MemberStatus,
+    UsageLogStatus,
     WorkspaceStatus,
 )
 from app.shared.exceptions.types import DatabaseException
@@ -706,7 +707,7 @@ class UsageLogDB(BaseDB[UsageLog]):
     CRUD operations for UsageLog model.
 
     Note: UsageLog records are immutable after creation.
-    Only the reverted/reverted_at fields can be updated via mark_reverted().
+    Only the status/committed_at fields can be updated via commit().
     """
 
     def __init__(self):
@@ -716,7 +717,7 @@ class UsageLogDB(BaseDB[UsageLog]):
         self,
         session: AsyncSession,
         workspace_id: UUID,
-        include_reverted: bool = False,
+        status_filter: list[UsageLogStatus] | None = None,
         limit: int = 100,
     ) -> Sequence[UsageLog]:
         """
@@ -725,18 +726,18 @@ class UsageLogDB(BaseDB[UsageLog]):
         Args:
             session: Database session.
             workspace_id: Workspace ID.
-            include_reverted: Include reverted usage logs.
+            status_filter: Only include logs with these statuses. If None, includes all.
             limit: Maximum number of logs to return.
 
         Returns:
             List of usage logs, ordered by created_at descending.
         """
-        conditions = [
+        conditions: list[SQLColumnExpression[bool]] = [
             UsageLog.workspace_id == workspace_id,
             UsageLog.is_deleted.is_(False),
         ]
-        if not include_reverted:
-            conditions.append(UsageLog.reverted.is_(False))
+        if status_filter is not None:
+            conditions.append(UsageLog.status.in_(status_filter))
 
         stmt = (
             select(UsageLog)
@@ -757,7 +758,7 @@ class UsageLogDB(BaseDB[UsageLog]):
         self,
         session: AsyncSession,
         api_key_id: UUID,
-        include_reverted: bool = False,
+        status_filter: list[UsageLogStatus] | None = None,
         limit: int = 100,
     ) -> Sequence[UsageLog]:
         """
@@ -766,18 +767,18 @@ class UsageLogDB(BaseDB[UsageLog]):
         Args:
             session: Database session.
             api_key_id: API key ID.
-            include_reverted: Include reverted usage logs.
+            status_filter: Only include logs with these statuses. If None, includes all.
             limit: Maximum number of logs to return.
 
         Returns:
             List of usage logs, ordered by created_at descending.
         """
-        conditions = [
+        conditions: list[SQLColumnExpression[bool]] = [
             UsageLog.api_key_id == api_key_id,
             UsageLog.is_deleted.is_(False),
         ]
-        if not include_reverted:
-            conditions.append(UsageLog.reverted.is_(False))
+        if status_filter is not None:
+            conditions.append(UsageLog.status.in_(status_filter))
 
         stmt = (
             select(UsageLog)
@@ -794,42 +795,81 @@ class UsageLogDB(BaseDB[UsageLog]):
                 f"Error getting usage logs for API key {api_key_id}: {str(e)}"
             ) from e
 
-    async def mark_reverted(
+    async def commit(
         self,
         session: AsyncSession,
         usage_log_id: UUID,
+        success: bool,
         commit_self: bool = True,
     ) -> UsageLog | None:
         """
-        Mark a usage log as reverted (idempotent).
-
-        This is the only allowed update operation on usage logs.
+        Commit a pending usage log (idempotent).
 
         Args:
             session: Database session.
             usage_log_id: Usage log ID.
+            success: True for SUCCESS status, False for FAILED status.
             commit_self: Whether to commit the transaction.
 
         Returns:
             Updated usage log or None if not found.
         """
-        # First check if already reverted (idempotent)
         existing = await self.get_by_id(session, usage_log_id)
         if existing is None or existing.is_deleted:
             return None
-        if existing.reverted:
-            # Already reverted, return as-is (idempotent)
+
+        # Already committed, return as-is (idempotent)
+        if existing.status != UsageLogStatus.PENDING:
             return existing
 
+        new_status = UsageLogStatus.SUCCESS if success else UsageLogStatus.FAILED
         return await self.update(
             session,
             usage_log_id,
             {
-                "reverted": True,
-                "reverted_at": datetime.now(timezone.utc),
+                "status": new_status,
+                "committed_at": datetime.now(timezone.utc),
             },
             commit_self=commit_self,
         )
+
+    async def expire_pending(
+        self,
+        session: AsyncSession,
+        older_than: datetime,
+        commit_self: bool = True,
+    ) -> int:
+        """
+        Expire pending usage logs older than the given cutoff.
+
+        Args:
+            session: Database session.
+            older_than: Expire logs created before this time.
+            commit_self: Whether to commit the transaction.
+
+        Returns:
+            Number of logs expired.
+        """
+        from sqlalchemy import update
+
+        stmt = (
+            update(UsageLog)
+            .where(
+                UsageLog.status == UsageLogStatus.PENDING,
+                UsageLog.created_at < older_than,
+                UsageLog.is_deleted.is_(False),
+            )
+            .values(
+                status=UsageLogStatus.EXPIRED,
+                committed_at=datetime.now(timezone.utc),
+            )
+        )
+        result = await session.execute(stmt)
+
+        if commit_self:
+            await session.commit()
+
+        return result.rowcount  # type: ignore[return-value]
 
 
 # Global CRUD instances
