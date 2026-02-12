@@ -544,14 +544,16 @@ class QuotaCacheService:
         Get the internal credit cost for an endpoint.
 
         Args:
-            endpoint: The API endpoint path.
+            endpoint: The API endpoint path (will be normalized to lowercase).
 
         Returns:
             The internal credit cost, or DEFAULT_ENDPOINT_COST if not configured.
         """
         if cls._backend is None:
             return cls.DEFAULT_ENDPOINT_COST
-        cost = await cls._backend.get_endpoint_cost(endpoint)
+        # Normalize endpoint to lowercase for consistent lookups
+        normalized_endpoint = endpoint.lower()
+        cost = await cls._backend.get_endpoint_cost(normalized_endpoint)
         return cost if cost is not None else cls.DEFAULT_ENDPOINT_COST
 
     @classmethod

@@ -14,6 +14,7 @@ from pydantic import (
     Field,
     StringConstraints,
     computed_field,
+    field_validator,
     model_validator,
 )
 
@@ -614,6 +615,18 @@ class UsageValidateRequest(BaseModel):
         UsageEstimate | None,
         Field(description="Optional usage estimation for the request"),
     ] = None
+
+    @field_validator("endpoint")
+    @classmethod
+    def normalize_endpoint(cls, v: str) -> str:
+        """Normalize endpoint to lowercase for consistent idempotency."""
+        return v.lower()
+
+    @field_validator("method")
+    @classmethod
+    def normalize_method(cls, v: str) -> str:
+        """Normalize HTTP method to uppercase for consistent idempotency."""
+        return v.upper()
 
 
 class UsageValidateResponse(BaseModel):

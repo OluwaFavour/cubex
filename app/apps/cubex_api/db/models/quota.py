@@ -11,7 +11,7 @@ from uuid import UUID
 
 from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.shared.db.models.base import BaseModel
 
@@ -46,6 +46,11 @@ class EndpointCostConfig(BaseModel):
     )
 
     __table_args__ = (Index("ix_endpoint_cost_configs_endpoint_lookup", "endpoint"),)
+
+    @validates("endpoint")
+    def normalize_endpoint(self, key: str, value: str) -> str:
+        """Normalize endpoint to lowercase for consistent lookups."""
+        return value.lower() if value else value
 
 
 class PlanPricingRule(BaseModel):

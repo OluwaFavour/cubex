@@ -247,6 +247,57 @@ class TestUsageCommitRequestValidation:
         assert request.metrics is None
         assert request.failure is None
 
+
+class TestUsageValidateRequestNormalization:
+    """Test suite for UsageValidateRequest field normalization."""
+
+    def test_endpoint_normalized_to_lowercase(self):
+        """Test that endpoint is normalized to lowercase."""
+        from app.apps.cubex_api.schemas.workspace import UsageValidateRequest
+
+        request = UsageValidateRequest(
+            request_id="req_123",
+            client_id="ws_550e8400e29b41d4a716446655440000",
+            api_key="cbx_live_abc123",
+            endpoint="/V1/EXTRACT-CUES/RESUME",
+            method="POST",
+            payload_hash="a" * 64,
+        )
+        assert request.endpoint == "/v1/extract-cues/resume"
+
+    def test_method_normalized_to_uppercase(self):
+        """Test that method is normalized to uppercase."""
+        from app.apps.cubex_api.schemas.workspace import UsageValidateRequest
+
+        request = UsageValidateRequest(
+            request_id="req_123",
+            client_id="ws_550e8400e29b41d4a716446655440000",
+            api_key="cbx_live_abc123",
+            endpoint="/v1/analyze",
+            method="post",
+            payload_hash="a" * 64,
+        )
+        assert request.method == "POST"
+
+    def test_mixed_case_normalization(self):
+        """Test both fields normalized with mixed case input."""
+        from app.apps.cubex_api.schemas.workspace import UsageValidateRequest
+
+        request = UsageValidateRequest(
+            request_id="req_123",
+            client_id="ws_550e8400e29b41d4a716446655440000",
+            api_key="cbx_live_abc123",
+            endpoint="/Api/V1/Analyze",
+            method="Post",
+            payload_hash="a" * 64,
+        )
+        assert request.endpoint == "/api/v1/analyze"
+        assert request.method == "POST"
+
+
+class TestUsageCommitRequestMetricsValidation:
+    """Test suite for UsageCommitRequest with metrics."""
+
     def test_success_with_metrics(self):
         """Test successful commit with metrics."""
         from app.apps.cubex_api.schemas.workspace import (
