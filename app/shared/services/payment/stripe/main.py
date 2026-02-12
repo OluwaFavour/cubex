@@ -1478,7 +1478,9 @@ class Stripe:
                     item_index += 1
 
             # Handle quantity-only updates (no seat_price_id provided)
-            elif quantity is not None and seat_price_id is None and new_price_id is None:
+            elif (
+                quantity is not None and seat_price_id is None and new_price_id is None
+            ):
                 # Update quantity on first item when no specific seat item is targeted
                 payload[f"items[{item_index}][id]"] = items_data[0].id
                 payload[f"items[{item_index}][quantity]"] = quantity
