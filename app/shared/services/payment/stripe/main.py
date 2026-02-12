@@ -1358,6 +1358,7 @@ class Stripe:
         new_price_id: str | None = None,
         quantity: int | None = None,
         seat_price_id: str | None = None,
+        new_seat_price_id: str | None = None,
         metadata: dict[str, str] | None = None,
         default_payment_method: str | None = None,
         trial_end: int | Literal["now"] | None = None,
@@ -1389,6 +1390,10 @@ class Stripe:
             Price ID of the seat item to update quantity for.
             Use this for subscriptions with base + seat pricing (dual line items).
             If provided, quantity updates will target the item matching this price ID.
+        new_seat_price_id : str, optional
+            New price ID for the seat item during plan upgrades.
+            Use this when upgrading plans to change the seat pricing along with the base plan.
+            The seat item is identified by seat_price_id and updated to new_seat_price_id.
         metadata : dict[str, str], optional
             Custom key-value pairs to attach to the subscription.
         default_payment_method : str, optional
@@ -1416,40 +1421,61 @@ class Stripe:
         Any exception raised by the underlying _request coroutine.
         """
         # If changing price or quantity, need to update subscription items
-        if new_price_id is not None or quantity is not None:
+        if (
+            new_price_id is not None
+            or quantity is not None
+            or new_seat_price_id is not None
+        ):
             # First, get the current subscription to find the subscription item ID
             subscription = await cls.get_subscription(subscription_id)
 
             items = subscription.items
             items_data = items.data
 
-            # Find the target item based on seat_price_id or default to first item
-            target_item = None
-            if seat_price_id is not None and quantity is not None:
-                # Look for the item matching the seat price ID
-                for item in items_data:
-                    if item.price.id == seat_price_id:
-                        target_item = item
-                        break
-                if target_item is None:
-                    # Seat price item not found, fall back to first item
-                    target_item = items_data[0]
-            else:
-                # Default: use the first item
-                target_item = items_data[0]
-
-            subscription_item_id = target_item.id
-
-            # Update the subscription with new price/quantity -> Flattened for form-encoded request
             payload: dict[str, Any] = {
-                "items[0][id]": subscription_item_id,
                 "proration_behavior": proration_behavior,
             }
 
+            item_index = 0
+
+            # Handle base plan price change (first item or item not matching seat_price_id)
             if new_price_id is not None:
-                payload["items[0][price]"] = new_price_id
-            if quantity is not None:
-                payload["items[0][quantity]"] = quantity
+                # Find the base plan item (not the seat item)
+                base_item = None
+                for item in items_data:
+                    if seat_price_id is None or item.price.id != seat_price_id:
+                        base_item = item
+                        break
+                if base_item is None:
+                    base_item = items_data[0]
+
+                payload[f"items[{item_index}][id]"] = base_item.id
+                payload[f"items[{item_index}][price]"] = new_price_id
+                item_index += 1
+
+            # Handle seat item updates (quantity change or price change)
+            if (
+                seat_price_id is not None and quantity is not None
+            ) or new_seat_price_id is not None:
+                # Find the seat item by current seat_price_id
+                seat_item = None
+                for item in items_data:
+                    if seat_price_id is not None and item.price.id == seat_price_id:
+                        seat_item = item
+                        break
+
+                if seat_item is not None:
+                    payload[f"items[{item_index}][id]"] = seat_item.id
+                    if new_seat_price_id is not None:
+                        payload[f"items[{item_index}][price]"] = new_seat_price_id
+                    if quantity is not None:
+                        payload[f"items[{item_index}][quantity]"] = quantity
+                    item_index += 1
+                elif quantity is not None and new_price_id is None:
+                    # Fallback: if no seat item found and only updating quantity, use first item
+                    payload[f"items[{item_index}][id]"] = items_data[0].id
+                    payload[f"items[{item_index}][quantity]"] = quantity
+                    item_index += 1
 
             if proration_date is not None:
                 payload["proration_date"] = proration_date

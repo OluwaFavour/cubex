@@ -1126,10 +1126,15 @@ class SubscriptionService:
 
         # Update Stripe subscription with new price
         # Proration is handled automatically by Stripe
+        # For dual line item subscriptions (base + seats), update both:
+        # - Base plan price: current_plan.stripe_price_id -> new_plan.stripe_price_id
+        # - Seat price: current_plan.seat_stripe_price_id -> new_plan.seat_stripe_price_id
         await Stripe.update_subscription(
             subscription.stripe_subscription_id,
             new_price_id=new_plan.stripe_price_id,
             quantity=subscription.seat_count,
+            seat_price_id=current_plan.seat_stripe_price_id,
+            new_seat_price_id=new_plan.seat_stripe_price_id,
             proration_behavior="create_prorations",
         )
 
