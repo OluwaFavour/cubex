@@ -10,6 +10,7 @@ integrity, efficient queries, and clear relationships between entities.
 """
 
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -20,6 +21,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     JSON,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -30,6 +32,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.db.models.base import BaseModel
 from app.shared.enums import (
+    FailureType,
     InvitationStatus,
     MemberRole,
     MemberStatus,
@@ -540,6 +543,12 @@ class UsageLog(BaseModel):
     Note: Quota tracking is per-workspace (via APISubscriptionContext),
     not per-key. Multiple API keys share the workspace's quota.
 
+    Idempotency:
+        Uses workspace_id + request_id + fingerprint_hash for true idempotency.
+        - Same workspace + request_id + fingerprint_hash = return existing record
+        - Same request_id + different fingerprint = create new record
+        - Different workspace = always independent (workspace isolation)
+
     Status lifecycle:
         PENDING -> SUCCESS (request completed successfully)
         PENDING -> FAILED (request failed, does not count toward quota)
@@ -548,7 +557,15 @@ class UsageLog(BaseModel):
     Attributes:
         api_key_id: Foreign key to the API key used.
         workspace_id: Foreign key to the workspace (denormalized for efficient queries).
-        cost: JSON field storing usage cost/credits consumed.
+        request_id: Globally unique request ID for idempotency.
+        fingerprint_hash: Hash of endpoint+method+payload_hash+usage_estimate.
+        access_status: The access decision (GRANTED/DENIED) for this request.
+        endpoint: The API endpoint path being called.
+        method: HTTP method (GET, POST, etc.).
+        client_ip: Optional client IP address.
+        client_user_agent: Optional client user agent string.
+        usage_estimate: JSON field storing usage estimation data.
+        credits_reserved: The billable cost in credits.
         status: Current status of this usage log entry.
         committed_at: When the status changed from PENDING.
     """
@@ -558,6 +575,14 @@ class UsageLog(BaseModel):
         Index("ix_usage_logs_workspace_created", "workspace_id", "created_at"),
         Index("ix_usage_logs_api_key_created", "api_key_id", "created_at"),
         Index("ix_usage_logs_status", "status"),
+        Index("ix_usage_logs_endpoint", "endpoint"),
+        Index(
+            "ix_usage_logs_request_fingerprint_workspace",
+            "request_id",
+            "fingerprint_hash",
+            "workspace_id",
+            unique=True,
+        ),
         {"comment": "Immutable usage log. Only status/committed_at can be updated."},
     )
 
@@ -576,10 +601,60 @@ class UsageLog(BaseModel):
         comment="Denormalized for efficient workspace-level quota queries",
     )
 
-    cost: Mapped[dict | None] = mapped_column(
+    request_id: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        index=True,
+        comment="Globally unique request ID for idempotency",
+    )
+
+    fingerprint_hash: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        index=True,
+        comment="Hash of endpoint+method+payload_hash+usage_estimate for idempotency",
+    )
+
+    access_status: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        comment="Access decision: 'granted' or 'denied'",
+    )
+
+    endpoint: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        comment="The API endpoint path being called",
+    )
+
+    method: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        comment="HTTP method (GET, POST, etc.)",
+    )
+
+    client_ip: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+        comment="Optional client IP address",
+    )
+
+    client_user_agent: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+        comment="Optional client user agent string",
+    )
+
+    usage_estimate: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
-        comment="Usage cost/credits consumed (structure TBD by quota system)",
+        comment="Usage estimation data (input_chars, max_output_tokens, model)",
+    )
+
+    credits_reserved: Mapped[Decimal] = mapped_column(
+        Numeric(12, 4),
+        nullable=False,
+        comment="The billable cost in credits",
     )
 
     status: Mapped[UsageLogStatus] = mapped_column(
@@ -593,6 +668,42 @@ class UsageLog(BaseModel):
         DateTime(timezone=True),
         nullable=True,
         comment="When the status changed from PENDING",
+    )
+
+    # Metrics fields (populated on commit for successful requests)
+    model_used: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="Model identifier used (e.g., 'gpt-4o')",
+    )
+
+    input_tokens: Mapped[int | None] = mapped_column(
+        nullable=True,
+        comment="Actual input tokens used",
+    )
+
+    output_tokens: Mapped[int | None] = mapped_column(
+        nullable=True,
+        comment="Actual output tokens generated",
+    )
+
+    latency_ms: Mapped[int | None] = mapped_column(
+        nullable=True,
+        comment="Request latency in milliseconds",
+    )
+
+    # Failure tracking fields (populated on commit for failed requests)
+    failure_type: Mapped[FailureType | None] = mapped_column(
+        Enum(FailureType, native_enum=False, name="failure_type"),
+        nullable=True,
+        index=True,
+        comment="Category of failure when status=FAILED",
+    )
+
+    failure_reason: Mapped[str | None] = mapped_column(
+        String(1000),
+        nullable=True,
+        comment="Human-readable failure description",
     )
 
     # Relationships

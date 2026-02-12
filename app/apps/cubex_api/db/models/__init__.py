@@ -2,6 +2,7 @@
 Database models for cubex_api.
 """
 
+from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule
 from app.apps.cubex_api.db.models.support import SalesRequest
 from app.apps.cubex_api.db.models.workspace import (
     APIKey,
@@ -13,6 +14,8 @@ from app.apps.cubex_api.db.models.workspace import (
 
 __all__ = [
     "APIKey",
+    "EndpointCostConfig",
+    "PlanPricingRule",
     "SalesRequest",
     "UsageLog",
     "Workspace",

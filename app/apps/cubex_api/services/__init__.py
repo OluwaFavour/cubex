@@ -40,6 +40,12 @@ from app.apps.cubex_api.services.quota import (
     API_KEY_PREFIX,
     CLIENT_ID_PREFIX,
 )
+from app.apps.cubex_api.services.quota_cache import (
+    QuotaCacheService,
+    QuotaCacheBackend,
+    MemoryBackend,
+    RedisBackend,
+)
 
 __all__ = [
     # Subscription service
@@ -77,4 +83,9 @@ __all__ = [
     "UsageLogNotFoundException",
     "API_KEY_PREFIX",
     "CLIENT_ID_PREFIX",
+    # Quota cache service
+    "QuotaCacheService",
+    "QuotaCacheBackend",
+    "MemoryBackend",
+    "RedisBackend",
 ]

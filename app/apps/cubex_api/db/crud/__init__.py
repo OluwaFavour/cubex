@@ -2,6 +2,12 @@
 CRUD operations for cubex_api.
 """
 
+from app.apps.cubex_api.db.crud.quota import (
+    EndpointCostConfigDB,
+    PlanPricingRuleDB,
+    endpoint_cost_config_db,
+    plan_pricing_rule_db,
+)
 from app.apps.cubex_api.db.crud.support import (
     SalesRequestDB,
     sales_request_db,
@@ -21,6 +27,11 @@ from app.apps.cubex_api.db.crud.workspace import (
 )
 
 __all__ = [
+    # Quota
+    "EndpointCostConfigDB",
+    "PlanPricingRuleDB",
+    "endpoint_cost_config_db",
+    "plan_pricing_rule_db",
     # Support
     "SalesRequestDB",
     "sales_request_db",

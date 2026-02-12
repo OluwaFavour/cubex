@@ -3,6 +3,7 @@ Pydantic schemas for workspace endpoints.
 """
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -13,10 +14,12 @@ from pydantic import (
     Field,
     StringConstraints,
     computed_field,
+    model_validator,
 )
 
 from app.shared.enums import (
     AccessStatus,
+    FailureType,
     InvitationStatus,
     MemberRole,
     MemberStatus,
@@ -501,22 +504,79 @@ class APIKeyListResponse(BaseModel):
 # ============================================================================
 
 
+class ClientInfo(BaseModel):
+    """Schema for client information in usage validation."""
+
+    ip: Annotated[
+        str | None,
+        Field(description="Client IP address"),
+    ] = None
+    user_agent: Annotated[
+        str | None,
+        Field(description="Client user agent string"),
+    ] = None
+
+
+class UsageEstimate(BaseModel):
+    """Schema for usage estimation in usage validation.
+
+    If provided, at least one field must be set.
+    """
+
+    input_chars: Annotated[
+        int | None,
+        Field(ge=0, le=10_000_000, description="Number of input characters"),
+    ] = None
+    max_output_tokens: Annotated[
+        int | None,
+        Field(ge=0, le=2_000_000, description="Maximum output tokens expected"),
+    ] = None
+    model: Annotated[
+        str | None,
+        StringConstraints(max_length=100),
+        Field(description="Model identifier being used"),
+    ] = None
+
+    @model_validator(mode="after")
+    def at_least_one_field_required(self) -> "UsageEstimate":
+        """Ensure at least one field is provided."""
+        if (
+            self.input_chars is None
+            and self.max_output_tokens is None
+            and self.model is None
+        ):
+            raise ValueError(
+                "At least one field must be provided in usage_estimate "
+                "(input_chars, max_output_tokens, or model)"
+            )
+        return self
+
+
 class UsageValidateRequest(BaseModel):
     """Schema for validating API usage (internal endpoint)."""
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
+                "request_id": "req_9f0c2a7e-acde-4b9a-8b2f-83cc71a3c9a2",
                 "client_id": "ws_550e8400e29b41d4a716446655440000",
-                "cost": {"credits": 10, "tokens": 1500},
+                "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
+                "endpoint": "/v1/extract-cues/resume",
+                "method": "POST",
+                "payload_hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+                "client": {"ip": "102.89.1.22", "user_agent": "Mozilla/5.0"},
+                "usage_estimate": {
+                    "input_chars": 22000,
+                    "max_output_tokens": 700,
+                    "model": "gpt-4o-mini",
+                },
             }
         }
     )
 
-    api_key: Annotated[
+    request_id: Annotated[
         str,
-        Field(description="The full API key to validate"),
+        Field(description="Globally unique request ID for idempotency"),
     ]
     client_id: Annotated[
         str,
@@ -525,11 +585,34 @@ class UsageValidateRequest(BaseModel):
             pattern=r"^ws_[a-f0-9]{32}$",
         ),
     ]
-    cost: Annotated[
-        float | dict | None,
+    api_key: Annotated[
+        str,
+        Field(description="The full API key to validate"),
+    ]
+    endpoint: Annotated[
+        str,
+        Field(description="The API endpoint path being called"),
+    ]
+    method: Annotated[
+        str,
+        Field(description="HTTP method (GET, POST, etc.)"),
+    ]
+    payload_hash: Annotated[
+        str,
         Field(
-            description="Usage cost/credits to consume (structure TBD)",
+            description="SHA-256 hash of the request payload for fingerprinting",
+            min_length=64,
+            max_length=64,
+            pattern=r"^[a-f0-9]{64}$",
         ),
+    ]
+    client: Annotated[
+        ClientInfo | None,
+        Field(description="Optional client information"),
+    ] = None
+    usage_estimate: Annotated[
+        UsageEstimate | None,
+        Field(description="Optional usage estimation for the request"),
     ] = None
 
 
@@ -542,6 +625,7 @@ class UsageValidateResponse(BaseModel):
                 "access": "denied",
                 "usage_id": None,
                 "message": "Quota system is not yet implemented. Please try again later.",
+                "credits_reserved": "1.5000",
             }
         }
     )
@@ -549,10 +633,18 @@ class UsageValidateResponse(BaseModel):
     access: AccessStatus
     usage_id: UUID | None
     message: str
+    credits_reserved: Annotated[
+        Decimal | None,
+        Field(description="The credits reserved/charged for this request"),
+    ] = None
 
 
 class UsageCommitRequest(BaseModel):
-    """Schema for committing API usage (internal endpoint)."""
+    """Schema for committing API usage (internal endpoint).
+
+    When success=True, optionally provide metrics (model, tokens, latency).
+    When success=False, failure details are REQUIRED.
+    """
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -560,6 +652,12 @@ class UsageCommitRequest(BaseModel):
                 "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
                 "usage_id": "550e8400-e29b-41d4-a716-446655440000",
                 "success": True,
+                "metrics": {
+                    "model_used": "gpt-4o",
+                    "input_tokens": 1500,
+                    "output_tokens": 500,
+                    "latency_ms": 1200,
+                },
             }
         }
     )
@@ -575,6 +673,79 @@ class UsageCommitRequest(BaseModel):
     success: Annotated[
         bool,
         Field(description="True if request succeeded, False if failed"),
+    ]
+    metrics: Annotated[
+        "UsageMetrics | None",
+        Field(description="Optional metrics for successful requests"),
+    ] = None
+    failure: Annotated[
+        "FailureDetails | None",
+        Field(description="Required failure details when success=False"),
+    ] = None
+
+    @model_validator(mode="after")
+    def failure_required_when_not_success(self) -> "UsageCommitRequest":
+        """Ensure failure details are provided when success=False."""
+        if not self.success and self.failure is None:
+            raise ValueError("failure details are required when success=False")
+        return self
+
+
+class UsageMetrics(BaseModel):
+    """Schema for usage metrics when committing successful requests."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "model_used": "gpt-4o",
+                "input_tokens": 1500,
+                "output_tokens": 500,
+                "latency_ms": 1200,
+            }
+        }
+    )
+
+    model_used: Annotated[
+        str | None,
+        StringConstraints(max_length=100),
+        Field(description="Model identifier used (e.g., 'gpt-4o')"),
+    ] = None
+    input_tokens: Annotated[
+        int | None,
+        Field(ge=0, le=2_000_000, description="Actual input tokens used"),
+    ] = None
+    output_tokens: Annotated[
+        int | None,
+        Field(ge=0, le=2_000_000, description="Actual output tokens generated"),
+    ] = None
+    latency_ms: Annotated[
+        int | None,
+        Field(
+            ge=0, le=3_600_000, description="Request latency in milliseconds (max 1hr)"
+        ),
+    ] = None
+
+
+class FailureDetails(BaseModel):
+    """Schema for failure details when committing failed requests."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "failure_type": "internal_error",
+                "reason": "Model API returned 500 Internal Server Error",
+            }
+        }
+    )
+
+    failure_type: Annotated[
+        FailureType,
+        Field(description="Category of the failure"),
+    ]
+    reason: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=1000),
+        Field(description="Human-readable failure description"),
     ]
 
 
@@ -615,8 +786,12 @@ __all__ = [
     "APIKeyCreatedResponse",
     "APIKeyListResponse",
     # Usage schemas
+    "ClientInfo",
+    "UsageEstimate",
     "UsageValidateRequest",
     "UsageValidateResponse",
     "UsageCommitRequest",
     "UsageCommitResponse",
+    "UsageMetrics",
+    "FailureDetails",
 ]

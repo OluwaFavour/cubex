@@ -6,6 +6,7 @@ This module contains comprehensive tests for the QuotaService including:
 - Usage validation and logging
 - Usage reverting (idempotent)
 - client_id parsing
+- Schema validation (UsageEstimate, UsageCommitRequest, metrics, failure)
 
 Run all tests:
     pytest tests/apps/cubex_api/test_quota_service.py -v
@@ -17,8 +18,288 @@ Run with coverage:
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
-from app.shared.enums import AccessStatus
+from app.shared.enums import AccessStatus, FailureType
+
+
+class TestFailureTypeEnum:
+    """Test suite for FailureType enum."""
+
+    def test_failure_type_values(self):
+        """Test that all expected failure types exist."""
+        assert FailureType.INTERNAL_ERROR.value == "internal_error"
+        assert FailureType.TIMEOUT.value == "timeout"
+        assert FailureType.RATE_LIMITED.value == "rate_limited"
+        assert FailureType.INVALID_RESPONSE.value == "invalid_response"
+        assert FailureType.UPSTREAM_ERROR.value == "upstream_error"
+        assert FailureType.CLIENT_ERROR.value == "client_error"
+        assert FailureType.VALIDATION_ERROR.value == "validation_error"
+
+    def test_failure_type_count(self):
+        """Test that we have exactly 7 failure types."""
+        assert len(FailureType) == 7
+
+
+class TestUsageEstimateValidation:
+    """Test suite for UsageEstimate schema validation."""
+
+    def test_valid_usage_estimate_with_all_fields(self):
+        """Test valid usage estimate with all fields."""
+        from app.apps.cubex_api.schemas.workspace import UsageEstimate
+
+        estimate = UsageEstimate(
+            input_chars=1000,
+            max_output_tokens=500,
+            model="gpt-4o",
+        )
+        assert estimate.input_chars == 1000
+        assert estimate.max_output_tokens == 500
+        assert estimate.model == "gpt-4o"
+
+    def test_valid_usage_estimate_with_only_input_chars(self):
+        """Test valid usage estimate with only input_chars."""
+        from app.apps.cubex_api.schemas.workspace import UsageEstimate
+
+        estimate = UsageEstimate(input_chars=1000)
+        assert estimate.input_chars == 1000
+        assert estimate.max_output_tokens is None
+        assert estimate.model is None
+
+    def test_valid_usage_estimate_with_only_model(self):
+        """Test valid usage estimate with only model."""
+        from app.apps.cubex_api.schemas.workspace import UsageEstimate
+
+        estimate = UsageEstimate(model="gpt-4o-mini")
+        assert estimate.model == "gpt-4o-mini"
+
+    def test_invalid_usage_estimate_no_fields(self):
+        """Test that empty usage estimate raises validation error."""
+        from app.apps.cubex_api.schemas.workspace import UsageEstimate
+
+        with pytest.raises(ValidationError) as exc_info:
+            UsageEstimate()
+        assert "At least one field must be provided" in str(exc_info.value)
+
+    def test_input_chars_max_bound(self):
+        """Test input_chars max bound (10,000,000)."""
+        from app.apps.cubex_api.schemas.workspace import UsageEstimate
+
+        # Valid at max
+        estimate = UsageEstimate(input_chars=10_000_000)
+        assert estimate.input_chars == 10_000_000
+
+        # Invalid above max
+        with pytest.raises(ValidationError):
+            UsageEstimate(input_chars=10_000_001)
+
+    def test_max_output_tokens_max_bound(self):
+        """Test max_output_tokens max bound (2,000,000)."""
+        from app.apps.cubex_api.schemas.workspace import UsageEstimate
+
+        # Valid at max
+        estimate = UsageEstimate(max_output_tokens=2_000_000)
+        assert estimate.max_output_tokens == 2_000_000
+
+        # Invalid above max
+        with pytest.raises(ValidationError):
+            UsageEstimate(max_output_tokens=2_000_001)
+
+    def test_model_max_length(self):
+        """Test model max length (100)."""
+        from app.apps.cubex_api.schemas.workspace import UsageEstimate
+
+        # Valid at max length
+        estimate = UsageEstimate(model="a" * 100)
+        assert len(estimate.model) == 100
+
+        # Invalid above max
+        with pytest.raises(ValidationError):
+            UsageEstimate(model="a" * 101)
+
+
+class TestUsageMetricsValidation:
+    """Test suite for UsageMetrics schema validation."""
+
+    def test_valid_metrics_all_fields(self):
+        """Test valid metrics with all fields."""
+        from app.apps.cubex_api.schemas.workspace import UsageMetrics
+
+        metrics = UsageMetrics(
+            model_used="gpt-4o",
+            input_tokens=1500,
+            output_tokens=500,
+            latency_ms=1200,
+        )
+        assert metrics.model_used == "gpt-4o"
+        assert metrics.input_tokens == 1500
+        assert metrics.output_tokens == 500
+        assert metrics.latency_ms == 1200
+
+    def test_valid_metrics_partial_fields(self):
+        """Test valid metrics with partial fields."""
+        from app.apps.cubex_api.schemas.workspace import UsageMetrics
+
+        metrics = UsageMetrics(latency_ms=500)
+        assert metrics.latency_ms == 500
+        assert metrics.model_used is None
+
+    def test_valid_metrics_empty(self):
+        """Test valid empty metrics (all optional)."""
+        from app.apps.cubex_api.schemas.workspace import UsageMetrics
+
+        metrics = UsageMetrics()
+        assert metrics.model_used is None
+        assert metrics.input_tokens is None
+
+    def test_tokens_max_bounds(self):
+        """Test input/output tokens max bounds (2,000,000)."""
+        from app.apps.cubex_api.schemas.workspace import UsageMetrics
+
+        # Valid at max
+        metrics = UsageMetrics(input_tokens=2_000_000, output_tokens=2_000_000)
+        assert metrics.input_tokens == 2_000_000
+        assert metrics.output_tokens == 2_000_000
+
+        # Invalid above max
+        with pytest.raises(ValidationError):
+            UsageMetrics(input_tokens=2_000_001)
+        with pytest.raises(ValidationError):
+            UsageMetrics(output_tokens=2_000_001)
+
+    def test_latency_ms_max_bound(self):
+        """Test latency_ms max bound (3,600,000 = 1 hour)."""
+        from app.apps.cubex_api.schemas.workspace import UsageMetrics
+
+        # Valid at max
+        metrics = UsageMetrics(latency_ms=3_600_000)
+        assert metrics.latency_ms == 3_600_000
+
+        # Invalid above max
+        with pytest.raises(ValidationError):
+            UsageMetrics(latency_ms=3_600_001)
+
+
+class TestFailureDetailsValidation:
+    """Test suite for FailureDetails schema validation."""
+
+    def test_valid_failure_details(self):
+        """Test valid failure details."""
+        from app.apps.cubex_api.schemas.workspace import FailureDetails
+
+        failure = FailureDetails(
+            failure_type=FailureType.INTERNAL_ERROR,
+            reason="Model API returned 500 Internal Server Error",
+        )
+        assert failure.failure_type == FailureType.INTERNAL_ERROR
+        assert "500" in failure.reason
+
+    def test_failure_type_required(self):
+        """Test that failure_type is required."""
+        from app.apps.cubex_api.schemas.workspace import FailureDetails
+
+        with pytest.raises(ValidationError):
+            FailureDetails(reason="Some error")  # type: ignore
+
+    def test_reason_required(self):
+        """Test that reason is required."""
+        from app.apps.cubex_api.schemas.workspace import FailureDetails
+
+        with pytest.raises(ValidationError):
+            FailureDetails(failure_type=FailureType.TIMEOUT)  # type: ignore
+
+    def test_reason_min_length(self):
+        """Test reason min length (1)."""
+        from app.apps.cubex_api.schemas.workspace import FailureDetails
+
+        with pytest.raises(ValidationError):
+            FailureDetails(failure_type=FailureType.TIMEOUT, reason="")
+
+    def test_reason_max_length(self):
+        """Test reason max length (1000)."""
+        from app.apps.cubex_api.schemas.workspace import FailureDetails
+
+        # Valid at max length
+        failure = FailureDetails(
+            failure_type=FailureType.TIMEOUT,
+            reason="a" * 1000,
+        )
+        assert len(failure.reason) == 1000
+
+        # Invalid above max
+        with pytest.raises(ValidationError):
+            FailureDetails(failure_type=FailureType.TIMEOUT, reason="a" * 1001)
+
+
+class TestUsageCommitRequestValidation:
+    """Test suite for UsageCommitRequest schema validation."""
+
+    def test_success_without_metrics(self):
+        """Test successful commit without metrics."""
+        from app.apps.cubex_api.schemas.workspace import UsageCommitRequest
+
+        request = UsageCommitRequest(
+            api_key="cbx_live_abc123",
+            usage_id=uuid4(),
+            success=True,
+        )
+        assert request.success is True
+        assert request.metrics is None
+        assert request.failure is None
+
+    def test_success_with_metrics(self):
+        """Test successful commit with metrics."""
+        from app.apps.cubex_api.schemas.workspace import (
+            UsageCommitRequest,
+            UsageMetrics,
+        )
+
+        request = UsageCommitRequest(
+            api_key="cbx_live_abc123",
+            usage_id=uuid4(),
+            success=True,
+            metrics=UsageMetrics(
+                model_used="gpt-4o",
+                input_tokens=1000,
+                output_tokens=200,
+                latency_ms=800,
+            ),
+        )
+        assert request.success is True
+        assert request.metrics is not None
+        assert request.metrics.model_used == "gpt-4o"
+
+    def test_failure_requires_failure_details(self):
+        """Test that failure=False requires failure details."""
+        from app.apps.cubex_api.schemas.workspace import UsageCommitRequest
+
+        with pytest.raises(ValidationError) as exc_info:
+            UsageCommitRequest(
+                api_key="cbx_live_abc123",
+                usage_id=uuid4(),
+                success=False,
+            )
+        assert "failure details are required" in str(exc_info.value)
+
+    def test_failure_with_failure_details(self):
+        """Test failed commit with failure details."""
+        from app.apps.cubex_api.schemas.workspace import (
+            FailureDetails,
+            UsageCommitRequest,
+        )
+
+        request = UsageCommitRequest(
+            api_key="cbx_live_abc123",
+            usage_id=uuid4(),
+            success=False,
+            failure=FailureDetails(
+                failure_type=FailureType.TIMEOUT,
+                reason="Request timed out after 30 seconds",
+            ),
+        )
+        assert request.success is False
+        assert request.failure is not None
+        assert request.failure.failure_type == FailureType.TIMEOUT
 
 
 class TestQuotaServiceInit:
@@ -321,3 +602,179 @@ class TestQuotaServiceExports:
         assert UsageLogNotFoundException is not None
         assert API_KEY_PREFIX == "cbx_live_"
         assert CLIENT_ID_PREFIX == "ws_"
+
+
+class TestBillingPeriodCalculation:
+    """Test suite for _calculate_billing_period helper."""
+
+    def test_uses_subscription_period_when_available(self):
+        """Test that subscription period is used when both start/end are available."""
+        from datetime import datetime, timezone
+
+        from app.apps.cubex_api.services.quota import quota_service
+
+        sub_start = datetime(2026, 1, 15, 0, 0, 0, tzinfo=timezone.utc)
+        sub_end = datetime(2026, 2, 15, 0, 0, 0, tzinfo=timezone.utc)
+        workspace_created = datetime(2025, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 2, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+        period_start, period_end = quota_service._calculate_billing_period(
+            subscription_period_start=sub_start,
+            subscription_period_end=sub_end,
+            workspace_created_at=workspace_created,
+            now=now,
+        )
+
+        assert period_start == sub_start
+        assert period_end == sub_end
+
+    def test_falls_back_to_workspace_created_when_no_subscription(self):
+        """Test 30-day rolling periods from workspace creation when no subscription."""
+        from datetime import datetime, timezone, timedelta
+
+        from app.apps.cubex_api.services.quota import quota_service
+
+        workspace_created = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        # 45 days after creation = period 1 (days 30-60)
+        now = datetime(2026, 2, 15, 0, 0, 0, tzinfo=timezone.utc)
+
+        period_start, period_end = quota_service._calculate_billing_period(
+            subscription_period_start=None,
+            subscription_period_end=None,
+            workspace_created_at=workspace_created,
+            now=now,
+        )
+
+        # Should be in period 1: Jan 31 - Mar 2 (30 days from Jan 1 + 30 days)
+        expected_start = workspace_created + timedelta(days=30)
+        expected_end = expected_start + timedelta(days=30)
+
+        assert period_start == expected_start
+        assert period_end == expected_end
+
+    def test_first_period_is_workspace_creation_date(self):
+        """Test that first period starts at workspace creation."""
+        from datetime import datetime, timezone, timedelta
+
+        from app.apps.cubex_api.services.quota import quota_service
+
+        workspace_created = datetime(2026, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        # 10 days after creation = still in period 0
+        now = datetime(2026, 1, 25, 0, 0, 0, tzinfo=timezone.utc)
+
+        period_start, period_end = quota_service._calculate_billing_period(
+            subscription_period_start=None,
+            subscription_period_end=None,
+            workspace_created_at=workspace_created,
+            now=now,
+        )
+
+        assert period_start == workspace_created
+        assert period_end == workspace_created + timedelta(days=30)
+
+    def test_handles_naive_datetime(self):
+        """Test that naive datetimes are handled correctly."""
+        from datetime import datetime, timezone
+
+        from app.apps.cubex_api.services.quota import quota_service
+
+        # Naive datetime (no timezone)
+        workspace_created = datetime(2026, 1, 1, 0, 0, 0)
+        now = datetime(2026, 1, 15, 0, 0, 0, tzinfo=timezone.utc)
+
+        period_start, period_end = quota_service._calculate_billing_period(
+            subscription_period_start=None,
+            subscription_period_end=None,
+            workspace_created_at=workspace_created,
+            now=now,
+        )
+
+        # Should add UTC timezone and work correctly
+        assert period_start.tzinfo == timezone.utc
+        assert period_end.tzinfo == timezone.utc
+
+    def test_partial_subscription_period_falls_back(self):
+        """Test that partial subscription period (only start) falls back to workspace."""
+        from datetime import datetime, timezone, timedelta
+
+        from app.apps.cubex_api.services.quota import quota_service
+
+        workspace_created = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 1, 15, 0, 0, 0, tzinfo=timezone.utc)
+
+        # Only start provided, no end
+        period_start, period_end = quota_service._calculate_billing_period(
+            subscription_period_start=datetime(
+                2026, 1, 10, 0, 0, 0, tzinfo=timezone.utc
+            ),
+            subscription_period_end=None,
+            workspace_created_at=workspace_created,
+            now=now,
+        )
+
+        # Should fall back to workspace-based calculation
+        assert period_start == workspace_created
+        assert period_end == workspace_created + timedelta(days=30)
+
+
+class TestUsageLogSumCredits:
+    """Test suite for UsageLogDB.sum_credits_for_period."""
+
+    def test_sum_credits_method_exists(self):
+        """Test that sum_credits_for_period method exists."""
+        from app.apps.cubex_api.db.crud.workspace import usage_log_db
+
+        assert hasattr(usage_log_db, "sum_credits_for_period")
+        assert callable(usage_log_db.sum_credits_for_period)
+
+    def test_sum_credits_method_signature(self):
+        """Test that sum_credits_for_period has correct signature."""
+        import inspect
+
+        from app.apps.cubex_api.db.crud.workspace import usage_log_db
+
+        sig = inspect.signature(usage_log_db.sum_credits_for_period)
+        params = list(sig.parameters.keys())
+
+        assert "session" in params
+        assert "workspace_id" in params
+        assert "period_start" in params
+        assert "period_end" in params
+
+
+class TestQuotaCacheServiceFallback:
+    """Test suite for QuotaCacheService.get_plan_credits_allocation_with_fallback."""
+
+    def test_fallback_method_exists(self):
+        """Test that get_plan_credits_allocation_with_fallback method exists."""
+        from app.apps.cubex_api.services.quota_cache import QuotaCacheService
+
+        assert hasattr(QuotaCacheService, "get_plan_credits_allocation_with_fallback")
+        assert callable(QuotaCacheService.get_plan_credits_allocation_with_fallback)
+
+    def test_fallback_method_signature(self):
+        """Test that fallback method has correct signature."""
+        import inspect
+
+        from app.apps.cubex_api.services.quota_cache import QuotaCacheService
+
+        sig = inspect.signature(
+            QuotaCacheService.get_plan_credits_allocation_with_fallback
+        )
+        params = list(sig.parameters.keys())
+
+        assert "session" in params
+        assert "plan_id" in params
+
+    @pytest.mark.asyncio
+    async def test_returns_default_when_plan_id_is_none(self):
+        """Test that default is returned when plan_id is None."""
+        from app.apps.cubex_api.services.quota_cache import QuotaCacheService
+
+        # Mock session not needed when plan_id is None
+        result = await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+            session=None,  # type: ignore
+            plan_id=None,
+        )
+
+        assert result == QuotaCacheService.DEFAULT_PLAN_CREDITS

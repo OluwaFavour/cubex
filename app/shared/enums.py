@@ -134,10 +134,27 @@ class UsageLogStatus(str, Enum):
     EXPIRED = "expired"  # Pending too long, expired by scheduler
 
 
+class FailureType(str, Enum):
+    """Type of failure for API usage tracking.
+
+    Used to categorize failures when committing usage logs with success=False.
+    Helps identify patterns and issues we may be responsible for.
+    """
+
+    INTERNAL_ERROR = "internal_error"  # Our server error (5xx)
+    TIMEOUT = "timeout"  # Request timed out
+    RATE_LIMITED = "rate_limited"  # Upstream rate limit hit
+    INVALID_RESPONSE = "invalid_response"  # Malformed response from upstream
+    UPSTREAM_ERROR = "upstream_error"  # Upstream service error
+    CLIENT_ERROR = "client_error"  # Client-side error (4xx)
+    VALIDATION_ERROR = "validation_error"  # Request/response validation failed
+
+
 __all__ = [
     "AccessStatus",
     "APIPlanName",
     "CareerPlanName",
+    "FailureType",
     "InvitationStatus",
     "MemberRole",
     "MemberStatus",

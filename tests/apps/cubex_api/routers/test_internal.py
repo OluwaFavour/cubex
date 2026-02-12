@@ -13,6 +13,7 @@ Run with coverage:
     pytest tests/apps/cubex_api/routers/test_internal.py --cov=app.apps.cubex_api.routers.internal --cov-report=term-missing -v
 """
 
+import hashlib
 from uuid import uuid4
 
 import pytest
@@ -20,6 +21,40 @@ from httpx import AsyncClient
 
 from app.shared.config import settings
 from app.shared.enums import AccessStatus
+
+
+def _generate_payload_hash(data: str = "") -> str:
+    """Generate a valid 64-char hex payload hash."""
+    if not data:
+        data = str(uuid4())
+    return hashlib.sha256(data.encode()).hexdigest()
+
+
+def make_validate_request(
+    api_key: str = "cbx_live_test123abc",
+    client_id: str | None = None,
+    request_id: str | None = None,
+    endpoint: str = "/test/endpoint",
+    method: str = "POST",
+    payload_hash: str | None = None,
+    **extra,
+) -> dict:
+    """Helper to create valid usage validate request with required fields."""
+    if client_id is None:
+        client_id = f"ws_{uuid4().hex}"
+    if request_id is None:
+        request_id = str(uuid4())
+    if payload_hash is None:
+        payload_hash = _generate_payload_hash()
+    return {
+        "api_key": api_key,
+        "client_id": client_id,
+        "request_id": request_id,
+        "endpoint": endpoint,
+        "method": method,
+        "payload_hash": payload_hash,
+        **extra,
+    }
 
 
 @pytest.fixture
@@ -70,10 +105,7 @@ class TestInternalAPIKeyAuthentication:
         """Test that missing API key header returns 401."""
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_test123",
-                "client_id": f"ws_{uuid4().hex}",
-            },
+            json=make_validate_request(),
         )
 
         assert response.status_code == 401
@@ -85,10 +117,7 @@ class TestInternalAPIKeyAuthentication:
         """Test that invalid API key header returns 401."""
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_test123",
-                "client_id": f"ws_{uuid4().hex}",
-            },
+            json=make_validate_request(),
             headers=invalid_internal_api_headers,
         )
 
@@ -101,10 +130,7 @@ class TestInternalAPIKeyAuthentication:
         """Test that valid API key header is accepted (may fail for other reasons)."""
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_test123",
-                "client_id": f"ws_{uuid4().hex}",
-            },
+            json=make_validate_request(),
             headers=internal_api_headers,
         )
 
@@ -122,10 +148,7 @@ class TestUsageValidateEndpoint:
         """Test validation with invalid API key format."""
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "invalid_key_format",  # Missing cbx_live_ prefix
-                "client_id": f"ws_{uuid4().hex}",
-            },
+            json=make_validate_request(api_key="invalid_key_format"),
             headers=internal_api_headers,
         )
 
@@ -140,10 +163,7 @@ class TestUsageValidateEndpoint:
         """Test validation with invalid client_id format."""
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_test123abc",
-                "client_id": "invalid_client_id",  # Missing ws_ prefix
-            },
+            json=make_validate_request(client_id="invalid_client_id"),
             headers=internal_api_headers,
         )
 
@@ -151,24 +171,28 @@ class TestUsageValidateEndpoint:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_validate_with_optional_cost(
+    async def test_validate_with_optional_usage_estimate(
         self, client: AsyncClient, internal_api_headers: dict[str, str]
     ):
-        """Test validation with optional cost field."""
+        """Test validation with optional usage_estimate field."""
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_test123abc",
-                "client_id": f"ws_{uuid4().hex}",
-                "cost": {"tokens": 100, "requests": 1},
-            },
+            json=make_validate_request(
+                usage_estimate={
+                    "input_chars": 1000,
+                    "max_output_tokens": 500,
+                    "model": "gpt-4",
+                }
+            ),
             headers=internal_api_headers,
         )
 
-        # Should process without error - returns 200 with DENIED access
-        assert response.status_code == 200
+        # API key doesn't exist, so returns 401 with DENIED access
+        assert response.status_code == 401
         data = response.json()
         assert data["access"] == AccessStatus.DENIED.value
+        # Response should include credits_reserved field
+        assert "credits_reserved" in data
 
     @pytest.mark.asyncio
     async def test_validate_nonexistent_api_key(
@@ -177,15 +201,12 @@ class TestUsageValidateEndpoint:
         """Test validation with non-existent API key."""
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_nonexistentkey123456789",
-                "client_id": f"ws_{uuid4().hex}",
-            },
+            json=make_validate_request(api_key="cbx_live_nonexistentkey123456789"),
             headers=internal_api_headers,
         )
 
-        # Returns 200 with DENIED access, not 404
-        assert response.status_code == 200
+        # Returns 401 with DENIED access for nonexistent API key
+        assert response.status_code == 401
         data = response.json()
         assert data["access"] == AccessStatus.DENIED.value
 
@@ -360,10 +381,7 @@ class TestClientIdPattern:
 
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_test123abc",
-                "client_id": valid_client_id,
-            },
+            json=make_validate_request(client_id=valid_client_id),
             headers=internal_api_headers,
         )
 
@@ -379,10 +397,7 @@ class TestClientIdPattern:
 
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_test123abc",
-                "client_id": invalid_client_id,
-            },
+            json=make_validate_request(client_id=invalid_client_id),
             headers=internal_api_headers,
         )
 
@@ -397,10 +412,7 @@ class TestClientIdPattern:
 
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_test123abc",
-                "client_id": invalid_client_id,
-            },
+            json=make_validate_request(client_id=invalid_client_id),
             headers=internal_api_headers,
         )
 
@@ -417,21 +429,17 @@ class TestResponseFormat:
         """Test that validate response includes access field."""
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_test123abc",
-                "client_id": f"ws_{uuid4().hex}",
-            },
+            json=make_validate_request(),
             headers=internal_api_headers,
         )
 
-        # Skip check if error response
-        if response.status_code == 200:
-            data = response.json()
-            assert "access" in data
-            assert data["access"] in [
-                AccessStatus.GRANTED.value,
-                AccessStatus.DENIED.value,
-            ]
+        # All status codes should have the response format
+        data = response.json()
+        assert "access" in data
+        assert data["access"] in [
+            AccessStatus.GRANTED.value,
+            AccessStatus.DENIED.value,
+        ]
 
     @pytest.mark.asyncio
     async def test_validate_response_has_message(
@@ -440,17 +448,28 @@ class TestResponseFormat:
         """Test that validate response includes message field."""
         response = await client.post(
             "/api/internal/usage/validate",
-            json={
-                "api_key": "cbx_live_test123abc",
-                "client_id": f"ws_{uuid4().hex}",
-            },
+            json=make_validate_request(),
             headers=internal_api_headers,
         )
 
-        # Skip check if error response
-        if response.status_code == 200:
-            data = response.json()
-            assert "message" in data
+        # All status codes should have the response format
+        data = response.json()
+        assert "message" in data
+
+    @pytest.mark.asyncio
+    async def test_validate_response_has_credits_reserved(
+        self, client: AsyncClient, internal_api_headers: dict[str, str]
+    ):
+        """Test that validate response includes credits_reserved field."""
+        response = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(),
+            headers=internal_api_headers,
+        )
+
+        # All status codes should have the response format
+        data = response.json()
+        assert "credits_reserved" in data
 
     @pytest.mark.asyncio
     async def test_commit_response_has_success_field(
@@ -467,8 +486,8 @@ class TestResponseFormat:
             headers=internal_api_headers,
         )
 
-        # Skip check if error response
-        if response.status_code == 200:
-            data = response.json()
-            assert "success" in data
-            assert isinstance(data["success"], bool)
+        # Should return 200 (idempotent)
+        assert response.status_code == 200
+        data = response.json()
+        assert "success" in data
+        assert isinstance(data["success"], bool)

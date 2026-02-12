@@ -65,6 +65,8 @@ from app.apps.cubex_api.routers import (
 from app.apps.cubex_career.routers import (
     subscription_router as career_subscription_router,
 )
+from app.apps.cubex_api.services import QuotaCacheService
+from app.shared.db import AsyncSessionLocal
 from app.shared.utils import generate_openapi_json, write_to_file_async
 
 
@@ -77,6 +79,13 @@ async def lifespan(app: FastAPI):
     app_logger.info("Initializing Redis service...")
     await RedisService.init(settings.REDIS_URL)
     app_logger.info("Redis service initialized successfully.")
+
+    # Initialize Quota Cache service
+    app_logger.info("Initializing Quota Cache service...")
+    async with AsyncSessionLocal() as session:
+        # Use "redis" backend for distributed deployments, "memory" for single instance
+        await QuotaCacheService.init(session, backend=settings.QUOTA_CACHE_BACKEND)
+    app_logger.info("Quota Cache service initialized successfully.")
 
     # Initialize Auth service
     app_logger.info("Initializing Auth service...")

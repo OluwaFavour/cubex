@@ -6,7 +6,7 @@ with features, pricing, and Stripe integration.
 """
 
 from decimal import Decimal
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
 from pydantic import BaseModel as PydanticBaseModel, ConfigDict, ValidationError
 from sqlalchemy import (
@@ -20,10 +20,13 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, validates
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.shared.db.models.base import BaseModel
 from app.shared.enums import PlanType, ProductType
+
+if TYPE_CHECKING:
+    from app.apps.cubex_api.db.models.quota import PlanPricingRule
 
 
 # ============================================================================
@@ -290,6 +293,14 @@ class Plan(BaseModel):
     def has_seat_pricing(self) -> bool:
         """Check if plan uses per-seat pricing."""
         return self.seat_stripe_price_id is not None
+
+    # Relationship to pricing rule
+    pricing_rule: Mapped["PlanPricingRule | None"] = relationship(
+        "PlanPricingRule",
+        back_populates="plan",
+        uselist=False,
+        lazy="selectin",
+    )
 
 
 __all__ = ["Plan", "FeatureSchema"]

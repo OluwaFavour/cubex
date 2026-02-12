@@ -3,29 +3,32 @@ Quota service for API usage tracking and validation.
 
 This module provides business logic for:
 - Validating API keys and logging usage
-- Reverting usage logs (idempotent)
+- Committing usage logs (idempotent)
 - Future: Quota checking and enforcement
 
 Usage flow:
 1. External API calls /internal/usage/validate with API key and client_id
 2. QuotaService validates key, logs usage, checks quota
 3. Returns granted/denied response with usage_id
-4. If error occurs, external API calls /internal/usage/revert with usage_id
+4. External API calls /internal/usage/commit to finalize usage
 """
 
+from decimal import Decimal
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
+from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apps.cubex_api.db.crud import api_key_db, usage_log_db, workspace_db
 from app.apps.cubex_api.db.models import APIKey
+from app.apps.cubex_api.services.quota_cache import QuotaCacheService
 from app.shared.config import settings, workspace_logger
 from app.shared.enums import AccessStatus
 from app.shared.exceptions.types import NotFoundException
-from app.shared.utils import hmac_hash_otp
+from app.shared.utils import create_request_fingerprint, hmac_hash_otp
 
 
 # ============================================================================
@@ -146,6 +149,62 @@ class QuotaService:
             True if format is valid, False otherwise.
         """
         return api_key.startswith(API_KEY_PREFIX) and len(api_key) > len(API_KEY_PREFIX)
+
+    def _calculate_billing_period(
+        self,
+        subscription_period_start: datetime | None,
+        subscription_period_end: datetime | None,
+        workspace_created_at: datetime,
+        now: datetime | None = None,
+    ) -> tuple[datetime, datetime]:
+        """
+        Calculate the billing period for quota checking.
+
+        If subscription has current_period_start/end, use those.
+        Otherwise, use 30-day rolling periods from workspace creation date.
+
+        Args:
+            subscription_period_start: Subscription's current_period_start (if any).
+            subscription_period_end: Subscription's current_period_end (if any).
+            workspace_created_at: When the workspace was created.
+            now: Current time (for testing). Defaults to UTC now.
+
+        Returns:
+            Tuple of (period_start, period_end) datetimes.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        # Use subscription billing period if available
+        if (
+            subscription_period_start is not None
+            and subscription_period_end is not None
+        ):
+            return (subscription_period_start, subscription_period_end)
+
+        # Fall back to 30-day rolling periods from workspace creation
+        # Ensure workspace_created_at is timezone-aware
+        if workspace_created_at.tzinfo is None:
+            workspace_created_at = workspace_created_at.replace(tzinfo=timezone.utc)
+
+        period_length = timedelta(days=30)
+
+        # Calculate which period we're in
+        # Period 0: created_at to created_at + 30 days
+        # Period 1: created_at + 30 days to created_at + 60 days
+        # etc.
+        time_since_creation = now - workspace_created_at
+        if time_since_creation < timedelta(0):
+            # Edge case: now is before workspace creation (shouldn't happen)
+            time_since_creation = timedelta(0)
+
+        periods_elapsed = int(
+            time_since_creation.total_seconds() // period_length.total_seconds()
+        )
+        period_start = workspace_created_at + (periods_elapsed * period_length)
+        period_end = period_start + period_length
+
+        return (period_start, period_end)
 
     # ========================================================================
     # API Key Management
@@ -287,38 +346,51 @@ class QuotaService:
         session: AsyncSession,
         api_key: str,
         client_id: str,
-        cost: float | dict[str, Any] | None = None,
+        request_id: str,
+        endpoint: str,
+        method: str,
+        payload_hash: str,
+        client_ip: str | None = None,
+        client_user_agent: str | None = None,
+        usage_estimate: dict[str, Any] | None = None,
         commit_self: bool = True,
-    ) -> tuple[AccessStatus, UUID | None, str]:
+    ) -> tuple[AccessStatus, UUID | None, str, Decimal | None, int]:
         """
         Validate API key and log usage.
 
         This is called by the external developer API to validate
         requests and track usage for quota management.
 
+        Idempotency:
+            Uses workspace_id + request_id + fingerprint_hash for true idempotency.
+            - Same workspace + request_id + fingerprint_hash = return existing record's access_status
+            - Same request_id + different fingerprint = create new record (different payload)
+            - Different workspace = always independent (workspace isolation)
+
+        The fingerprint is computed from: endpoint + method + payload_hash + usage_estimate
+
         Args:
             session: Database session.
             api_key: The full API key from the request.
             client_id: Workspace client ID (ws_<uuid_hex>).
-            cost: Usage cost/credits to consume.
+            request_id: Globally unique request ID for idempotency.
+            endpoint: The API endpoint path being called.
+            method: HTTP method (GET, POST, etc.).
+            payload_hash: SHA-256 hash of the request payload.
+            client_ip: Optional client IP address.
+            client_user_agent: Optional client user agent string.
+            usage_estimate: Optional usage estimation data.
             commit_self: Whether to commit the transaction.
 
         Returns:
-            Tuple of (access_status, usage_id, message).
+            Tuple of (access_status, usage_id, message, credits_reserved, status_code).
             - access_status: GRANTED or DENIED
             - usage_id: UUID of usage log (None if denied before logging)
             - message: Human-readable status message
+            - credits_reserved: The billable cost in credits (None if denied)
+            - status_code: HTTP status code for the response
         """
-        # Validate API key format
-        if not self._validate_api_key_format(api_key):
-            workspace_logger.warning(f"Invalid API key format: {api_key[:20]}...")
-            return (
-                AccessStatus.DENIED,
-                None,
-                "Invalid API key format.",
-            )
-
-        # Parse client_id
+        # Parse client_id first (needed for idempotency check with workspace isolation)
         workspace_id = self._parse_client_id(client_id)
         if workspace_id is None:
             workspace_logger.warning(f"Invalid client_id format: {client_id}")
@@ -326,6 +398,48 @@ class QuotaService:
                 AccessStatus.DENIED,
                 None,
                 "Invalid client_id format. Expected: ws_<uuid_hex>",
+                None,
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Compute fingerprint for idempotency
+        fingerprint_hash = create_request_fingerprint(
+            endpoint=endpoint,
+            method=method,
+            payload_hash=payload_hash,
+            usage_estimate=usage_estimate,
+        )
+
+        # Check for existing request with same workspace + request_id + fingerprint (true idempotency)
+        existing_log = await usage_log_db.get_by_request_id_and_fingerprint(
+            session, workspace_id, request_id, fingerprint_hash
+        )
+        if existing_log:
+            # True duplicate - return the stored access_status
+            access = AccessStatus(existing_log.access_status)
+            workspace_logger.info(
+                f"Idempotent request: workspace={workspace_id}, request_id={request_id}, "
+                f"fingerprint={fingerprint_hash[:16]}..., "
+                f"returning existing access_status={access.value}, "
+                f"usage_id={existing_log.id}"
+            )
+            return (
+                access,
+                existing_log.id,
+                f"Request already processed (idempotent). Access: {access.value}",
+                existing_log.credits_reserved,
+                status.HTTP_200_OK,
+            )
+
+        # Validate API key format
+        if not self._validate_api_key_format(api_key):
+            workspace_logger.warning(f"Invalid API key format: {api_key[:20]}...")
+            return (
+                AccessStatus.DENIED,
+                None,
+                "Invalid API key format.",
+                None,
+                status.HTTP_400_BAD_REQUEST,
             )
 
         # Hash and lookup API key
@@ -340,6 +454,8 @@ class QuotaService:
                 AccessStatus.DENIED,
                 None,
                 "API key not found, expired, or revoked.",
+                None,
+                status.HTTP_401_UNAUTHORIZED,
             )
 
         # Verify workspace matches
@@ -352,42 +468,105 @@ class QuotaService:
                 AccessStatus.DENIED,
                 None,
                 "API key does not belong to the specified workspace.",
+                None,
+                status.HTTP_403_FORBIDDEN,
             )
 
         # Update last_used_at
         await api_key_db.update_last_used(session, api_key_record.id, commit_self=False)
 
-        # Create usage log with PENDING status
-        cost_data = None
-        if cost is not None:
-            if isinstance(cost, dict):
-                cost_data = cost
-            else:
-                cost_data = {"credits": cost}
+        # Calculate billable cost using QuotaCacheService
+        # Get the workspace's subscription plan_id for pricing multiplier
+        workspace = await workspace_db.get_by_id(session, workspace_id)
+        plan_id = None
+        subscription = None
+        if workspace and workspace.subscription:
+            subscription = workspace.subscription
+            plan_id = subscription.plan_id
 
+        credits_reserved = await QuotaCacheService.calculate_billable_cost(
+            endpoint, plan_id
+        )
+
+        # ====================================================================
+        # Quota Checking
+        # ====================================================================
+
+        # Get credits limit for the plan (with DB fallback if cache unavailable)
+        credits_limit = (
+            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+                session, plan_id
+            )
+        )
+
+        # Calculate billing period
+        subscription_period_start = None
+        subscription_period_end = None
+        if subscription is not None:
+            subscription_period_start = subscription.current_period_start
+            subscription_period_end = subscription.current_period_end
+
+        # Use workspace.created_at for fallback period calculation
+        workspace_created_at = (
+            workspace.created_at if workspace else datetime.now(timezone.utc)
+        )
+        period_start, period_end = self._calculate_billing_period(
+            subscription_period_start,
+            subscription_period_end,
+            workspace_created_at,
+        )
+
+        # Sum current usage for the period (only SUCCESS logs count)
+        current_usage = await usage_log_db.sum_credits_for_period(
+            session, workspace_id, period_start, period_end
+        )
+
+        # Check quota: current_usage + credits_reserved <= credits_limit
+        remaining_credits = credits_limit - current_usage
+        if current_usage + credits_reserved <= credits_limit:
+            access_status = AccessStatus.GRANTED
+            message = (
+                f"Access granted. {remaining_credits - credits_reserved:.2f} credits "
+                f"remaining after this request."
+            )
+            response_status_code = status.HTTP_200_OK
+        else:
+            access_status = AccessStatus.DENIED
+            message = (
+                f"Quota exceeded. Used {current_usage:.2f}/{credits_limit:.2f} credits. "
+                f"This request requires {credits_reserved:.2f} credits."
+            )
+            response_status_code = status.HTTP_429_TOO_MANY_REQUESTS
+
+        # Create usage log with PENDING status and store access decision
         usage_log = await usage_log_db.create(
             session,
             {
                 "api_key_id": api_key_record.id,
                 "workspace_id": workspace_id,
-                "cost": cost_data,
+                "request_id": request_id,
+                "fingerprint_hash": fingerprint_hash,
+                "access_status": access_status.value,
+                "endpoint": endpoint,
+                "method": method,
+                "client_ip": client_ip,
+                "client_user_agent": client_user_agent,
+                "usage_estimate": usage_estimate,
+                "credits_reserved": credits_reserved,
             },
-            commit_self=False,  # Defer commit to allow quota check before finalizing log
+            commit_self=False,
         )
 
         workspace_logger.info(
             f"Usage logged (PENDING): workspace={workspace_id}, "
             f"api_key={api_key_record.key_prefix}***, "
-            f"usage_id={usage_log.id}, cost={cost_data}"
+            f"usage_id={usage_log.id}, request_id={request_id}, "
+            f"fingerprint={fingerprint_hash[:16]}..., "
+            f"access_status={access_status.value}, "
+            f"endpoint={endpoint}, method={method}, "
+            f"credits_reserved={credits_reserved}, "
+            f"current_usage={current_usage:.2f}/{credits_limit:.2f}"
         )
-
-        # TODO: Implement quota checking
-        # For now, return DENIED with 501 message
-        # When quota is implemented:
-        # 1. Check workspace's APISubscriptionContext for quota limits
-        # 2. Calculate current usage for the period
-        # 3. If usage + cost > limit, return DENIED
-        # 4. Otherwise, return GRANTED
 
         if commit_self:
             await session.commit()
@@ -395,9 +574,11 @@ class QuotaService:
             await session.flush()
 
         return (
-            AccessStatus.DENIED,
+            access_status,
             usage_log.id,
-            "Quota system is not yet implemented. Please try again later.",
+            message,
+            credits_reserved,
+            response_status_code,
         )
 
     async def commit_usage(
@@ -406,6 +587,8 @@ class QuotaService:
         api_key: str,
         usage_id: UUID,
         success: bool,
+        metrics: dict | None = None,
+        failure: dict | None = None,
         commit_self: bool = True,
     ) -> tuple[bool, str]:
         """
@@ -420,6 +603,9 @@ class QuotaService:
             api_key: The API key that made the original request.
             usage_id: The usage log ID to commit.
             success: True if request succeeded, False if failed.
+            metrics: Optional dict with keys: model_used, input_tokens,
+                     output_tokens, latency_ms.
+            failure: Optional dict with keys: failure_type, reason.
             commit_self: Whether to commit the transaction.
 
         Returns:
@@ -458,7 +644,12 @@ class QuotaService:
 
         # Commit the usage log (idempotent - commit handles already-committed case)
         committed_log = await usage_log_db.commit(
-            session, usage_id, success=success, commit_self=commit_self
+            session,
+            usage_id,
+            success=success,
+            metrics=metrics,
+            failure=failure,
+            commit_self=commit_self,
         )
 
         if committed_log:

@@ -17,6 +17,7 @@ Security layers:
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apps.cubex_api.dependencies import InternalAPIKeyDep
@@ -36,7 +37,6 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
 @router.post(
     "/usage/validate",
     response_model=UsageValidateResponse,
-    status_code=status.HTTP_200_OK,
     summary="Validate API key and log usage",
     description="""
     Validate an API key and log usage for quota tracking.
@@ -44,80 +44,206 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     This endpoint is called by the external developer API to:
     1. Validate the API key is valid, active, and not expired
     2. Verify the API key belongs to the specified workspace (client_id)
-    3. Create a PENDING usage log for quota tracking
-    4. Return access granted/denied with a usage_id
+    3. Check workspace quota (credits used vs credits_allocation)
+    4. Create a PENDING usage log for quota tracking
+    5. Calculate and reserve credits for billing
+    6. Return access granted/denied with a usage_id and credits_reserved
+    
+    **Idempotency**: Uses request_id + fingerprint (computed from endpoint,
+    method, payload_hash, usage_estimate) for true idempotency.
+    - Same request_id + same fingerprint = return existing access_status
+    - Same request_id + different fingerprint = create new record (different payload)
     
     The caller must then call /usage/commit to mark the usage as SUCCESS
     or FAILED after the request completes. PENDING logs that are not
     committed will be expired by a scheduled job.
     
-    **Note**: Currently returns DENIED with 501 message as quota system
-    is not yet implemented. The usage is still logged for future quota
-    enforcement.
+    **Quota Enforcement**: The system checks if the workspace has sufficient
+    credits remaining in the current billing period. If quota is exceeded,
+    access is denied with HTTP 429.
+    
+    **Usage Estimate Validation**: If `usage_estimate` is provided, at least
+    one field must be set (input_chars, max_output_tokens, or model). Fields
+    are validated with bounds: input_chars (0-10M), max_output_tokens (0-2M),
+    model (max 100 chars).
     
     **Security**: Requires X-Internal-API-Key header.
+    
+    **Status Codes**:
+    - 200: Access granted (quota available) or idempotent request
+    - 400: Invalid request format (bad client_id or API key format)
+    - 401: API key not found, expired, or revoked
+    - 403: API key does not belong to the specified workspace
+    - 429: Quota exceeded (workspace has used all credits for billing period)
     """,
     responses={
         200: {
-            "description": "Validation result",
+            "description": "Access granted or idempotent request",
             "content": {
                 "application/json": {
                     "examples": {
-                        "denied_not_implemented": {
-                            "summary": "Denied - Not Implemented",
+                        "granted": {
+                            "summary": "Access Granted",
                             "value": {
-                                "access": "denied",
+                                "access": "granted",
                                 "usage_id": "550e8400-e29b-41d4-a716-446655440000",
-                                "message": "Quota system is not yet implemented.",
+                                "message": "Quota available. Remaining: 4500.0000 credits.",
+                                "credits_reserved": "1.0000",
                             },
                         },
-                        "denied_invalid_key": {
-                            "summary": "Denied - Invalid Key",
+                        "granted_idempotent": {
+                            "summary": "Granted - Idempotent Request",
                             "value": {
-                                "access": "denied",
-                                "usage_id": None,
-                                "message": "API key not found, expired, or revoked.",
-                            },
-                        },
-                        "denied_invalid_client_id": {
-                            "summary": "Denied - Invalid Client ID",
-                            "value": {
-                                "access": "denied",
-                                "usage_id": None,
-                                "message": "Invalid client_id format.",
+                                "access": "granted",
+                                "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "message": "Request already processed (idempotent). Access: granted",
+                                "credits_reserved": "1.0000",
                             },
                         },
                     }
                 }
             },
         },
-        401: {"description": "Invalid or missing internal API key"},
+        400: {
+            "description": "Invalid request format",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_client_id": {
+                            "summary": "Invalid Client ID",
+                            "value": {
+                                "access": "denied",
+                                "usage_id": None,
+                                "message": "Invalid client_id format. Expected: ws_<uuid_hex>",
+                                "credits_reserved": None,
+                            },
+                        },
+                        "invalid_api_key_format": {
+                            "summary": "Invalid API Key Format",
+                            "value": {
+                                "access": "denied",
+                                "usage_id": None,
+                                "message": "Invalid API key format.",
+                                "credits_reserved": None,
+                            },
+                        },
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "API key authentication failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "api_key_not_found": {
+                            "summary": "API Key Not Found",
+                            "value": {
+                                "access": "denied",
+                                "usage_id": None,
+                                "message": "API key not found, expired, or revoked.",
+                                "credits_reserved": None,
+                            },
+                        },
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "API key does not belong to workspace",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "workspace_mismatch": {
+                            "summary": "Workspace Mismatch",
+                            "value": {
+                                "access": "denied",
+                                "usage_id": None,
+                                "message": "API key does not belong to the specified workspace.",
+                                "credits_reserved": None,
+                            },
+                        },
+                    }
+                }
+            },
+        },
+        429: {
+            "description": "Quota exceeded",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "quota_exceeded": {
+                            "summary": "Quota Exceeded",
+                            "value": {
+                                "access": "denied",
+                                "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "message": "Quota exceeded. Current usage: 5000.0000, limit: 5000.0000",
+                                "credits_reserved": "1.0000",
+                            },
+                        },
+                    }
+                }
+            },
+        },
     },
 )
 async def validate_usage(
     request: UsageValidateRequest,
     _: InternalAPIKeyDep,  # Validates X-Internal-API-Key header
     session: Annotated[AsyncSession, Depends(get_async_session)],
-) -> UsageValidateResponse:
+) -> JSONResponse:
     """
     Validate API key and log usage.
 
-    Returns access status, usage_id (if logged), and a message.
-    Currently always returns DENIED as quota system is not implemented.
+    Returns access status, usage_id (if logged), credits_reserved, and a message.
+
+    The response status code reflects the validation result:
+    - 200: Access granted (quota available) or idempotent request
+    - 400: Invalid format (client_id or API key)
+    - 401: API key not found/expired/revoked
+    - 403: API key doesn't belong to workspace
+    - 429: Quota exceeded
     """
+    # Extract client info if provided
+    client_ip = request.client.ip if request.client else None
+    client_user_agent = request.client.user_agent if request.client else None
+
+    # Extract usage estimate if provided
+    usage_estimate = None
+    if request.usage_estimate:
+        usage_estimate = {
+            "input_chars": request.usage_estimate.input_chars,
+            "max_output_tokens": request.usage_estimate.max_output_tokens,
+            "model": request.usage_estimate.model,
+        }
+
     async with session.begin():
-        access, usage_id, message = await quota_service.validate_and_log_usage(
-            session=session,
-            api_key=request.api_key,
-            client_id=request.client_id,
-            cost=request.cost,
-            commit_self=False,
+        access, usage_id, message, credits_reserved, status_code = (
+            await quota_service.validate_and_log_usage(
+                session=session,
+                api_key=request.api_key,
+                client_id=request.client_id,
+                request_id=request.request_id,
+                endpoint=request.endpoint,
+                method=request.method,
+                payload_hash=request.payload_hash,
+                client_ip=client_ip,
+                client_user_agent=client_user_agent,
+                usage_estimate=usage_estimate,
+                commit_self=False,
+            )
         )
 
-    return UsageValidateResponse(
+    response_data = UsageValidateResponse(
         access=access,
         usage_id=usage_id,
         message=message,
+        credits_reserved=credits_reserved,
+    )
+
+    return JSONResponse(
+        content=response_data.model_dump(mode="json"),
+        status_code=status_code,
     )
 
 
@@ -133,6 +259,19 @@ async def validate_usage(
     completes to mark the usage as SUCCESS (counts toward quota) or FAILED
     (does not count toward quota).
     
+    **Metrics (optional)**: When `success=True`, you can optionally provide
+    metrics about the request:
+    - `model_used`: Model identifier (e.g., "gpt-4o")
+    - `input_tokens`: Actual input tokens used (0-2,000,000)
+    - `output_tokens`: Actual output tokens generated (0-2,000,000)
+    - `latency_ms`: Request latency in milliseconds (0-3,600,000)
+    
+    **Failure Details (required when success=False)**: When `success=False`,
+    you MUST provide failure details:
+    - `failure_type`: Category of failure (internal_error, timeout, rate_limited,
+      invalid_response, upstream_error, client_error, validation_error)
+    - `reason`: Human-readable description of what went wrong (max 1000 chars)
+    
     **Idempotent**: This operation is safe to retry. If the usage log
     is already committed or doesn't exist, success is still returned.
     
@@ -144,15 +283,15 @@ async def validate_usage(
             "content": {
                 "application/json": {
                     "examples": {
-                        "success_committed": {
-                            "summary": "Successfully Committed (Success)",
+                        "success_with_metrics": {
+                            "summary": "Success with Metrics",
                             "value": {
                                 "success": True,
                                 "message": "Usage committed as SUCCESS.",
                             },
                         },
-                        "failed_committed": {
-                            "summary": "Successfully Committed (Failed)",
+                        "failed_with_details": {
+                            "summary": "Failed with Details",
                             "value": {
                                 "success": True,
                                 "message": "Usage committed as FAILED.",
@@ -177,6 +316,9 @@ async def validate_usage(
             },
         },
         401: {"description": "Invalid or missing internal API key"},
+        422: {
+            "description": "Validation error (e.g., missing failure details when success=False)",
+        },
     },
 )
 async def commit_usage(
@@ -190,12 +332,32 @@ async def commit_usage(
     This is idempotent - if the log is already committed or doesn't exist,
     success is still returned.
     """
+    # Extract metrics if provided
+    metrics = None
+    if request.metrics:
+        metrics = {
+            "model_used": request.metrics.model_used,
+            "input_tokens": request.metrics.input_tokens,
+            "output_tokens": request.metrics.output_tokens,
+            "latency_ms": request.metrics.latency_ms,
+        }
+
+    # Extract failure details if provided
+    failure = None
+    if request.failure:
+        failure = {
+            "failure_type": request.failure.failure_type,
+            "reason": request.failure.reason,
+        }
+
     async with session.begin():
         success, message = await quota_service.commit_usage(
             session=session,
             api_key=request.api_key,
             usage_id=request.usage_id,
             success=request.success,
+            metrics=metrics,
+            failure=failure,
             commit_self=False,
         )
 

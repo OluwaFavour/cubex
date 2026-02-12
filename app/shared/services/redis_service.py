@@ -374,5 +374,47 @@ class RedisService:
             redis_logger.error(f"Redis set_if_not_exists({key}) failed: {str(e)}")
             return False
 
+    @classmethod
+    async def delete_pattern(cls, pattern: str) -> int:
+        """
+        Delete all keys matching a pattern.
+
+        Uses SCAN to safely iterate through keys matching the pattern,
+        then deletes them in batches. This is safe for production use
+        unlike KEYS which can block Redis.
+
+        Args:
+            pattern: The pattern to match (e.g., "quota:endpoint_cost:*").
+
+        Returns:
+            int: Number of keys deleted.
+        """
+        if cls._client is None:
+            redis_logger.warning(
+                f"Redis delete_pattern({pattern}) attempted but client not initialized"
+            )
+            return 0
+
+        try:
+            deleted_count = 0
+            cursor = 0
+
+            while True:
+                cursor, keys = await cls._client.scan(
+                    cursor=cursor, match=pattern, count=100
+                )
+                if keys:
+                    deleted_count += await cls._client.delete(*keys)
+                if cursor == 0:
+                    break
+
+            redis_logger.debug(
+                f"Redis delete_pattern({pattern}) deleted {deleted_count} keys"
+            )
+            return deleted_count
+        except Exception as e:
+            redis_logger.error(f"Redis delete_pattern({pattern}) failed: {str(e)}")
+            return 0
+
 
 __all__ = ["RedisService"]

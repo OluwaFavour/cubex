@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_DEFAULT_REQUESTS: int = 100
     RATE_LIMIT_DEFAULT_WINDOW: int = 60  # seconds
 
+    # Quota cache settings
+    QUOTA_CACHE_BACKEND: Literal["memory", "redis"] = "memory"
+
     # OTP settings
     OTP_LENGTH: int = 6
     OTP_EXPIRY_MINUTES: int = 10
