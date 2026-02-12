@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     # Internal API settings (for external API communication)
     INTERNAL_API_SECRET: str = "internal_api_secret_change_in_production"
 
+    # Admin settings
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "admin_password_change_in_production"
+
     model_config: SettingsConfigDict = SettingsConfigDict(  # type: ignore
         env_file=".env",
         extra="ignore",

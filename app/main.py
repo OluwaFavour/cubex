@@ -68,6 +68,7 @@ from app.apps.cubex_career.routers import (
 from app.apps.cubex_api.services import QuotaCacheService
 from app.shared.db import AsyncSessionLocal
 from app.shared.utils import generate_openapi_json, write_to_file_async
+from app.admin import init_admin
 
 
 @asynccontextmanager
@@ -248,6 +249,9 @@ app.include_router(internal_router, prefix="/api", tags=["API - Internal API"])
 app.include_router(
     career_subscription_router, prefix="/career", tags=["Career - Subscriptions"]
 )
+
+# Mount admin interface
+init_admin(app)
 
 
 @app.get("/", include_in_schema=False)
