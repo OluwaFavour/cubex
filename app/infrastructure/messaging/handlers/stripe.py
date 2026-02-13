@@ -155,7 +155,7 @@ async def _send_subscription_canceled_email(
                     "user_name": full_name,
                     "plan_name": plan_name,
                     "workspace_name": None,
-                    "product_name": "Cubex Career",
+                    "product_name": "CueBX Career",
                 },
             )
     else:
@@ -169,7 +169,7 @@ async def _send_subscription_canceled_email(
                     "user_name": full_name,
                     "plan_name": plan_name,
                     "workspace_name": workspace_name,
-                    "product_name": "Cubex API",
+                    "product_name": "CueBX API",
                 },
             )
 
@@ -193,7 +193,7 @@ async def _send_payment_failed_email(
                     "plan_name": plan_name,
                     "workspace_name": None,
                     "amount": amount_str,
-                    "product_name": "Cubex Career",
+                    "product_name": "CueBX Career",
                 },
             )
     else:
@@ -208,7 +208,7 @@ async def _send_payment_failed_email(
                     "plan_name": plan_name,
                     "workspace_name": workspace_name,
                     "amount": amount_str,
-                    "product_name": "Cubex API",
+                    "product_name": "CueBX API",
                 },
             )
 

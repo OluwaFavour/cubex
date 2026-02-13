@@ -1,4 +1,4 @@
-[CUBEX ALERT] Invalid Payload Alert
+[CueBX ALERT] Invalid Payload Alert
 ====================================
 
 A message was received with an invalid payload that failed schema validation.

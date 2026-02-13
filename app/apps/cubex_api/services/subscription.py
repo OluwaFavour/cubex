@@ -441,7 +441,7 @@ class SubscriptionService:
                         "plan_name": plan.name,
                         "workspace_name": workspace.display_name,
                         "seat_count": seat_count,
-                        "product_name": "Cubex API",
+                        "product_name": "CueBX API",
                     },
                 )
 

@@ -118,7 +118,7 @@ async def handle_subscription_activated_email(event: dict[str, Any]) -> None:
             - plan_name (str | None): Name of the subscribed plan
             - workspace_name (str | None): Name of the workspace (for API subscriptions)
             - seat_count (int | None): Number of seats in the subscription
-            - product_name (str): Product name (e.g., "Cubex API", "Cubex Career")
+            - product_name (str): Product name (e.g., "CueBX API", "CueBX Career")
 
     Raises:
         Exception: If email sending fails, exception is raised to trigger retry.
@@ -128,7 +128,7 @@ async def handle_subscription_activated_email(event: dict[str, Any]) -> None:
     plan_name = event.get("plan_name")
     workspace_name = event.get("workspace_name")
     seat_count = event.get("seat_count")
-    product_name = event.get("product_name", "Cubex")
+    product_name = event.get("product_name", "CueBX")
 
     stripe_logger.info(f"Processing subscription activated email: email={email}")
 
@@ -171,7 +171,7 @@ async def handle_subscription_canceled_email(event: dict[str, Any]) -> None:
             - user_name (str | None): Optional user name for personalization
             - plan_name (str | None): Name of the canceled plan
             - workspace_name (str | None): Name of the workspace (for API subscriptions)
-            - product_name (str): Product name (e.g., "Cubex API", "Cubex Career")
+            - product_name (str): Product name (e.g., "CueBX API", "CueBX Career")
 
     Raises:
         Exception: If email sending fails, exception is raised to trigger retry.
@@ -180,7 +180,7 @@ async def handle_subscription_canceled_email(event: dict[str, Any]) -> None:
     user_name = event.get("user_name")
     plan_name = event.get("plan_name")
     workspace_name = event.get("workspace_name")
-    product_name = event.get("product_name", "Cubex")
+    product_name = event.get("product_name", "CueBX")
 
     stripe_logger.info(f"Processing subscription canceled email: email={email}")
 
@@ -224,7 +224,7 @@ async def handle_payment_failed_email(event: dict[str, Any]) -> None:
             - workspace_name (str | None): Name of the workspace (for API subscriptions)
             - amount (str | None): Payment amount that failed
             - update_payment_url (str | None): URL to update payment method
-            - product_name (str): Product name (e.g., "Cubex API", "Cubex Career")
+            - product_name (str): Product name (e.g., "CueBX API", "CueBX Career")
 
     Raises:
         Exception: If email sending fails, exception is raised to trigger retry.
@@ -235,7 +235,7 @@ async def handle_payment_failed_email(event: dict[str, Any]) -> None:
     workspace_name = event.get("workspace_name")
     amount = event.get("amount")
     update_payment_url = event.get("update_payment_url")
-    product_name = event.get("product_name", "Cubex")
+    product_name = event.get("product_name", "CueBX")
 
     stripe_logger.info(f"Processing payment failed email: email={email}")
 

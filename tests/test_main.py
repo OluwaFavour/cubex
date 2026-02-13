@@ -61,7 +61,7 @@ class TestAppConfiguration:
 
     def test_app_title(self):
         """Test that app has correct title from settings."""
-        assert app.title == "CUEBEX"
+        assert app.title == "CueBX"
 
     def test_app_version(self):
         """Test that app has correct version from settings."""
@@ -486,7 +486,7 @@ class TestRootEndpoint:
 
         assert response.status_code == 200
         assert "message" in response.json()
-        assert response.json()["message"] == "Welcome to CUEBEX API"
+        assert response.json()["message"] == "Welcome to CueBX API"
 
     def test_root_endpoint_returns_documentation_links(self, client):
         """Test that root endpoint returns documentation links."""
@@ -574,7 +574,7 @@ class TestHealthCheckEndpoint:
                 assert response.status_code == 200
                 data = response.json()
                 assert data["status"] == "ok"
-                assert "CUEBEX API is running" in data["message"]
+                assert "CueBX API is running" in data["message"]
                 assert data["checks"]["database"] == "ok"
                 assert data["checks"]["redis"] == "ok"
 

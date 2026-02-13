@@ -417,7 +417,7 @@ class CareerSubscriptionService:
                     "plan_name": plan.name,
                     "workspace_name": None,  # Career is user-based
                     "seat_count": None,  # Career is always single-user
-                    "product_name": "Cubex Career",
+                    "product_name": "CueBX Career",
                 },
             )
 

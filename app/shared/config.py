@@ -11,10 +11,10 @@ class Settings(BaseSettings):
     # Application settings
     ENVIRONMENT: str = "development"  # Options: development, production
     API_DOMAIN: str = "http://localhost:8000"
-    APP_NAME: str = "CUEBEX"
+    APP_NAME: str = "CueBX"
     APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = """
-    CUEBEX
+    CueBX
     """
     DEBUG: bool = True
     ROOT_PATH: str = "/v1"

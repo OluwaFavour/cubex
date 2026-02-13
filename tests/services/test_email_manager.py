@@ -353,7 +353,7 @@ class TestSendWelcomeEmail:
         ) as mock_brevo, patch(
             "app.shared.services.email_manager.settings"
         ) as mock_settings:
-            mock_settings.APP_NAME = "CubeX"
+            mock_settings.APP_NAME = "CueBX"
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Welcome</html>", "Welcome"]
             )
@@ -373,11 +373,11 @@ class TestSendWelcomeEmail:
             html_call = mock_renderer.render_template.call_args_list[0]
             assert html_call[0][0] == "welcome_email.html"
             assert html_call[1]["context"]["user_name"] == "New User"
-            assert html_call[1]["context"]["app_name"] == "CubeX"
+            assert html_call[1]["context"]["app_name"] == "CueBX"
 
             # Verify Brevo was called with correct subject
             brevo_call = mock_brevo.send_transactional_email.call_args
-            assert brevo_call[1]["subject"] == "Welcome to CubeX!"
+            assert brevo_call[1]["subject"] == "Welcome to CueBX!"
 
     @pytest.mark.asyncio
     async def test_send_welcome_email_default_user_name(self):
@@ -454,7 +454,7 @@ class TestSendPasswordResetConfirmationEmail:
         ) as mock_brevo, patch(
             "app.shared.services.email_manager.settings"
         ) as mock_settings:
-            mock_settings.APP_NAME = "CubeX"
+            mock_settings.APP_NAME = "CueBX"
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Password changed</html>", "Password changed"]
             )
@@ -476,7 +476,7 @@ class TestSendPasswordResetConfirmationEmail:
 
             # Verify subject
             brevo_call = mock_brevo.send_transactional_email.call_args
-            assert brevo_call[1]["subject"] == "Password Changed Successfully - CubeX"
+            assert brevo_call[1]["subject"] == "Password Changed Successfully - CueBX"
 
     @pytest.mark.asyncio
     async def test_send_password_reset_confirmation_handles_failure(self):

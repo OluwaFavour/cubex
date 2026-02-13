@@ -258,7 +258,7 @@ init_admin(app)
 async def root(request: Request):
     base_url = request.base_url._url.rstrip("/")
     return {
-        "message": "Welcome to CUEBEX API",
+        "message": "Welcome to CueBX API",
         "documentations": {
             "swagger": f"{base_url}/docs",
             "redoc": f"{base_url}/redoc",
@@ -279,7 +279,7 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
     """
     health_status = {
         "status": "ok",
-        "message": "CUEBEX API is running.",
+        "message": "CueBX API is running.",
         "checks": {
             "database": "ok",
             "redis": "ok",

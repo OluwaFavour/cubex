@@ -338,7 +338,7 @@ class EmailManagerService:
         plan_name: str | None = None,
         workspace_name: str | None = None,
         seat_count: int | None = None,
-        product_name: str = "Cubex",
+        product_name: str = "CueBX",
     ) -> bool:
         """
         Send a subscription activation confirmation email.
@@ -351,7 +351,7 @@ class EmailManagerService:
             plan_name: Name of the subscribed plan.
             workspace_name: Name of the workspace (for API subscriptions).
             seat_count: Number of seats in the subscription (for API subscriptions).
-            product_name: Product name (e.g., "Cubex API", "Cubex Career").
+            product_name: Product name (e.g., "CueBX API", "CueBX Career").
 
         Returns:
             bool: True if email was sent successfully, False otherwise.
@@ -363,7 +363,7 @@ class EmailManagerService:
             ...     plan_name="Pro",
             ...     workspace_name="Acme Corp",
             ...     seat_count=5,
-            ...     product_name="Cubex API",
+            ...     product_name="CueBX API",
             ... )
             True
         """
@@ -393,7 +393,7 @@ class EmailManagerService:
         user_name: str | None = None,
         plan_name: str | None = None,
         workspace_name: str | None = None,
-        product_name: str = "Cubex",
+        product_name: str = "CueBX",
     ) -> bool:
         """
         Send a subscription cancellation confirmation email.
@@ -405,7 +405,7 @@ class EmailManagerService:
             user_name: Recipient name for personalization.
             plan_name: Name of the canceled plan.
             workspace_name: Name of the workspace (for API subscriptions).
-            product_name: Product name (e.g., "Cubex API", "Cubex Career").
+            product_name: Product name (e.g., "CueBX API", "CueBX Career").
 
         Returns:
             bool: True if email was sent successfully, False otherwise.
@@ -416,7 +416,7 @@ class EmailManagerService:
             ...     user_name="John",
             ...     plan_name="Pro",
             ...     workspace_name="Acme Corp",
-            ...     product_name="Cubex API",
+            ...     product_name="CueBX API",
             ... )
             True
         """
@@ -447,7 +447,7 @@ class EmailManagerService:
         workspace_name: str | None = None,
         amount: str | None = None,
         update_payment_url: str | None = None,
-        product_name: str = "Cubex",
+        product_name: str = "CueBX",
     ) -> bool:
         """
         Send a payment failure notification email.
@@ -461,7 +461,7 @@ class EmailManagerService:
             workspace_name: Name of the workspace (for API subscriptions).
             amount: Payment amount that failed.
             update_payment_url: URL to update payment method.
-            product_name: Product name (e.g., "Cubex API", "Cubex Career").
+            product_name: Product name (e.g., "CueBX API", "CueBX Career").
 
         Returns:
             bool: True if email was sent successfully, False otherwise.
@@ -473,8 +473,8 @@ class EmailManagerService:
             ...     plan_name="Pro",
             ...     workspace_name="Acme Corp",
             ...     amount="49.00",
-            ...     update_payment_url="https://app.cubex.com/billing",
-            ...     product_name="Cubex API",
+            ...     update_payment_url="https://app.cuebx.com/billing",
+            ...     product_name="CueBX API",
             ... )
             True
         """
@@ -530,7 +530,7 @@ class EmailManagerService:
             ...     inviter_name="John Doe",
             ...     workspace_name="Acme Corp",
             ...     role="Member",
-            ...     invitation_link="https://app.cubex.com/invites/accept/abc123",
+            ...     invitation_link="https://app.cuebx.com/invites/accept/abc123",
             ...     expiry_hours=72,
             ... )
             True
@@ -600,7 +600,7 @@ class EmailManagerService:
 
         return await cls.send_email(
             email=admin_email,
-            subject=f"[CUBEX ALERT] DLQ: {queue_name}",
+            subject=f"[CueBX ALERT] DLQ: {queue_name}",
             html_template="dlq_alert.html",
             text_template="dlq_alert.txt",
             context=context,
@@ -653,7 +653,7 @@ class EmailManagerService:
 
         return await cls.send_email(
             email=admin_email,
-            subject=f"[CUBEX ALERT] Invalid Payload: {queue_name}",
+            subject=f"[CueBX ALERT] Invalid Payload: {queue_name}",
             html_template="invalid_payload_alert.html",
             text_template="invalid_payload_alert.txt",
             context=context,

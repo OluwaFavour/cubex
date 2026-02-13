@@ -1,4 +1,4 @@
-[CUBEX ALERT] Dead Letter Queue Alert
+[CueBX ALERT] Dead Letter Queue Alert
 =====================================
 
 A message has been moved to the dead-letter queue after exhausting all retry attempts.

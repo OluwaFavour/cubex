@@ -37,7 +37,7 @@ def init_admin(app: FastAPI) -> None:
     admin = Admin(
         app=app,
         engine=async_engine,
-        title="Cubex Admin",
+        title="CueBX Admin",
         base_url="/admin",
         authentication_backend=admin_auth,
     )

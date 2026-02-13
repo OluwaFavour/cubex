@@ -373,7 +373,7 @@ class TestAdminSetup:
 
         assert admin is not None
         assert admin.base_url == "/admin"
-        assert admin.title == "Cubex Admin"
+        assert admin.title == "CueBX Admin"
 
     def test_admin_has_authentication(self):
         """Test that admin has authentication backend configured."""
