@@ -57,6 +57,8 @@ def _build_plan_response(plan: Plan) -> PlanResponse:
         description=plan.description,
         price=plan.price,
         display_price=plan.display_price,
+        seat_price=plan.seat_price,
+        seat_display_price=plan.seat_display_price,
         is_active=plan.is_active,
         trial_days=plan.trial_days,
         type=plan.type,

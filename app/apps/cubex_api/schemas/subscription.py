@@ -49,6 +49,8 @@ class PlanResponse(BaseModel):
                 "description": "Professional plan with advanced features",
                 "price": "29.99",
                 "display_price": "$29.99/month",
+                "seat_price": "5.00",
+                "seat_display_price": "$5/seat/month",
                 "is_active": True,
                 "trial_days": 14,
                 "type": "paid",
@@ -71,6 +73,8 @@ class PlanResponse(BaseModel):
     description: str | None
     price: Decimal
     display_price: str | None
+    seat_price: Decimal
+    seat_display_price: str | None
     is_active: bool
     trial_days: int | None
     type: PlanType
@@ -92,6 +96,8 @@ class PlanListResponse(BaseModel):
                         "description": "Professional plan",
                         "price": "29.99",
                         "display_price": "$29.99/month",
+                        "seat_price": "5.00",
+                        "seat_display_price": "$5/seat/month",
                         "is_active": True,
                         "trial_days": 14,
                         "type": "paid",
