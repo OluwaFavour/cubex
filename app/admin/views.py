@@ -8,23 +8,32 @@ Defines admin views for managing application models:
 - UserAdmin: Read-only user view
 - WorkspaceAdmin: Read-only workspace view
 - SubscriptionAdmin: View/edit subscriptions
+- UsageLogAdmin: Read-only usage log view
 """
+
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, List, Tuple
 
 from sqladmin import ModelView
 from sqladmin.filters import BooleanFilter, StaticValuesFilter
+from sqlalchemy.sql.expression import Select
+from starlette.requests import Request
 
 from app.apps.cubex_api.db.crud.quota import plan_pricing_rule_db
 from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule
-from app.apps.cubex_api.db.models.workspace import Workspace, WorkspaceMember
+from app.apps.cubex_api.db.models.workspace import UsageLog, Workspace, WorkspaceMember
 from app.shared.db.models.plan import Plan
 from app.shared.db.models.subscription import Subscription
 from app.shared.db.models.user import User
 from app.shared.enums import (
+    AccessStatus,
+    FailureType,
     MemberRole,
     MemberStatus,
     PlanType,
     ProductType,
     SubscriptionStatus,
+    UsageLogStatus,
     WorkspaceStatus,
 )
 
@@ -525,6 +534,219 @@ class SubscriptionAdmin(ModelView, model=Subscription):
     can_export = True
 
 
+# ============================================================================
+# Custom Filters
+# ============================================================================
+
+
+class DateRangeFilter:
+    """Custom filter for date range filtering on datetime columns."""
+
+    has_operator = False
+
+    def __init__(
+        self,
+        column: Any,
+        title: str | None = None,
+        parameter_name: str | None = None,
+    ):
+        self.column = column
+        self.title = title or "Date Range"
+        self.parameter_name = parameter_name or "date_range"
+
+    async def lookups(
+        self,
+        request: Request,
+        model: Any,
+        run_query: Callable[[Select], Any],
+    ) -> List[Tuple[str, str]]:
+        return [
+            ("", "All Time"),
+            ("today", "Today"),
+            ("yesterday", "Yesterday"),
+            ("last_7_days", "Last 7 Days"),
+            ("last_30_days", "Last 30 Days"),
+            ("this_month", "This Month"),
+            ("last_month", "Last Month"),
+        ]
+
+    async def get_filtered_query(self, query: Select, value: Any, model: Any) -> Select:
+        if not value or value == "":
+            return query
+
+        now = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        if value == "today":
+            return query.filter(self.column >= today_start)
+        elif value == "yesterday":
+            yesterday_start = today_start - timedelta(days=1)
+            return query.filter(
+                self.column >= yesterday_start, self.column < today_start
+            )
+        elif value == "last_7_days":
+            start = today_start - timedelta(days=7)
+            return query.filter(self.column >= start)
+        elif value == "last_30_days":
+            start = today_start - timedelta(days=30)
+            return query.filter(self.column >= start)
+        elif value == "this_month":
+            month_start = today_start.replace(day=1)
+            return query.filter(self.column >= month_start)
+        elif value == "last_month":
+            this_month_start = today_start.replace(day=1)
+            last_month_end = this_month_start - timedelta(days=1)
+            last_month_start = last_month_end.replace(day=1)
+            return query.filter(
+                self.column >= last_month_start, self.column < this_month_start
+            )
+
+        return query
+
+
+# ============================================================================
+# Usage Log Management (Read-Only)
+# ============================================================================
+
+
+class UsageLogAdmin(ModelView, model=UsageLog):
+    """Admin view for API usage logs (read-only)."""
+
+    name = "Usage Log"
+    name_plural = "Usage Logs"
+    icon = "fa-solid fa-chart-line"
+
+    # List view configuration
+    column_list = [
+        UsageLog.id,
+        UsageLog.workspace_id,
+        UsageLog.api_key_id,
+        UsageLog.endpoint,
+        UsageLog.method,
+        UsageLog.access_status,
+        UsageLog.status,
+        UsageLog.credits_reserved,
+        UsageLog.credits_charged,
+        UsageLog.created_at,
+    ]
+
+    column_searchable_list = ["request_id", "endpoint", "client_ip"]
+    column_sortable_list = [
+        UsageLog.endpoint,
+        UsageLog.method,
+        UsageLog.access_status,
+        UsageLog.status,
+        UsageLog.credits_reserved,
+        UsageLog.credits_charged,
+        UsageLog.created_at,
+    ]
+    column_default_sort = [(UsageLog.created_at, True)]  # Newest first
+
+    # Filters
+    column_filters = [
+        StaticValuesFilter(
+            UsageLog.status,
+            values=[(e.value, e.value.title()) for e in UsageLogStatus],
+            title="Status",
+        ),
+        StaticValuesFilter(
+            UsageLog.access_status,
+            values=[(e.value, e.value.title()) for e in AccessStatus],
+            title="Access",
+        ),
+        StaticValuesFilter(
+            UsageLog.failure_type,
+            values=[(e.value, e.value.replace("_", " ").title()) for e in FailureType],
+            title="Failure Type",
+        ),
+        DateRangeFilter(UsageLog.created_at, title="Created"),
+    ]
+
+    # Detail view - includes all fields including metrics
+    column_details_list = [
+        UsageLog.id,
+        UsageLog.workspace_id,
+        UsageLog.api_key_id,
+        UsageLog.request_id,
+        UsageLog.fingerprint_hash,
+        UsageLog.endpoint,
+        UsageLog.method,
+        UsageLog.access_status,
+        UsageLog.status,
+        UsageLog.client_ip,
+        UsageLog.client_user_agent,
+        UsageLog.usage_estimate,
+        UsageLog.credits_reserved,
+        UsageLog.credits_charged,
+        UsageLog.committed_at,
+        # Metrics (populated on successful commit)
+        UsageLog.model_used,
+        UsageLog.input_tokens,
+        UsageLog.output_tokens,
+        UsageLog.latency_ms,
+        # Failure details (populated on failed commit)
+        UsageLog.failure_type,
+        UsageLog.failure_reason,
+        UsageLog.created_at,
+        UsageLog.updated_at,
+    ]
+
+    # Labels
+    column_labels = {
+        UsageLog.id: "ID",
+        UsageLog.workspace_id: "Workspace",
+        UsageLog.api_key_id: "API Key",
+        UsageLog.request_id: "Request ID",
+        UsageLog.fingerprint_hash: "Fingerprint",
+        UsageLog.endpoint: "Endpoint",
+        UsageLog.method: "Method",
+        UsageLog.access_status: "Access",
+        UsageLog.status: "Status",
+        UsageLog.client_ip: "Client IP",
+        UsageLog.client_user_agent: "User Agent",
+        UsageLog.usage_estimate: "Usage Estimate",
+        UsageLog.credits_reserved: "Credits Reserved",
+        UsageLog.credits_charged: "Credits Charged",
+        UsageLog.committed_at: "Committed At",
+        UsageLog.model_used: "Model Used",
+        UsageLog.input_tokens: "Input Tokens",
+        UsageLog.output_tokens: "Output Tokens",
+        UsageLog.latency_ms: "Latency (ms)",
+        UsageLog.failure_type: "Failure Type",
+        UsageLog.failure_reason: "Failure Reason",
+        UsageLog.created_at: "Created",
+        UsageLog.updated_at: "Updated",
+    }
+
+    # Formatting
+    column_formatters = {
+        UsageLog.credits_reserved: lambda m, a: f"{m.credits_reserved:.4f}",
+        UsageLog.credits_charged: lambda m, a: (
+            f"{m.credits_charged:.4f}" if m.credits_charged else "-"
+        ),
+        UsageLog.latency_ms: lambda m, a: (
+            f"{m.latency_ms:,} ms" if m.latency_ms else "-"
+        ),
+        UsageLog.input_tokens: lambda m, a: (
+            f"{m.input_tokens:,}" if m.input_tokens else "-"
+        ),
+        UsageLog.output_tokens: lambda m, a: (
+            f"{m.output_tokens:,}" if m.output_tokens else "-"
+        ),
+    }
+
+    # Read-only - usage logs are immutable
+    can_create = False
+    can_edit = False
+    can_delete = False
+    can_view_details = True
+    can_export = True
+
+    # Increase page size for logs
+    page_size = 50
+    page_size_options = [25, 50, 100, 200]
+
+
 # Export all admin views
 __all__ = [
     "PlanAdmin",
@@ -534,4 +756,5 @@ __all__ = [
     "WorkspaceAdmin",
     "WorkspaceMemberAdmin",
     "SubscriptionAdmin",
+    "UsageLogAdmin",
 ]

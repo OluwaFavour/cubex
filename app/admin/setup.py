@@ -14,6 +14,7 @@ from app.admin.views import (
     PlanAdmin,
     PlanPricingRuleAdmin,
     SubscriptionAdmin,
+    UsageLogAdmin,
     UserAdmin,
     WorkspaceAdmin,
     WorkspaceMemberAdmin,
@@ -50,6 +51,7 @@ def init_admin(app: FastAPI) -> None:
     admin.add_view(WorkspaceAdmin)
     admin.add_view(WorkspaceMemberAdmin)
     admin.add_view(SubscriptionAdmin)
+    admin.add_view(UsageLogAdmin)
 
 
 __all__ = ["admin", "init_admin"]
