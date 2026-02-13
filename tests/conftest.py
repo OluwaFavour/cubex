@@ -7,6 +7,7 @@ All fixtures are function-scoped for complete test isolation.
 
 import os
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, patch
@@ -19,6 +20,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy import select
 
 
 # ============================================================================
@@ -484,6 +486,37 @@ async def basic_api_plan(db_session: AsyncSession):
 
 
 @pytest.fixture
+async def basic_api_plan_pricing_rule(db_session: AsyncSession, basic_api_plan):
+    """Get or create a PlanPricingRule for the basic API plan.
+
+    This ensures quota and rate limit tests have proper pricing rules.
+    """
+    from decimal import Decimal
+
+    from app.apps.cubex_api.db.models import PlanPricingRule
+
+    # Check if pricing rule already exists
+    result = await db_session.execute(
+        select(PlanPricingRule).where(PlanPricingRule.plan_id == basic_api_plan.id)
+    )
+    pricing_rule = result.scalar_one_or_none()
+
+    if pricing_rule is None:
+        # Create pricing rule for the plan
+        pricing_rule = PlanPricingRule(
+            id=uuid4(),
+            plan_id=basic_api_plan.id,
+            multiplier=Decimal("1.0"),
+            credits_allocation=Decimal("5000.00"),
+            rate_limit_per_minute=20,
+        )
+        db_session.add(pricing_rule)
+        await db_session.flush()
+
+    return pricing_rule
+
+
+@pytest.fixture
 async def professional_api_plan(db_session: AsyncSession):
     """Get the professional API plan from seeded data."""
     from sqlalchemy import select
@@ -927,3 +960,394 @@ def mock_settings():
     settings.DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
     return settings
+
+
+# ============================================================================
+# Redis Testcontainer Fixtures
+# ============================================================================
+
+
+@pytest.fixture(scope="session")
+def redis_container():
+    """Start a Redis container for the test session.
+
+    Uses testcontainers to start a real Redis instance.
+    The container is shared across all tests in the session for efficiency.
+    """
+    try:
+        from testcontainers.core.container import DockerContainer
+        from testcontainers.core.wait_strategies import LogMessageWaitStrategy
+    except ImportError:
+        pytest.skip("testcontainers not installed")
+
+    # Use DockerContainer directly with proper wait strategy to avoid deprecation warning
+    container = DockerContainer("redis:7-alpine")
+    container.with_exposed_ports(6379)
+    # Use structured wait strategy (new API)
+    container.waiting_for(LogMessageWaitStrategy("Ready to accept connections"))
+
+    with container:
+        yield container
+
+
+@pytest.fixture(scope="session")
+def redis_url(redis_container) -> str:
+    """Get the Redis URL from the testcontainer."""
+    host = redis_container.get_container_host_ip()
+    port = redis_container.get_exposed_port(6379)
+    return f"redis://{host}:{port}/0"
+
+
+@pytest.fixture(autouse=True)
+async def setup_redis_service(redis_url):
+    """Initialize RedisService with the testcontainer URL and flush after each test.
+
+    This fixture:
+    1. Initializes RedisService to use the testcontainer Redis
+    2. After each test, flushes the database to ensure test isolation
+    """
+    from app.shared.services.redis_service import RedisService
+
+    # Initialize with testcontainer URL
+    await RedisService.init(redis_url)
+
+    yield
+
+    # Flush the Redis database after each test for isolation
+    if RedisService._client is not None:
+        await RedisService._client.flushdb()
+
+
+# ============================================================================
+# API Key Fixtures
+# ============================================================================
+
+
+def make_client_id(workspace) -> str:
+    """Create a client_id from a workspace."""
+    return f"ws_{workspace.id.hex}"
+
+
+@pytest.fixture
+async def live_api_key(db_session: AsyncSession, test_workspace, test_subscription):
+    """Create a live API key for test_workspace.
+
+    Returns:
+        Tuple of (raw_key, APIKey model instance)
+    """
+    from app.apps.cubex_api.db.models import APIKey
+    from app.apps.cubex_api.services.quota import quota_service
+
+    # Generate key using the service's method
+    raw_key, key_hash, key_prefix = quota_service._generate_api_key(is_test_key=False)
+
+    api_key = APIKey(
+        id=uuid4(),
+        workspace_id=test_workspace.id,
+        name="Test Live Key",
+        key_hash=key_hash,
+        key_prefix=key_prefix,
+        is_active=True,
+        is_test_key=False,
+    )
+    db_session.add(api_key)
+    await db_session.flush()
+
+    return raw_key, api_key
+
+
+@pytest.fixture
+async def test_api_key(db_session: AsyncSession, test_workspace, test_subscription):
+    """Create a test API key for test_workspace (cbx_test_ prefix).
+
+    Returns:
+        Tuple of (raw_key, APIKey model instance)
+    """
+    from app.apps.cubex_api.db.models import APIKey
+    from app.apps.cubex_api.services.quota import quota_service
+
+    # Generate test key using the service's method
+    raw_key, key_hash, key_prefix = quota_service._generate_api_key(is_test_key=True)
+
+    api_key = APIKey(
+        id=uuid4(),
+        workspace_id=test_workspace.id,
+        name="Test API Key",
+        key_hash=key_hash,
+        key_prefix=key_prefix,
+        is_active=True,
+        is_test_key=True,
+    )
+    db_session.add(api_key)
+    await db_session.flush()
+
+    return raw_key, api_key
+
+
+@pytest.fixture
+async def expired_api_key(db_session: AsyncSession, test_workspace, test_subscription):
+    """Create an expired API key for test_workspace.
+
+    Returns:
+        Tuple of (raw_key, APIKey model instance)
+    """
+    from app.apps.cubex_api.db.models import APIKey
+    from app.apps.cubex_api.services.quota import quota_service
+
+    raw_key, key_hash, key_prefix = quota_service._generate_api_key(is_test_key=False)
+
+    api_key = APIKey(
+        id=uuid4(),
+        workspace_id=test_workspace.id,
+        name="Expired Key",
+        key_hash=key_hash,
+        key_prefix=key_prefix,
+        is_active=True,
+        is_test_key=False,
+        expires_at=datetime.now(timezone.utc) - timedelta(days=1),  # Expired yesterday
+    )
+    db_session.add(api_key)
+    await db_session.flush()
+
+    return raw_key, api_key
+
+
+@pytest.fixture
+async def revoked_api_key(db_session: AsyncSession, test_workspace, test_subscription):
+    """Create a revoked API key for test_workspace.
+
+    Returns:
+        Tuple of (raw_key, APIKey model instance)
+    """
+    from app.apps.cubex_api.db.models import APIKey
+    from app.apps.cubex_api.services.quota import quota_service
+
+    raw_key, key_hash, key_prefix = quota_service._generate_api_key(is_test_key=False)
+
+    api_key = APIKey(
+        id=uuid4(),
+        workspace_id=test_workspace.id,
+        name="Revoked Key",
+        key_hash=key_hash,
+        key_prefix=key_prefix,
+        is_active=True,
+        is_test_key=False,
+        revoked_at=datetime.now(timezone.utc),  # Revoked now
+    )
+    db_session.add(api_key)
+    await db_session.flush()
+
+    return raw_key, api_key
+
+
+# ============================================================================
+# Quota Edge Case Fixtures
+# ============================================================================
+
+
+@pytest.fixture
+async def other_workspace(db_session: AsyncSession, test_user, basic_api_plan):
+    """Create a second workspace for mismatch tests.
+
+    This workspace is owned by the same user but is separate from test_workspace.
+    Includes its own subscription for quota tracking.
+    """
+    from app.shared.db.models import (
+        APISubscriptionContext,
+        Subscription,
+        Workspace,
+        WorkspaceMember,
+    )
+    from app.shared.enums import (
+        MemberRole,
+        MemberStatus,
+        SubscriptionStatus,
+        WorkspaceStatus,
+    )
+
+    workspace = Workspace(
+        id=uuid4(),
+        display_name="Other Workspace",
+        slug="other-workspace",
+        status=WorkspaceStatus.ACTIVE,
+        is_personal=False,
+        owner_id=test_user.id,
+    )
+    db_session.add(workspace)
+    await db_session.flush()
+
+    member = WorkspaceMember(
+        id=uuid4(),
+        workspace_id=workspace.id,
+        user_id=test_user.id,
+        role=MemberRole.OWNER,
+        status=MemberStatus.ENABLED,
+        joined_at=datetime.now(timezone.utc),
+    )
+    db_session.add(member)
+    await db_session.flush()
+
+    # Create subscription
+    subscription = Subscription(
+        id=uuid4(),
+        plan_id=basic_api_plan.id,
+        status=SubscriptionStatus.ACTIVE,
+        stripe_subscription_id=f"sub_other_{uuid4().hex[:12]}",
+        stripe_customer_id=f"cus_other_{uuid4().hex[:12]}",
+        seat_count=5,
+        current_period_start=datetime.now(timezone.utc),
+        current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
+    )
+    db_session.add(subscription)
+    await db_session.flush()
+
+    context = APISubscriptionContext(
+        id=uuid4(),
+        subscription_id=subscription.id,
+        workspace_id=workspace.id,
+    )
+    db_session.add(context)
+    await db_session.flush()
+
+    return workspace
+
+
+@pytest.fixture
+async def workspace_quota_exhausted(
+    db_session: AsyncSession, test_user, basic_api_plan, basic_api_plan_pricing_rule
+):
+    """Create a workspace with exhausted quota.
+
+    Creates workspace + subscription + APISubscriptionContext where
+    credits_used equals credits_allocation from PlanPricingRule.
+
+    Returns:
+        Tuple of (workspace, subscription, credits_allocation)
+    """
+    from app.shared.db.models import (
+        APISubscriptionContext,
+        Subscription,
+        Workspace,
+        WorkspaceMember,
+    )
+    from app.shared.enums import (
+        MemberRole,
+        MemberStatus,
+        SubscriptionStatus,
+        WorkspaceStatus,
+    )
+
+    # Use the pricing rule from fixture
+    credits_allocation = basic_api_plan_pricing_rule.credits_allocation
+
+    # Create workspace
+    workspace = Workspace(
+        id=uuid4(),
+        display_name="Exhausted Quota Workspace",
+        slug="exhausted-quota-workspace",
+        status=WorkspaceStatus.ACTIVE,
+        is_personal=False,
+        owner_id=test_user.id,
+    )
+    db_session.add(workspace)
+    await db_session.flush()
+
+    member = WorkspaceMember(
+        id=uuid4(),
+        workspace_id=workspace.id,
+        user_id=test_user.id,
+        role=MemberRole.OWNER,
+        status=MemberStatus.ENABLED,
+        joined_at=datetime.now(timezone.utc),
+    )
+    db_session.add(member)
+    await db_session.flush()
+
+    # Create subscription
+    subscription = Subscription(
+        id=uuid4(),
+        plan_id=basic_api_plan.id,
+        status=SubscriptionStatus.ACTIVE,
+        stripe_subscription_id=f"sub_exhausted_{uuid4().hex[:12]}",
+        stripe_customer_id=f"cus_exhausted_{uuid4().hex[:12]}",
+        seat_count=5,
+        current_period_start=datetime.now(timezone.utc),
+        current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
+    )
+    db_session.add(subscription)
+    await db_session.flush()
+
+    # Create context with exhausted credits
+    context = APISubscriptionContext(
+        id=uuid4(),
+        subscription_id=subscription.id,
+        workspace_id=workspace.id,
+        credits_used=credits_allocation,  # Exactly at the limit
+        billing_period_start=datetime.now(timezone.utc),
+    )
+    db_session.add(context)
+    await db_session.flush()
+
+    return workspace, subscription, credits_allocation
+
+
+@pytest.fixture
+async def api_key_for_exhausted_workspace(
+    db_session: AsyncSession, workspace_quota_exhausted
+):
+    """Create a live API key for the exhausted quota workspace.
+
+    Returns:
+        Tuple of (raw_key, APIKey model instance, workspace, subscription, credits_allocation)
+    """
+    from app.apps.cubex_api.db.models import APIKey
+    from app.apps.cubex_api.services.quota import quota_service
+
+    workspace, subscription, credits_allocation = workspace_quota_exhausted
+
+    raw_key, key_hash, key_prefix = quota_service._generate_api_key(is_test_key=False)
+
+    api_key = APIKey(
+        id=uuid4(),
+        workspace_id=workspace.id,
+        name="Key for Exhausted Workspace",
+        key_hash=key_hash,
+        key_prefix=key_prefix,
+        is_active=True,
+        is_test_key=False,
+    )
+    db_session.add(api_key)
+    await db_session.flush()
+
+    return raw_key, api_key, workspace, subscription, credits_allocation
+
+
+@pytest.fixture
+async def test_api_key_for_exhausted_workspace(
+    db_session: AsyncSession, workspace_quota_exhausted
+):
+    """Create a test API key for the exhausted quota workspace.
+
+    Returns:
+        Tuple of (raw_key, APIKey model instance, workspace, subscription, credits_allocation)
+    """
+    from app.apps.cubex_api.db.models import APIKey
+    from app.apps.cubex_api.services.quota import quota_service
+
+    workspace, subscription, credits_allocation = workspace_quota_exhausted
+
+    raw_key, key_hash, key_prefix = quota_service._generate_api_key(is_test_key=True)
+
+    api_key = APIKey(
+        id=uuid4(),
+        workspace_id=workspace.id,
+        name="Test Key for Exhausted Workspace",
+        key_hash=key_hash,
+        key_prefix=key_prefix,
+        is_active=True,
+        is_test_key=True,
+    )
+    db_session.add(api_key)
+    await db_session.flush()
+
+    return raw_key, api_key, workspace, subscription, credits_allocation

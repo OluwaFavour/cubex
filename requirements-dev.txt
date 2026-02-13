@@ -15,3 +15,7 @@ mypy==1.19.1
 # For factories (if needed in future)
 factory-boy==3.3.3
 faker==40.1.2
+
+# For E2E tests with real Redis
+testcontainers[redis]>=4.0.0
+freezegun>=1.2.0

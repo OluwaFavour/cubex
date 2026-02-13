@@ -18,6 +18,7 @@ from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.config import settings
 from app.shared.enums import AccessStatus
@@ -491,3 +492,441 @@ class TestResponseFormat:
         data = response.json()
         assert "success" in data
         assert isinstance(data["success"], bool)
+
+
+# ============================================================================
+# E2E Tests for validate_usage with Real Database and Redis
+# ============================================================================
+
+
+class TestValidateUsageE2E:
+    """End-to-end tests for validate_usage using real fixtures.
+
+    These tests use:
+    - Real PostgreSQL database (via test fixtures)
+    - Real Redis (via testcontainers)
+    - Real API key generation and validation
+    """
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_live_key_success(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        live_api_key,
+        test_workspace,
+    ):
+        """Test successful validation with a live API key."""
+        from tests.conftest import make_client_id
+
+        raw_key, api_key = live_api_key
+        client_id = make_client_id(test_workspace)
+
+        response = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["access"] == AccessStatus.GRANTED.value
+        assert data["usage_id"] is not None
+        assert data["is_test_key"] is False
+        assert data["credits_reserved"] is not None
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_quota_exceeded_returns_429(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        api_key_for_exhausted_workspace,
+    ):
+        """Test that quota exceeded returns 429 with appropriate message."""
+        from tests.conftest import make_client_id
+
+        raw_key, api_key, workspace, subscription, credits_allocation = (
+            api_key_for_exhausted_workspace
+        )
+        client_id = make_client_id(workspace)
+
+        response = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response.status_code == 429
+        data = response.json()
+        assert data["access"] == AccessStatus.DENIED.value
+        assert (
+            "quota" in data["message"].lower() or "exceeded" in data["message"].lower()
+        )
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_idempotent_same_fingerprint(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        live_api_key,
+        test_workspace,
+    ):
+        """Test idempotency: same request_id + same fingerprint returns same usage_id."""
+        from tests.conftest import make_client_id
+
+        raw_key, api_key = live_api_key
+        client_id = make_client_id(test_workspace)
+        request_id = str(uuid4())
+        payload_hash = _generate_payload_hash("same_payload")
+
+        # First request
+        response1 = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+                request_id=request_id,
+                endpoint="/test",
+                method="POST",
+                payload_hash=payload_hash,
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response1.status_code == 200
+        data1 = response1.json()
+        usage_id_1 = data1["usage_id"]
+
+        # Second request with same fingerprint
+        response2 = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+                request_id=request_id,  # Same request_id
+                endpoint="/test",  # Same endpoint
+                method="POST",  # Same method
+                payload_hash=payload_hash,  # Same payload_hash
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert data2["usage_id"] == usage_id_1  # Same usage_id returned
+        assert "idempotent" in data2["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_idempotent_different_fingerprint(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        live_api_key,
+        test_workspace,
+    ):
+        """Test that same request_id but different fingerprint creates new record."""
+        from tests.conftest import make_client_id
+
+        raw_key, api_key = live_api_key
+        client_id = make_client_id(test_workspace)
+        request_id = str(uuid4())
+
+        # First request
+        response1 = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+                request_id=request_id,
+                payload_hash=_generate_payload_hash("payload_1"),
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response1.status_code == 200
+        usage_id_1 = response1.json()["usage_id"]
+
+        # Second request with same request_id but different payload_hash
+        response2 = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+                request_id=request_id,  # Same request_id
+                payload_hash=_generate_payload_hash("payload_2"),  # Different payload
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response2.status_code == 200
+        usage_id_2 = response2.json()["usage_id"]
+        assert usage_id_2 != usage_id_1  # Different usage_id (new record)
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_workspace_mismatch_returns_403(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        live_api_key,
+        other_workspace,
+    ):
+        """Test that API key from one workspace + client_id from another returns 403."""
+        from tests.conftest import make_client_id
+
+        raw_key, api_key = live_api_key  # Key belongs to test_workspace
+        client_id = make_client_id(other_workspace)  # client_id from other_workspace
+
+        response = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response.status_code == 403
+        data = response.json()
+        assert data["access"] == AccessStatus.DENIED.value
+        assert "does not belong" in data["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_expired_key_returns_401(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        expired_api_key,
+        test_workspace,
+    ):
+        """Test that an expired API key returns 401."""
+        from tests.conftest import make_client_id
+
+        raw_key, api_key = expired_api_key
+        client_id = make_client_id(test_workspace)
+
+        response = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response.status_code == 401
+        data = response.json()
+        assert data["access"] == AccessStatus.DENIED.value
+        assert (
+            "expired" in data["message"].lower()
+            or "not found" in data["message"].lower()
+        )
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_revoked_key_returns_401(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        revoked_api_key,
+        test_workspace,
+    ):
+        """Test that a revoked API key returns 401."""
+        from tests.conftest import make_client_id
+
+        raw_key, api_key = revoked_api_key
+        client_id = make_client_id(test_workspace)
+
+        response = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response.status_code == 401
+        data = response.json()
+        assert data["access"] == AccessStatus.DENIED.value
+        assert (
+            "revoked" in data["message"].lower()
+            or "not found" in data["message"].lower()
+        )
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_test_key_bypasses_quota(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        test_api_key_for_exhausted_workspace,
+    ):
+        """Test that test keys bypass quota checks even when quota is exhausted."""
+        from tests.conftest import make_client_id
+
+        raw_key, api_key, workspace, subscription, credits_allocation = (
+            test_api_key_for_exhausted_workspace
+        )
+        client_id = make_client_id(workspace)
+
+        response = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+            ),
+            headers=internal_api_headers,
+        )
+
+        # Test keys should be granted even with exhausted quota
+        assert response.status_code == 200
+        data = response.json()
+        assert data["access"] == AccessStatus.GRANTED.value
+        assert data["is_test_key"] is True
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_test_key_response_fields(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        test_api_key,
+        test_workspace,
+    ):
+        """Test that test key responses have correct fields: is_test_key=True, credits_reserved='0.0000'."""
+        from tests.conftest import make_client_id
+
+        raw_key, api_key = test_api_key
+        client_id = make_client_id(test_workspace)
+
+        response = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_test_key"] is True
+        # credits_reserved may be "0.00" or "0.0000" depending on decimal precision
+        assert data["credits_reserved"] in ("0.00", "0.0000")
+        assert data["access"] == AccessStatus.GRANTED.value
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_test_key_rate_limited(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        test_api_key,
+        test_workspace,
+        basic_api_plan_pricing_rule,
+    ):
+        """Test that test keys are still subject to rate limits.
+
+        Uses freezegun to freeze time so all requests happen in the same window.
+        """
+        from freezegun import freeze_time
+
+        from tests.conftest import make_client_id
+
+        raw_key, api_key = test_api_key
+        client_id = make_client_id(test_workspace)
+
+        # Get rate limit from pricing rule fixture
+        rate_limit = basic_api_plan_pricing_rule.rate_limit_per_minute
+
+        # Freeze time to ensure all requests are in the same window
+        with freeze_time("2026-02-13 12:00:00"):
+            # Make requests up to the rate limit
+            for i in range(rate_limit):
+                response = await client.post(
+                    "/api/internal/usage/validate",
+                    json=make_validate_request(
+                        api_key=raw_key,
+                        client_id=client_id,
+                        request_id=str(uuid4()),  # Unique request_id each time
+                    ),
+                    headers=internal_api_headers,
+                )
+                # Should succeed until we hit the limit
+                assert response.status_code == 200, f"Request {i+1} failed unexpectedly"
+
+            # The next request should be rate limited
+            response = await client.post(
+                "/api/internal/usage/validate",
+                json=make_validate_request(
+                    api_key=raw_key,
+                    client_id=client_id,
+                    request_id=str(uuid4()),
+                ),
+                headers=internal_api_headers,
+            )
+
+            assert response.status_code == 429
+            data = response.json()
+            assert data["access"] == AccessStatus.DENIED.value
+            assert "rate limit" in data["message"].lower()
+            # Should have Retry-After header
+            assert "Retry-After" in response.headers
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_headers_absent_on_400(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+    ):
+        """Test that rate limit headers are NOT present on 400 errors (early validation failures)."""
+        # Invalid client_id format should fail before rate limiting
+        response = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                client_id="invalid_not_ws_prefix",
+            ),
+            headers=internal_api_headers,
+        )
+
+        # Should be 422 (validation error) not 400
+        assert response.status_code == 422
+        # Rate limit headers should NOT be present on validation errors
+        assert "X-RateLimit-Limit" not in response.headers
+        assert "X-RateLimit-Remaining" not in response.headers
+        assert "X-RateLimit-Reset" not in response.headers
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_rate_limit_headers_present(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        live_api_key,
+        test_workspace,
+    ):
+        """Test that rate limit headers are present on successful requests."""
+        from tests.conftest import make_client_id
+
+        raw_key, api_key = live_api_key
+        client_id = make_client_id(test_workspace)
+
+        response = await client.post(
+            "/api/internal/usage/validate",
+            json=make_validate_request(
+                api_key=raw_key,
+                client_id=client_id,
+            ),
+            headers=internal_api_headers,
+        )
+
+        assert response.status_code == 200
+        # Rate limit headers should be present
+        assert "X-RateLimit-Limit" in response.headers
+        assert "X-RateLimit-Remaining" in response.headers
+        assert "X-RateLimit-Reset" in response.headers
+        # Remaining should be less than limit (we just used one)
+        limit = int(response.headers["X-RateLimit-Limit"])
+        remaining = int(response.headers["X-RateLimit-Remaining"])
+        assert remaining < limit
