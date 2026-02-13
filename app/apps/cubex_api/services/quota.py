@@ -36,8 +36,9 @@ from app.shared.utils import create_request_fingerprint, hmac_hash_otp
 # Constants
 # ============================================================================
 
-# API key prefix for identification
-API_KEY_PREFIX = "cbx_live_"
+# API key prefixes for identification
+API_KEY_PREFIX = "cbx_live_"  # Live keys (consume credits)
+TEST_API_KEY_PREFIX = "cbx_test_"  # Test keys (no credits charged)
 
 # Client ID prefix for workspace identification
 CLIENT_ID_PREFIX = "ws_"
@@ -81,27 +82,33 @@ class QuotaService:
     # Private Helper Methods
     # ========================================================================
 
-    def _generate_api_key(self) -> tuple[str, str, str]:
+    def _generate_api_key(self, is_test_key: bool = False) -> tuple[str, str, str]:
         """
         Generate a new API key with its hash and prefix.
 
+        Args:
+            is_test_key: Whether to generate a test key (cbx_test_) or live key (cbx_live_).
+
         Returns:
             Tuple of (raw_key, key_hash, key_prefix).
-            - raw_key: Full API key to give to user (cbx_live_xxx...)
+            - raw_key: Full API key to give to user (cbx_live_xxx... or cbx_test_xxx...)
             - key_hash: HMAC-SHA256 hash for storage and lookup
-            - key_prefix: Display prefix (cbx_live_ + first 5 chars of token)
+            - key_prefix: Display prefix (prefix + first 5 chars of token)
         """
         # Generate random token
         token = secrets.token_urlsafe(32)
 
+        # Choose prefix based on key type
+        prefix = TEST_API_KEY_PREFIX if is_test_key else API_KEY_PREFIX
+
         # Construct full API key
-        raw_key = f"{API_KEY_PREFIX}{token}"
+        raw_key = f"{prefix}{token}"
 
         # Hash the full key for storage
         key_hash = hmac_hash_otp(raw_key, settings.OTP_HMAC_SECRET)
 
-        # Create display prefix (cbx_live_ + first 5 chars of token)
-        key_prefix = f"{API_KEY_PREFIX}{token[:5]}"
+        # Create display prefix (prefix + first 5 chars of token)
+        key_prefix = f"{prefix}{token[:5]}"
 
         return raw_key, key_hash, key_prefix
 
@@ -149,7 +156,13 @@ class QuotaService:
         Returns:
             True if format is valid, False otherwise.
         """
-        return api_key.startswith(API_KEY_PREFIX) and len(api_key) > len(API_KEY_PREFIX)
+        is_live = api_key.startswith(API_KEY_PREFIX) and len(api_key) > len(
+            API_KEY_PREFIX
+        )
+        is_test = api_key.startswith(TEST_API_KEY_PREFIX) and len(api_key) > len(
+            TEST_API_KEY_PREFIX
+        )
+        return is_live or is_test
 
     def _calculate_billing_period(
         self,
@@ -217,6 +230,7 @@ class QuotaService:
         workspace_id: UUID,
         name: str,
         expires_in_days: int | None = 90,
+        is_test_key: bool = False,
         commit_self: bool = True,
     ) -> tuple[APIKey, str]:
         """
@@ -227,6 +241,7 @@ class QuotaService:
             workspace_id: Workspace to create key for.
             name: User-defined label for the key.
             expires_in_days: Days until expiry (None = never).
+            is_test_key: Whether this is a test key (no credits charged).
             commit_self: Whether to commit the transaction.
              If False, caller must commit. Useful for batch operations.
 
@@ -239,8 +254,8 @@ class QuotaService:
         if not workspace or workspace.is_deleted:
             raise NotFoundException(f"Workspace {workspace_id} not found.")
 
-        # Generate key
-        raw_key, key_hash, key_prefix = self._generate_api_key()
+        # Generate key with appropriate prefix
+        raw_key, key_hash, key_prefix = self._generate_api_key(is_test_key=is_test_key)
 
         # Calculate expiry
         expires_at = None
@@ -257,12 +272,14 @@ class QuotaService:
                 "key_prefix": key_prefix,
                 "expires_at": expires_at,
                 "is_active": True,
+                "is_test_key": is_test_key,
             },
             commit_self=commit_self,
         )
 
+        key_type = "test" if is_test_key else "live"
         workspace_logger.info(
-            f"Created API key '{name}' for workspace {workspace_id} "
+            f"Created {key_type} API key '{name}' for workspace {workspace_id} "
             f"(prefix: {key_prefix}, expires: {expires_at})"
         )
 
@@ -355,7 +372,7 @@ class QuotaService:
         client_user_agent: str | None = None,
         usage_estimate: dict[str, Any] | None = None,
         commit_self: bool = True,
-    ) -> tuple[AccessStatus, UUID | None, str, Decimal | None, int]:
+    ) -> tuple[AccessStatus, UUID | None, str, Decimal | None, int, bool]:
         """
         Validate API key and log usage.
 
@@ -384,12 +401,13 @@ class QuotaService:
             commit_self: Whether to commit the transaction.
 
         Returns:
-            Tuple of (access_status, usage_id, message, credits_reserved, status_code).
+            Tuple of (access_status, usage_id, message, credits_reserved, status_code, is_test_key).
             - access_status: GRANTED or DENIED
             - usage_id: UUID of usage log (None if denied before logging)
             - message: Human-readable status message
-            - credits_reserved: The billable cost in credits (None if denied)
+            - credits_reserved: The billable cost in credits (None if denied, 0 for test keys)
             - status_code: HTTP status code for the response
+            - is_test_key: Whether a test key was used (for mocked responses)
         """
         # Parse client_id first (needed for idempotency check with workspace isolation)
         workspace_id = self._parse_client_id(client_id)
@@ -401,6 +419,7 @@ class QuotaService:
                 "Invalid client_id format. Expected: ws_<uuid_hex>",
                 None,
                 status.HTTP_400_BAD_REQUEST,
+                False,  # is_test_key
             )
 
         # Compute fingerprint for idempotency
@@ -418,11 +437,16 @@ class QuotaService:
         if existing_log:
             # True duplicate - return the stored access_status
             access = AccessStatus(existing_log.access_status)
+            # Get the API key to check if it's a test key
+            existing_api_key = await api_key_db.get_by_id(
+                session, existing_log.api_key_id
+            )
+            is_test = existing_api_key.is_test_key if existing_api_key else False
             workspace_logger.info(
                 f"Idempotent request: workspace={workspace_id}, request_id={request_id}, "
                 f"fingerprint={fingerprint_hash[:16]}..., "
                 f"returning existing access_status={access.value}, "
-                f"usage_id={existing_log.id}"
+                f"usage_id={existing_log.id}, is_test={is_test}"
             )
             return (
                 access,
@@ -430,6 +454,7 @@ class QuotaService:
                 f"Request already processed (idempotent). Access: {access.value}",
                 existing_log.credits_reserved,
                 status.HTTP_200_OK,
+                is_test,
             )
 
         # Validate API key format
@@ -441,6 +466,7 @@ class QuotaService:
                 "Invalid API key format.",
                 None,
                 status.HTTP_400_BAD_REQUEST,
+                False,  # is_test_key
             )
 
         # Hash and lookup API key
@@ -457,6 +483,7 @@ class QuotaService:
                 "API key not found, expired, or revoked.",
                 None,
                 status.HTTP_401_UNAUTHORIZED,
+                False,  # is_test_key
             )
 
         # Verify workspace matches
@@ -471,7 +498,11 @@ class QuotaService:
                 "API key does not belong to the specified workspace.",
                 None,
                 status.HTTP_403_FORBIDDEN,
+                False,  # is_test_key
             )
+
+        # Check if this is a test key
+        is_test_key = api_key_record.is_test_key
 
         # Update last_used_at
         await api_key_db.update_last_used(session, api_key_record.id, commit_self=False)
@@ -485,48 +516,58 @@ class QuotaService:
             subscription = workspace.subscription
             plan_id = subscription.plan_id
 
-        credits_reserved = await QuotaCacheService.calculate_billable_cost(
-            endpoint, plan_id
-        )
-
-        # ====================================================================
-        # Quota Checking
-        # ====================================================================
-
-        # Get credits limit for the plan (with DB fallback if cache unavailable)
-        credits_limit = (
-            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-                session, plan_id
-            )
-        )
-
-        # Get current usage from subscription context (O(1) lookup)
-        context = await api_subscription_context_db.get_by_workspace(
-            session, workspace_id
-        )
-
-        if context:
-            current_usage = context.credits_used
+        # Test keys don't consume credits
+        if is_test_key:
+            credits_reserved = Decimal("0.00")
         else:
-            # Fallback: no context yet (shouldn't happen normally)
-            current_usage = Decimal("0.0000")
-
-        # Check quota: current_usage + credits_reserved <= credits_limit
-        remaining_credits = credits_limit - current_usage
-        if current_usage + credits_reserved <= credits_limit:
-            access_status = AccessStatus.GRANTED
-            message = (
-                f"Access granted. {remaining_credits - credits_reserved:.2f} credits "
-                f"remaining after this request."
+            credits_reserved = await QuotaCacheService.calculate_billable_cost(
+                endpoint, plan_id
             )
+
+        # ====================================================================
+        # Quota Checking (skipped for test keys)
+        # ====================================================================
+
+        if is_test_key:
+            # Test keys always get access and don't consume credits
+            access_status = AccessStatus.GRANTED
+            message = "Access granted (test key - no credits charged)."
             response_status_code = status.HTTP_200_OK
         else:
-            access_status = AccessStatus.DENIED
-            message = (
-                f"Quota exceeded. Used {current_usage:.2f}/{credits_limit:.2f} credits. "
-                f"This request requires {credits_reserved:.2f} credits."
+            # Get credits limit for the plan (with DB fallback if cache unavailable)
+            credits_limit = (
+                await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+                    session, plan_id
+                )
             )
-            response_status_code = status.HTTP_429_TOO_MANY_REQUESTS
+
+            # Get current usage from subscription context (O(1) lookup)
+            context = await api_subscription_context_db.get_by_workspace(
+                session, workspace_id
+            )
+
+            if context:
+                current_usage = context.credits_used
+            else:
+                # Fallback: no context yet (shouldn't happen normally)
+                current_usage = Decimal("0.0000")
+
+            # Check quota: current_usage + credits_reserved <= credits_limit
+            remaining_credits = credits_limit - current_usage
+            if current_usage + credits_reserved <= credits_limit:
+                access_status = AccessStatus.GRANTED
+                message = (
+                    f"Access granted. {remaining_credits - credits_reserved:.2f} credits "
+                    f"remaining after this request."
+                )
+                response_status_code = status.HTTP_200_OK
+            else:
+                access_status = AccessStatus.DENIED
+                message = (
+                    f"Quota exceeded. Used {current_usage:.2f}/{credits_limit:.2f} credits. "
+                    f"This request requires {credits_reserved:.2f} credits."
+                )
+                response_status_code = status.HTTP_429_TOO_MANY_REQUESTS
 
         # Create usage log with PENDING status and store access decision
         usage_log = await usage_log_db.create(
@@ -547,15 +588,15 @@ class QuotaService:
             commit_self=False,
         )
 
+        key_type = "test" if is_test_key else "live"
         workspace_logger.info(
             f"Usage logged (PENDING): workspace={workspace_id}, "
-            f"api_key={api_key_record.key_prefix}***, "
+            f"api_key={api_key_record.key_prefix}*** ({key_type}), "
             f"usage_id={usage_log.id}, request_id={request_id}, "
             f"fingerprint={fingerprint_hash[:16]}..., "
             f"access_status={access_status.value}, "
             f"endpoint={endpoint}, method={method}, "
-            f"credits_reserved={credits_reserved}, "
-            f"current_usage={current_usage:.2f}/{credits_limit:.2f}"
+            f"credits_reserved={credits_reserved}, is_test={is_test_key}"
         )
 
         if commit_self:
@@ -569,6 +610,7 @@ class QuotaService:
             message,
             credits_reserved,
             response_status_code,
+            is_test_key,
         )
 
     async def commit_usage(
@@ -643,8 +685,16 @@ class QuotaService:
         )
 
         if committed_log:
+            # Check if this is a test key - test keys don't increment credits_used
+            is_test_key = api_key_record.is_test_key
+
             # If successfully committed as SUCCESS, increment credits_used counter
-            if success and committed_log.credits_charged is not None:
+            # (but not for test keys - they don't consume credits)
+            if (
+                success
+                and committed_log.credits_charged is not None
+                and not is_test_key
+            ):
                 context = await api_subscription_context_db.get_by_workspace(
                     session, committed_log.workspace_id
                 )
@@ -657,9 +707,11 @@ class QuotaService:
                 await session.commit()
 
             status_str = "SUCCESS" if success else "FAILED"
+            key_type = "test" if is_test_key else "live"
             workspace_logger.info(
                 f"Usage committed as {status_str}: usage_id={usage_id}, "
-                f"api_key={api_key_record.key_prefix}***"
+                f"api_key={api_key_record.key_prefix}*** ({key_type}), "
+                f"credits_charged={'0 (test key)' if is_test_key else committed_log.credits_charged}"
             )
             return (True, f"Usage committed as {status_str}.")
 
@@ -678,5 +730,6 @@ __all__ = [
     "APIKeyInvalidException",
     "UsageLogNotFoundException",
     "API_KEY_PREFIX",
+    "TEST_API_KEY_PREFIX",
     "CLIENT_ID_PREFIX",
 ]

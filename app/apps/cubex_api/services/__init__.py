@@ -38,6 +38,7 @@ from app.apps.cubex_api.services.quota import (
     APIKeyInvalidException,
     UsageLogNotFoundException,
     API_KEY_PREFIX,
+    TEST_API_KEY_PREFIX,
     CLIENT_ID_PREFIX,
 )
 from app.apps.cubex_api.services.quota_cache import (
@@ -82,6 +83,7 @@ __all__ = [
     "APIKeyInvalidException",
     "UsageLogNotFoundException",
     "API_KEY_PREFIX",
+    "TEST_API_KEY_PREFIX",
     "CLIENT_ID_PREFIX",
     # Quota cache service
     "QuotaCacheService",

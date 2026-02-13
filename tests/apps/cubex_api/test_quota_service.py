@@ -401,10 +401,16 @@ class TestQuotaServiceConstants:
     """Test suite for QuotaService constants."""
 
     def test_api_key_prefix(self):
-        """Test API key prefix constant."""
+        """Test live API key prefix constant."""
         from app.apps.cubex_api.services.quota import API_KEY_PREFIX
 
         assert API_KEY_PREFIX == "cbx_live_"
+
+    def test_test_api_key_prefix(self):
+        """Test test API key prefix constant."""
+        from app.apps.cubex_api.services.quota import TEST_API_KEY_PREFIX
+
+        assert TEST_API_KEY_PREFIX == "cbx_test_"
 
     def test_client_id_prefix(self):
         """Test client ID prefix constant."""
@@ -469,7 +475,7 @@ class TestAPIKeyGeneration:
         return QuotaService()
 
     def test_generate_api_key_format(self, service):
-        """Test that generated API keys have correct format."""
+        """Test that generated live API keys have correct format."""
         raw_key, key_hash, key_prefix = service._generate_api_key()
 
         # Check raw key format
@@ -483,6 +489,22 @@ class TestAPIKeyGeneration:
         # Check key prefix format
         assert key_prefix.startswith("cbx_live_")
         assert len(key_prefix) == len("cbx_live_") + 5  # prefix + 5 chars
+
+    def test_generate_test_api_key_format(self, service):
+        """Test that generated test API keys have correct format."""
+        raw_key, key_hash, key_prefix = service._generate_api_key(is_test_key=True)
+
+        # Check raw key format - test keys use cbx_test_ prefix
+        assert raw_key.startswith("cbx_test_")
+        assert len(raw_key) > 20  # Reasonable length
+
+        # Check key hash is 64 chars (HMAC-SHA256 hex)
+        assert len(key_hash) == 64
+        assert all(c in "0123456789abcdef" for c in key_hash)
+
+        # Check key prefix format
+        assert key_prefix.startswith("cbx_test_")
+        assert len(key_prefix) == len("cbx_test_") + 5  # prefix + 5 chars
 
     def test_generate_api_key_uniqueness(self, service):
         """Test that generated API keys are unique."""
@@ -553,8 +575,16 @@ class TestAPIKeyFormatValidation:
         return QuotaService()
 
     def test_validate_valid_api_key_format(self, service):
-        """Test validating a properly formatted API key."""
+        """Test validating a properly formatted live API key."""
         api_key = "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901"
+
+        result = service._validate_api_key_format(api_key)
+
+        assert result is True
+
+    def test_validate_valid_test_api_key_format(self, service):
+        """Test validating a properly formatted test API key."""
+        api_key = "cbx_test_abc123def456ghi789jkl012mno345pqr678stu901"
 
         result = service._validate_api_key_format(api_key)
 
@@ -571,6 +601,14 @@ class TestAPIKeyFormatValidation:
     def test_validate_api_key_only_prefix(self, service):
         """Test validating API key that is only the prefix returns False."""
         api_key = "cbx_live_"
+
+        result = service._validate_api_key_format(api_key)
+
+        assert result is False
+
+    def test_validate_test_api_key_only_prefix(self, service):
+        """Test validating test API key that is only the prefix returns False."""
+        api_key = "cbx_test_"
 
         result = service._validate_api_key_format(api_key)
 
@@ -643,6 +681,7 @@ class TestQuotaServiceExports:
             APIKeyInvalidException,
             UsageLogNotFoundException,
             API_KEY_PREFIX,
+            TEST_API_KEY_PREFIX,
             CLIENT_ID_PREFIX,
         )
 
@@ -652,6 +691,7 @@ class TestQuotaServiceExports:
         assert APIKeyInvalidException is not None
         assert UsageLogNotFoundException is not None
         assert API_KEY_PREFIX == "cbx_live_"
+        assert TEST_API_KEY_PREFIX == "cbx_test_"
         assert CLIENT_ID_PREFIX == "ws_"
 
 

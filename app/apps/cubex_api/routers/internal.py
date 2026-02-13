@@ -47,7 +47,18 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     3. Check workspace quota (credits used vs credits_allocation)
     4. Create a PENDING usage log for quota tracking
     5. Calculate and reserve credits for billing
-    6. Return access granted/denied with a usage_id and credits_reserved
+    6. Return access granted/denied with a usage_id, credits_reserved, and is_test_key
+    
+    **Key Types**:
+    | Type | Prefix | Behavior |
+    |------|--------|----------|
+    | Live | `cbx_live_` | Full quota enforcement, credits charged |
+    | Test | `cbx_test_` | Always granted, zero credits, `is_test_key=true` |
+    
+    **Test Keys**: Test API keys (`cbx_test_` prefix) are designed for development
+    and testing. They bypass quota checks, always return `access: "granted"`, and
+    reserve zero credits. The response includes `is_test_key: true` to indicate
+    that the caller should return mocked/sample responses instead of real data.
     
     **Idempotency**: Uses request_id + fingerprint (computed from endpoint,
     method, payload_hash, usage_estimate) for true idempotency.
@@ -60,7 +71,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     
     **Quota Enforcement**: The system checks if the workspace has sufficient
     credits remaining in the current billing period. If quota is exceeded,
-    access is denied with HTTP 429.
+    access is denied with HTTP 429. Test keys bypass quota checks entirely.
     
     **Usage Estimate Validation**: If `usage_estimate` is provided, at least
     one field must be set (input_chars, max_output_tokens, or model). Fields
@@ -70,7 +81,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     **Security**: Requires X-Internal-API-Key header.
     
     **Status Codes**:
-    - 200: Access granted (quota available) or idempotent request
+    - 200: Access granted (quota available, test key, or idempotent request)
     - 400: Invalid request format (bad client_id or API key format)
     - 401: API key not found, expired, or revoked
     - 403: API key does not belong to the specified workspace
@@ -83,12 +94,23 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
                 "application/json": {
                     "examples": {
                         "granted": {
-                            "summary": "Access Granted",
+                            "summary": "Access Granted (Live Key)",
                             "value": {
                                 "access": "granted",
                                 "usage_id": "550e8400-e29b-41d4-a716-446655440000",
                                 "message": "Quota available. Remaining: 4500.0000 credits.",
                                 "credits_reserved": "1.0000",
+                                "is_test_key": False,
+                            },
+                        },
+                        "granted_test_key": {
+                            "summary": "Access Granted (Test Key)",
+                            "value": {
+                                "access": "granted",
+                                "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "message": "Test key - access granted (no credits charged).",
+                                "credits_reserved": "0.0000",
+                                "is_test_key": True,
                             },
                         },
                         "granted_idempotent": {
@@ -98,6 +120,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
                                 "usage_id": "550e8400-e29b-41d4-a716-446655440000",
                                 "message": "Request already processed (idempotent). Access: granted",
                                 "credits_reserved": "1.0000",
+                                "is_test_key": False,
                             },
                         },
                     }
@@ -116,6 +139,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
                                 "usage_id": None,
                                 "message": "Invalid client_id format. Expected: ws_<uuid_hex>",
                                 "credits_reserved": None,
+                                "is_test_key": False,
                             },
                         },
                         "invalid_api_key_format": {
@@ -125,6 +149,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
                                 "usage_id": None,
                                 "message": "Invalid API key format.",
                                 "credits_reserved": None,
+                                "is_test_key": False,
                             },
                         },
                     }
@@ -143,6 +168,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
                                 "usage_id": None,
                                 "message": "API key not found, expired, or revoked.",
                                 "credits_reserved": None,
+                                "is_test_key": False,
                             },
                         },
                     }
@@ -161,6 +187,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
                                 "usage_id": None,
                                 "message": "API key does not belong to the specified workspace.",
                                 "credits_reserved": None,
+                                "is_test_key": False,
                             },
                         },
                     }
@@ -179,6 +206,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
                                 "usage_id": "550e8400-e29b-41d4-a716-446655440000",
                                 "message": "Quota exceeded. Current usage: 5000.0000, limit: 5000.0000",
                                 "credits_reserved": "1.0000",
+                                "is_test_key": False,
                             },
                         },
                     }
@@ -218,7 +246,7 @@ async def validate_usage(
         }
 
     async with session.begin():
-        access, usage_id, message, credits_reserved, status_code = (
+        access, usage_id, message, credits_reserved, status_code, is_test_key = (
             await quota_service.validate_and_log_usage(
                 session=session,
                 api_key=request.api_key,
@@ -239,6 +267,7 @@ async def validate_usage(
         usage_id=usage_id,
         message=message,
         credits_reserved=credits_reserved,
+        is_test_key=is_test_key,
     )
 
     return JSONResponse(

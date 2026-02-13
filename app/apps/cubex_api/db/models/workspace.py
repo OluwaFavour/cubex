@@ -417,17 +417,21 @@ class APIKey(BaseModel):
     Each key has a unique HMAC-SHA256 hash stored for secure lookup. The raw key
     is only shown once upon creation and cannot be retrieved afterwards.
 
-    Key format: cbx_live_{random_token}
-    Display format: cbx_live_xxxxx***...*** (prefix + first 5 chars of token)
+    Key format:
+        - Live keys: cbx_live_{random_token} (consume credits)
+        - Test keys: cbx_test_{random_token} (no credits charged)
+
+    Display format: cbx_live_xxxxx***...*** or cbx_test_xxxxx***...***
 
     Attributes:
         workspace_id: Foreign key to the workspace owning this key.
         name: User-defined label for the key.
         key_hash: HMAC-SHA256 hash of the full API key for lookup.
-        key_prefix: First portion of key for display (cbx_live_ + 5 chars).
+        key_prefix: First portion of key for display (cbx_live_/cbx_test_ + 5 chars).
         expires_at: When the key expires (null = never).
         revoked_at: When the key was revoked (null = not revoked).
         is_active: Whether the key is active and usable.
+        is_test_key: Whether this is a test key (no credits charged).
         last_used_at: Last time the key was used.
         scopes: Optional JSON field for future permission scopes.
     """
@@ -479,6 +483,14 @@ class APIKey(BaseModel):
         default=True,
         index=True,
         comment="Whether the key is active and can be used",
+    )
+
+    is_test_key: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        index=True,
+        comment="Whether this is a test key (no credits charged)",
     )
 
     last_used_at: Mapped[datetime | None] = mapped_column(

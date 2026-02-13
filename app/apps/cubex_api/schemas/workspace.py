@@ -397,6 +397,7 @@ class APIKeyCreate(BaseModel):
             "example": {
                 "name": "Production API Key",
                 "expires_in_days": 90,
+                "is_test_key": False,
             }
         }
     )
@@ -414,6 +415,12 @@ class APIKeyCreate(BaseModel):
             le=365,
         ),
     ] = 90
+    is_test_key: Annotated[
+        bool,
+        Field(
+            description="Whether this is a test key. Test keys use cbx_test_ prefix and don't consume credits."
+        ),
+    ] = False
 
 
 class APIKeyResponse(BaseModel):
@@ -427,6 +434,7 @@ class APIKeyResponse(BaseModel):
                 "name": "Production API Key",
                 "key_prefix": "cbx_live_abc12",
                 "is_active": True,
+                "is_test_key": False,
                 "created_at": "2024-01-15T10:30:00Z",
                 "expires_at": "2024-04-15T10:30:00Z",
                 "last_used_at": "2024-02-01T15:45:00Z",
@@ -439,6 +447,7 @@ class APIKeyResponse(BaseModel):
     name: str
     key_prefix: str
     is_active: bool
+    is_test_key: bool
     created_at: datetime
     expires_at: datetime | None
     last_used_at: datetime | None
@@ -635,10 +644,11 @@ class UsageValidateResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "access": "denied",
-                "usage_id": None,
-                "message": "Quota system is not yet implemented. Please try again later.",
+                "access": "granted",
+                "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                "message": "Access granted. 98.50 credits remaining after this request.",
                 "credits_reserved": "1.5000",
+                "is_test_key": False,
             }
         }
     )
@@ -650,6 +660,12 @@ class UsageValidateResponse(BaseModel):
         Decimal | None,
         Field(description="The credits reserved/charged for this request"),
     ] = None
+    is_test_key: Annotated[
+        bool,
+        Field(
+            description="Whether this request used a test key. Server B can use this to return mocked responses."
+        ),
+    ] = False
 
 
 class UsageCommitRequest(BaseModel):

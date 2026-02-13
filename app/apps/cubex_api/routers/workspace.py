@@ -1513,6 +1513,7 @@ def _build_api_key_response(api_key) -> APIKeyResponse:
         name=api_key.name,
         key_prefix=api_key.key_prefix,
         is_active=api_key.is_active,
+        is_test_key=api_key.is_test_key,
         created_at=api_key.created_at,
         expires_at=api_key.expires_at,
         last_used_at=api_key.last_used_at,
@@ -1546,7 +1547,15 @@ requests to the external developer API.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | ✅ | User-defined label for the key (1-128 characters) |
-| `expires_in_days` | integer | ❌ | Days until expiry (1-365). Default: 90. Null for never. |
+| `expires_in_days` | integer | ❌ | Days until expiry (1-365). Default: 90. |
+| `is_test_key` | boolean | ❌ | Whether this is a test key. Default: false. |
+
+### Key Types
+
+| Type | Prefix | Credits | Description |
+|------|--------|---------|-------------|
+| Live | `cbx_live_` | Charged | Production keys that consume credits |
+| Test | `cbx_test_` | Never | Development keys for testing (no credits charged) |
 
 ### Response
 
@@ -1558,6 +1567,7 @@ requests to the external developer API.
 | `key.name` | string | User-defined label |
 | `key.key_prefix` | string | Display prefix for identification |
 | `key.is_active` | boolean | Whether key is active |
+| `key.is_test_key` | boolean | Whether this is a test key |
 | `key.expires_at` | datetime | Expiration timestamp (null if never) |
 | `message` | string | Security reminder |
 
@@ -1571,7 +1581,7 @@ requests to the external developer API.
 ### Error Responses
 
 | Status | Reason |
-|--------|--------|
+|--------|---------|
 | `403 Forbidden` | User is not an admin of the workspace |
 | `404 Not Found` | Workspace not found |
 """,
@@ -1618,6 +1628,7 @@ async def create_api_key(
             workspace_id=workspace_id,
             name=data.name,
             expires_in_days=data.expires_in_days,
+            is_test_key=data.is_test_key,
             commit_self=False,
         )
 
