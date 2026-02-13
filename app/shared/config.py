@@ -108,6 +108,9 @@ class Settings(BaseSettings):
     # Admin settings
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin_password_change_in_production"
+    ADMIN_ALERT_EMAIL: str | None = (
+        None  # Email for system alerts (DLQ, validation errors)
+    )
 
     model_config: SettingsConfigDict = SettingsConfigDict(  # type: ignore
         env_file=".env",
@@ -227,6 +230,12 @@ webhook_logger = setup_logger(
     level=logging.INFO,
     sentry_tag="webhook",
 )
+usage_logger = setup_logger(
+    name="usage_logger",
+    log_file="logs/usage.log",
+    level=logging.INFO,
+    sentry_tag="usage",
+)
 
 __all__ = [
     "settings",
@@ -246,4 +255,5 @@ __all__ = [
     "plan_logger",
     "workspace_logger",
     "webhook_logger",
+    "usage_logger",
 ]

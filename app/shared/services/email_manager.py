@@ -26,6 +26,7 @@ Example usage:
 """
 
 from datetime import datetime
+import json
 from typing import Any
 
 from app.shared.config import email_manager_logger, settings
@@ -551,4 +552,110 @@ class EmailManagerService:
             html_template="workspace_invitation.html",
             text_template="workspace_invitation.txt",
             context=context,
+        )
+
+    @classmethod
+    async def send_dlq_alert(
+        cls,
+        queue_name: str,
+        message_body: str,
+        attempt_count: int,
+    ) -> bool:
+        """
+        Send a Dead Letter Queue alert email to admin.
+
+        Notifies the admin when a message is moved to a DLQ after
+        exhausting all retry attempts.
+
+        Args:
+            queue_name: Name of the queue that dead-lettered the message.
+            message_body: The message content (JSON string or dict).
+            attempt_count: Number of retry attempts made.
+
+        Returns:
+            bool: True if email was sent successfully, False otherwise.
+        """
+        admin_email = settings.ADMIN_ALERT_EMAIL
+        if not admin_email:
+            email_manager_logger.warning(
+                f"DLQ alert skipped: ADMIN_ALERT_EMAIL not configured. "
+                f"Queue: {queue_name}"
+            )
+            return False
+
+        # Format message body for display
+        if isinstance(message_body, dict):
+            formatted_body = json.dumps(message_body, indent=2, default=str)
+        else:
+            formatted_body = str(message_body)
+
+        context = {
+            "app_name": settings.APP_NAME,
+            "queue_name": queue_name,
+            "message_body": formatted_body,
+            "attempt_count": attempt_count,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "environment": settings.SENTRY_ENVIRONMENT,
+        }
+
+        return await cls.send_email(
+            email=admin_email,
+            subject=f"[CUBEX ALERT] DLQ: {queue_name}",
+            html_template="dlq_alert.html",
+            text_template="dlq_alert.txt",
+            context=context,
+            recipient_name="Admin",
+        )
+
+    @classmethod
+    async def send_invalid_payload_alert(
+        cls,
+        queue_name: str,
+        message_body: Any,
+        validation_errors: list[dict[str, Any]],
+    ) -> bool:
+        """
+        Send an invalid payload alert email to admin.
+
+        Notifies the admin when a message fails schema validation.
+        This indicates a bug in the publishing service.
+
+        Args:
+            queue_name: Name of the queue that received the invalid message.
+            message_body: The raw message content.
+            validation_errors: List of Pydantic validation errors.
+
+        Returns:
+            bool: True if email was sent successfully, False otherwise.
+        """
+        admin_email = settings.ADMIN_ALERT_EMAIL
+        if not admin_email:
+            email_manager_logger.warning(
+                f"Invalid payload alert skipped: ADMIN_ALERT_EMAIL not configured. "
+                f"Queue: {queue_name}"
+            )
+            return False
+
+        # Format message body for display
+        if isinstance(message_body, dict):
+            formatted_body = json.dumps(message_body, indent=2, default=str)
+        else:
+            formatted_body = str(message_body)
+
+        context = {
+            "app_name": settings.APP_NAME,
+            "queue_name": queue_name,
+            "message_body": formatted_body,
+            "validation_errors": validation_errors,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "environment": settings.SENTRY_ENVIRONMENT,
+        }
+
+        return await cls.send_email(
+            email=admin_email,
+            subject=f"[CUBEX ALERT] Invalid Payload: {queue_name}",
+            html_template="invalid_payload_alert.html",
+            text_template="invalid_payload_alert.txt",
+            context=context,
+            recipient_name="Admin",
         )

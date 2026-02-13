@@ -17,6 +17,7 @@ from app.infrastructure.messaging.handlers.stripe import (
     handle_stripe_subscription_deleted,
     handle_stripe_payment_failed,
 )
+from app.infrastructure.messaging.handlers.usage_handler import handle_usage_commit
 
 
 class RetryQueue(BaseModel):
@@ -164,6 +165,15 @@ QUEUE_CONFIG = [
         "retry_ttl": 60 * 1000,  # 1 minute
         "max_retries": 3,
         "dead_letter_queue": "stripe_payment_failed_dead",
+    },
+    # Usage Commit Queue - processes usage commits from external servers
+    {
+        "name": "usage_commits",
+        "handler": handle_usage_commit,
+        "retry_queue": "usage_commits_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "usage_commits_dead",
     },
 ]
 

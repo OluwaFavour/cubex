@@ -1,0 +1,31 @@
+[CUBEX ALERT] Invalid Payload Alert
+====================================
+
+A message was received with an invalid payload that failed schema validation.
+This indicates a bug in the publishing service.
+
+DETAILS
+-------
+Queue Name:   {{ queue_name }}
+Timestamp:    {{ timestamp }}
+Environment:  {{ environment }}
+Error Count:  {{ validation_errors | length }}
+
+VALIDATION ERRORS
+-----------------
+{% for error in validation_errors %}
+Field:   {{ error.loc | join(' → ') }}
+Type:    {{ error.type }}
+Message: {{ error.msg }}
+{% if not loop.last %}
+---
+{% endif %}
+{% endfor %}
+
+RAW MESSAGE BODY
+----------------
+{{ message_body }}
+
+---
+This is an automated alert from {{ app_name }}.
+Action Required: Investigate the publishing service to fix the payload format.
