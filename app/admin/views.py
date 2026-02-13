@@ -470,7 +470,7 @@ class SubscriptionAdmin(ModelView, model=Subscription):
 
     column_list = [
         Subscription.id,
-        Subscription.plan_id,
+        Subscription.plan,
         Subscription.status,
         Subscription.product_type,
         Subscription.seat_count,
@@ -516,7 +516,7 @@ class SubscriptionAdmin(ModelView, model=Subscription):
 
     column_labels = {
         Subscription.id: "ID",
-        Subscription.plan_id: "Plan",
+        Subscription.plan: "Plan",
         Subscription.status: "Status",
         Subscription.product_type: "Product",
         Subscription.seat_count: "Seats",
