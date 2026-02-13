@@ -1,8 +1,8 @@
 {
     "openapi": "3.1.0",
     "info": {
-        "title": "CUEBEX",
-        "description": "\n    CUEBEX\n    ",
+        "title": "CueBX",
+        "description": "\n    CueBX\n    ",
         "version": "1.0.0"
     },
     "servers": [
@@ -4183,7 +4183,7 @@
                     "API - Workspaces"
                 ],
                 "summary": "Create API key",
-                "description": "## Create API Key\n\nGenerate a new API key for the workspace. The key is used to authenticate\nrequests to the external developer API.\n\n### Authorization\n\n- User must be an **admin** or **owner** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `name` | string | \u2705 | User-defined label for the key (1-128 characters) |\n| `expires_in_days` | integer | \u274c | Days until expiry (1-365). Default: 90. Null for never. |\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `api_key` | string | The full API key. **Store securely - shown only once!** |\n| `key` | object | API key metadata |\n| `key.id` | UUID | Key identifier |\n| `key.name` | string | User-defined label |\n| `key.key_prefix` | string | Display prefix for identification |\n| `key.is_active` | boolean | Whether key is active |\n| `key.expires_at` | datetime | Expiration timestamp (null if never) |\n| `message` | string | Security reminder |\n\n### Security Notes\n\n- The full API key is shown **only once** in this response\n- Store the key securely (e.g., environment variable, secrets manager)\n- The key cannot be retrieved again - if lost, revoke and create a new one\n- Keys are hashed with HMAC-SHA256 before storage\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `403 Forbidden` | User is not an admin of the workspace |\n| `404 Not Found` | Workspace not found |",
+                "description": "## Create API Key\n\nGenerate a new API key for the workspace. The key is used to authenticate\nrequests to the external developer API.\n\n### Authorization\n\n- User must be an **admin** or **owner** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `name` | string | \u2705 | User-defined label for the key (1-128 characters) |\n| `expires_in_days` | integer | \u274c | Days until expiry (1-365). Default: 90. |\n| `is_test_key` | boolean | \u274c | Whether this is a test key. Default: false. |\n\n### Key Types\n\n| Type | Prefix | Credits | Description |\n|------|--------|---------|-------------|\n| Live | `cbx_live_` | Charged | Production keys that consume credits |\n| Test | `cbx_test_` | Never | Development keys for testing (no credits charged) |\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `api_key` | string | The full API key. **Store securely - shown only once!** |\n| `key` | object | API key metadata |\n| `key.id` | UUID | Key identifier |\n| `key.name` | string | User-defined label |\n| `key.key_prefix` | string | Display prefix for identification |\n| `key.is_active` | boolean | Whether key is active |\n| `key.is_test_key` | boolean | Whether this is a test key |\n| `key.expires_at` | datetime | Expiration timestamp (null if never) |\n| `message` | string | Security reminder |\n\n### Security Notes\n\n- The full API key is shown **only once** in this response\n- Store the key securely (e.g., environment variable, secrets manager)\n- The key cannot be retrieved again - if lost, revoke and create a new one\n- Keys are hashed with HMAC-SHA256 before storage\n\n### Error Responses\n\n| Status | Reason |\n|--------|---------|\n| `403 Forbidden` | User is not an admin of the workspace |\n| `404 Not Found` | Workspace not found |",
                 "operationId": "create_api_key_api_workspaces__workspace_id__api_keys_post",
                 "security": [
                     {
@@ -4784,7 +4784,7 @@
                     "API - Subscriptions"
                 ],
                 "summary": "Get workspace subscription",
-                "description": "## Get Workspace Subscription\n\nRetrieve the current subscription for a workspace. Returns `null` if the\nworkspace has no active subscription.\n\n### Authorization\n\n- User must be a **member** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace to get subscription for |\n\n### Response\n\nReturns the subscription details including:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Subscription identifier |\n| `workspace_id` | UUID | Associated workspace |\n| `plan_id` | UUID | Current plan |\n| `status` | string | Subscription status (`active`, `canceled`, `past_due`, etc.) |\n| `seat_count` | integer | Number of purchased seats |\n| `current_period_start` | datetime | Billing period start |\n| `current_period_end` | datetime | Billing period end |\n| `cancel_at_period_end` | boolean | Whether subscription will cancel at period end |\n| `plan` | object | Full plan details |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `403 Forbidden` | User is not a member of the workspace |\n\n### Notes\n\n- Returns `null` (not 404) if workspace exists but has no subscription\n- Personal workspaces automatically have a free subscription",
+                "description": "## Get Workspace Subscription\n\nRetrieve the current subscription for a workspace. Returns `null` if the\nworkspace has no active subscription.\n\n### Authorization\n\n- User must be a **member** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace to get subscription for |\n\n### Response\n\nReturns the subscription details including:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Subscription identifier |\n| `workspace_id` | UUID | Associated workspace |\n| `plan_id` | UUID | Current plan |\n| `status` | string | Subscription status (`active`, `canceled`, `past_due`, etc.) |\n| `seat_count` | integer | Number of purchased seats |\n| `current_period_start` | datetime | Billing period start |\n| `current_period_end` | datetime | Billing period end |\n| `cancel_at_period_end` | boolean | Whether subscription will cancel at period end |\n| `credits_allocation` | decimal | Total credits allocated for the billing period |\n| `credits_used` | decimal | Credits consumed in the current billing period |\n| `plan` | object | Full plan details |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `403 Forbidden` | User is not a member of the workspace |\n\n### Notes\n\n- Returns `null` (not 404) if workspace exists but has no subscription\n- Personal workspaces automatically have a free subscription",
                 "operationId": "get_workspace_subscription_api_subscriptions_workspaces__workspace_id__get",
                 "security": [
                     {
@@ -5868,7 +5868,7 @@
                     "Internal API"
                 ],
                 "summary": "Validate API key and log usage",
-                "description": "Validate an API key and log usage for quota tracking.\n    \n    This endpoint is called by the external developer API to:\n    1. Validate the API key is valid, active, and not expired\n    2. Verify the API key belongs to the specified workspace (client_id)\n    3. Check workspace quota (credits used vs credits_allocation)\n    4. Create a PENDING usage log for quota tracking\n    5. Calculate and reserve credits for billing\n    6. Return access granted/denied with a usage_id and credits_reserved\n    \n    **Idempotency**: Uses request_id + fingerprint (computed from endpoint,\n    method, payload_hash, usage_estimate) for true idempotency.\n    - Same request_id + same fingerprint = return existing access_status\n    - Same request_id + different fingerprint = create new record (different payload)\n    \n    The caller must then call /usage/commit to mark the usage as SUCCESS\n    or FAILED after the request completes. PENDING logs that are not\n    committed will be expired by a scheduled job.\n    \n    **Quota Enforcement**: The system checks if the workspace has sufficient\n    credits remaining in the current billing period. If quota is exceeded,\n    access is denied with HTTP 429.\n    \n    **Usage Estimate Validation**: If `usage_estimate` is provided, at least\n    one field must be set (input_chars, max_output_tokens, or model). Fields\n    are validated with bounds: input_chars (0-10M), max_output_tokens (0-2M),\n    model (max 100 chars).\n    \n    **Security**: Requires X-Internal-API-Key header.\n    \n    **Status Codes**:\n    - 200: Access granted (quota available) or idempotent request\n    - 400: Invalid request format (bad client_id or API key format)\n    - 401: API key not found, expired, or revoked\n    - 403: API key does not belong to the specified workspace\n    - 429: Quota exceeded (workspace has used all credits for billing period)",
+                "description": "Validate an API key and log usage for quota tracking.\n    \n    This endpoint is called by the external developer API to:\n    1. Validate the API key is valid, active, and not expired\n    2. Verify the API key belongs to the specified workspace (client_id)\n    3. Check workspace quota (credits used vs credits_allocation)\n    4. Create a PENDING usage log for quota tracking\n    5. Calculate and reserve credits for billing\n    6. Return access granted/denied with a usage_id, credits_reserved, and is_test_key\n    \n    **Key Types**:\n    | Type | Prefix | Behavior |\n    |------|--------|----------|\n    | Live | `cbx_live_` | Full quota enforcement, credits charged |\n    | Test | `cbx_test_` | Always granted, zero credits, `is_test_key=true` |\n    \n    **Test Keys**: Test API keys (`cbx_test_` prefix) are designed for development\n    and testing. They bypass quota checks, always return `access: \"granted\"`, and\n    reserve zero credits. The response includes `is_test_key: true` to indicate\n    that the caller should return mocked/sample responses instead of real data.\n    \n    **Idempotency**: Uses request_id + fingerprint (computed from endpoint,\n    method, payload_hash, usage_estimate) for true idempotency.\n    - Same request_id + same fingerprint = return existing access_status\n    - Same request_id + different fingerprint = create new record (different payload)\n    \n    The caller must then call /usage/commit to mark the usage as SUCCESS\n    or FAILED after the request completes. PENDING logs that are not\n    committed will be expired by a scheduled job.\n    \n    **Quota Enforcement**: The system checks if the workspace has sufficient\n    credits remaining in the current billing period. If quota is exceeded,\n    access is denied with HTTP 429. Test keys bypass quota checks entirely.\n    \n    **Usage Estimate Validation**: If `usage_estimate` is provided, at least\n    one field must be set (input_chars, max_output_tokens, or model). Fields\n    are validated with bounds: input_chars (0-10M), max_output_tokens (0-2M),\n    model (max 100 chars).\n    \n    **Security**: Requires X-Internal-API-Key header.\n    \n    **Status Codes**:\n    - 200: Access granted (quota available, test key, or idempotent request)\n    - 400: Invalid request format (bad client_id or API key format)\n    - 401: API key not found, expired, or revoked\n    - 403: API key does not belong to the specified workspace\n    - 429: Quota exceeded (workspace has used all credits for billing period)",
                 "operationId": "validate_usage_api_internal_usage_validate_post",
                 "parameters": [
                     {
@@ -5908,12 +5908,23 @@
                                 },
                                 "examples": {
                                     "granted": {
-                                        "summary": "Access Granted",
+                                        "summary": "Access Granted (Live Key)",
                                         "value": {
                                             "access": "granted",
                                             "usage_id": "550e8400-e29b-41d4-a716-446655440000",
                                             "message": "Quota available. Remaining: 4500.0000 credits.",
-                                            "credits_reserved": "1.0000"
+                                            "credits_reserved": "1.0000",
+                                            "is_test_key": false
+                                        }
+                                    },
+                                    "granted_test_key": {
+                                        "summary": "Access Granted (Test Key)",
+                                        "value": {
+                                            "access": "granted",
+                                            "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "message": "Test key - access granted (no credits charged).",
+                                            "credits_reserved": "0.0000",
+                                            "is_test_key": true
                                         }
                                     },
                                     "granted_idempotent": {
@@ -5922,7 +5933,8 @@
                                             "access": "granted",
                                             "usage_id": "550e8400-e29b-41d4-a716-446655440000",
                                             "message": "Request already processed (idempotent). Access: granted",
-                                            "credits_reserved": "1.0000"
+                                            "credits_reserved": "1.0000",
+                                            "is_test_key": false
                                         }
                                     }
                                 }
@@ -5938,14 +5950,16 @@
                                         "summary": "Invalid Client ID",
                                         "value": {
                                             "access": "denied",
-                                            "message": "Invalid client_id format. Expected: ws_<uuid_hex>"
+                                            "message": "Invalid client_id format. Expected: ws_<uuid_hex>",
+                                            "is_test_key": false
                                         }
                                     },
                                     "invalid_api_key_format": {
                                         "summary": "Invalid API Key Format",
                                         "value": {
                                             "access": "denied",
-                                            "message": "Invalid API key format."
+                                            "message": "Invalid API key format.",
+                                            "is_test_key": false
                                         }
                                     }
                                 }
@@ -5991,7 +6005,8 @@
                                         "summary": "API Key Not Found",
                                         "value": {
                                             "access": "denied",
-                                            "message": "API key not found, expired, or revoked."
+                                            "message": "API key not found, expired, or revoked.",
+                                            "is_test_key": false
                                         }
                                     }
                                 }
@@ -6009,7 +6024,8 @@
                                             "access": "denied",
                                             "usage_id": "550e8400-e29b-41d4-a716-446655440000",
                                             "message": "Quota exceeded. Current usage: 5000.0000, limit: 5000.0000",
-                                            "credits_reserved": "1.0000"
+                                            "credits_reserved": "1.0000",
+                                            "is_test_key": false
                                         }
                                     }
                                 }
@@ -6035,7 +6051,8 @@
                                         "summary": "Workspace Mismatch",
                                         "value": {
                                             "access": "denied",
-                                            "message": "API key does not belong to the specified workspace."
+                                            "message": "API key does not belong to the specified workspace.",
+                                            "is_test_key": false
                                         }
                                     }
                                 }
@@ -7184,6 +7201,12 @@
                         "title": "Expires In Days",
                         "description": "Number of days until the key expires. Must be between 1 and 365.",
                         "default": 90
+                    },
+                    "is_test_key": {
+                        "type": "boolean",
+                        "title": "Is Test Key",
+                        "description": "Whether this is a test key. Test keys use cbx_test_ prefix and don't consume credits.",
+                        "default": false
                     }
                 },
                 "type": "object",
@@ -7194,6 +7217,7 @@
                 "description": "Schema for creating an API key.",
                 "example": {
                     "expires_in_days": 90,
+                    "is_test_key": false,
                     "name": "Production API Key"
                 }
             },
@@ -7282,6 +7306,10 @@
                         "type": "boolean",
                         "title": "Is Active"
                     },
+                    "is_test_key": {
+                        "type": "boolean",
+                        "title": "Is Test Key"
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -7330,6 +7358,7 @@
                     "name",
                     "key_prefix",
                     "is_active",
+                    "is_test_key",
                     "created_at",
                     "expires_at",
                     "last_used_at",
@@ -7342,6 +7371,7 @@
                     "expires_at": "2024-04-15T10:30:00Z",
                     "id": "550e8400-e29b-41d4-a716-446655440000",
                     "is_active": true,
+                    "is_test_key": false,
                     "key_prefix": "cbx_live_abc12",
                     "last_used_at": "2024-02-01T15:45:00Z",
                     "name": "Production API Key"
@@ -8604,6 +8634,8 @@
                             "min_seats": 1,
                             "name": "pro",
                             "price": "29.99",
+                            "seat_display_price": "$5/seat/month",
+                            "seat_price": "5.00",
                             "trial_days": 14,
                             "type": "paid"
                         }
@@ -8647,6 +8679,22 @@
                             }
                         ],
                         "title": "Display Price"
+                    },
+                    "seat_price": {
+                        "type": "string",
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                        "title": "Seat Price"
+                    },
+                    "seat_display_price": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Seat Display Price"
                     },
                     "is_active": {
                         "type": "boolean",
@@ -8697,6 +8745,8 @@
                     "description",
                     "price",
                     "display_price",
+                    "seat_price",
+                    "seat_display_price",
                     "is_active",
                     "trial_days",
                     "type",
@@ -8722,6 +8772,8 @@
                     "min_seats": 1,
                     "name": "pro",
                     "price": "29.99",
+                    "seat_display_price": "$5/seat/month",
+                    "seat_price": "5.00",
                     "trial_days": 14,
                     "type": "paid"
                 }
@@ -9100,6 +9152,18 @@
                         ],
                         "title": "Canceled At"
                     },
+                    "credits_allocation": {
+                        "type": "string",
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                        "title": "Credits Allocation",
+                        "description": "Total credits allocated for the billing period"
+                    },
+                    "credits_used": {
+                        "type": "string",
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                        "title": "Credits Used",
+                        "description": "Credits used in the current billing period"
+                    },
                     "plan": {
                         "anyOf": [
                             {
@@ -9121,12 +9185,16 @@
                     "current_period_start",
                     "current_period_end",
                     "cancel_at_period_end",
-                    "canceled_at"
+                    "canceled_at",
+                    "credits_allocation",
+                    "credits_used"
                 ],
                 "title": "SubscriptionResponse",
                 "description": "Schema for subscription response.",
                 "example": {
                     "cancel_at_period_end": false,
+                    "credits_allocation": "5000.00",
+                    "credits_used": "1250.50",
                     "current_period_end": "2024-02-15T00:00:00Z",
                     "current_period_start": "2024-01-15T00:00:00Z",
                     "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -9607,6 +9675,12 @@
                         ],
                         "title": "Credits Reserved",
                         "description": "The credits reserved/charged for this request"
+                    },
+                    "is_test_key": {
+                        "type": "boolean",
+                        "title": "Is Test Key",
+                        "description": "Whether this request used a test key. Server B can use this to return mocked responses.",
+                        "default": false
                     }
                 },
                 "type": "object",
@@ -9618,9 +9692,11 @@
                 "title": "UsageValidateResponse",
                 "description": "Schema for usage validation response.",
                 "example": {
-                    "access": "denied",
+                    "access": "granted",
                     "credits_reserved": "1.5000",
-                    "message": "Quota system is not yet implemented. Please try again later."
+                    "is_test_key": false,
+                    "message": "Access granted. 98.50 credits remaining after this request.",
+                    "usage_id": "550e8400-e29b-41d4-a716-446655440000"
                 }
             },
             "ValidationError": {

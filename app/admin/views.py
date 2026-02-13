@@ -13,6 +13,7 @@ Defines admin views for managing application models:
 from sqladmin import ModelView
 from sqladmin.filters import BooleanFilter, StaticValuesFilter
 
+from app.apps.cubex_api.db.crud.quota import plan_pricing_rule_db
 from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule
 from app.apps.cubex_api.db.models.workspace import Workspace, WorkspaceMember
 from app.shared.db.models.plan import Plan
@@ -247,7 +248,7 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
     ]
 
     form_columns = [
-        PlanPricingRule.plan_id,
+        PlanPricingRule.plan,
         PlanPricingRule.multiplier,
         PlanPricingRule.credits_allocation,
         PlanPricingRule.rate_limit_per_minute,
@@ -255,7 +256,7 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
 
     column_labels = {
         PlanPricingRule.id: "ID",
-        PlanPricingRule.plan_id: "Plan",
+        PlanPricingRule.plan: "Plan",
         PlanPricingRule.multiplier: "Price Multiplier",
         PlanPricingRule.credits_allocation: "Credits Allocation",
         PlanPricingRule.rate_limit_per_minute: "Rate Limit/min",
@@ -284,6 +285,9 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
     can_delete = True
     can_view_details = True
     can_export = True
+
+    def details_query(self, request):
+        return super().details_query(request).options(plan_pricing_rule_db.plan_loader)
 
 
 # ============================================================================
@@ -481,7 +485,9 @@ class SubscriptionAdmin(ModelView, model=Subscription):
     column_filters = [
         StaticValuesFilter(
             Subscription.status,
-            values=[(e.value, e.value.replace("_", " ").title()) for e in SubscriptionStatus],
+            values=[
+                (e.value, e.value.replace("_", " ").title()) for e in SubscriptionStatus
+            ],
             title="Status",
         ),
         StaticValuesFilter(

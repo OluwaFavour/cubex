@@ -7,6 +7,7 @@ This module provides models for API usage pricing and cost configuration:
 """
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, UniqueConstraint
@@ -14,6 +15,9 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.shared.db.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.shared.db.models.plan import Plan
 
 
 class EndpointCostConfig(BaseModel):
@@ -104,7 +108,7 @@ class PlanPricingRule(BaseModel):
     )
 
     # Relationship
-    plan = relationship("Plan", back_populates="pricing_rule")
+    plan: Mapped["Plan"] = relationship("Plan", back_populates="pricing_rule")
 
     __table_args__ = (
         UniqueConstraint("plan_id", name="uq_plan_pricing_rules_plan_id"),

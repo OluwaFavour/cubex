@@ -11,6 +11,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule
 from app.shared.db.crud.base import BaseDB
@@ -114,6 +115,7 @@ class PlanPricingRuleDB(BaseDB[PlanPricingRule]):
     def __init__(self):
         """Initialize with PlanPricingRule model."""
         super().__init__(PlanPricingRule)
+        self.plan_loader = selectinload(PlanPricingRule.plan)
 
     async def get_by_plan_id(
         self,

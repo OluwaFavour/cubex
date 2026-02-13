@@ -210,7 +210,7 @@ class Plan(BaseModel):
     )
 
     def __str__(self) -> str:
-        return self.name
+        return f"{self.name} ({self.product_type.value})"
 
     @validates("type", "price", "stripe_price_id", "seat_price", "seat_stripe_price_id")
     def _validate_type_price_and_stripe(self, key: str, value: Any) -> Any:
