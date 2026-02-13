@@ -13,8 +13,10 @@ Usage flow:
 4. External API calls /internal/usage/commit to finalize usage
 """
 
+from dataclasses import dataclass
 from decimal import Decimal
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
@@ -26,6 +28,7 @@ from app.apps.cubex_api.db.crud import api_key_db, usage_log_db, workspace_db
 from app.apps.cubex_api.db.models import APIKey
 from app.apps.cubex_api.services.quota_cache import QuotaCacheService
 from app.shared.config import settings, workspace_logger
+from app.shared.services.redis_service import RedisService
 from app.shared.db.crud import api_subscription_context_db
 from app.shared.enums import AccessStatus
 from app.shared.exceptions.types import NotFoundException
@@ -68,6 +71,28 @@ class UsageLogNotFoundException(NotFoundException):
 
     def __init__(self, message: str = "Usage log not found."):
         super().__init__(message)
+
+
+# ============================================================================
+# Rate Limiting Data Classes
+# ============================================================================
+
+
+@dataclass
+class RateLimitInfo:
+    """Rate limiting information for API responses.
+
+    Attributes:
+        limit: Maximum requests allowed per minute.
+        remaining: Number of requests remaining in the current window.
+        reset_timestamp: Unix timestamp when the rate limit window resets.
+        is_exceeded: Whether the rate limit has been exceeded.
+    """
+
+    limit: int
+    remaining: int
+    reset_timestamp: int
+    is_exceeded: bool = False
 
 
 # ============================================================================
@@ -219,6 +244,69 @@ class QuotaService:
         period_end = period_start + period_length
 
         return (period_start, period_end)
+
+    async def _check_rate_limit(
+        self, workspace_id: UUID, plan_id: UUID | None
+    ) -> RateLimitInfo:
+        """
+        Check and update rate limit counter for a workspace.
+
+        Uses a sliding window approach with 60-second windows.
+        The counter is stored in Redis with key: rate_limit:{workspace_id}
+
+        Args:
+            workspace_id: The workspace UUID to check rate limit for.
+            plan_id: The plan UUID for rate limit configuration.
+
+        Returns:
+            RateLimitInfo with current rate limit status.
+        """
+        # Get rate limit for the plan
+        rate_limit = await QuotaCacheService.get_plan_rate_limit(plan_id)
+
+        # Redis key for workspace rate limit
+        rate_limit_key = f"rate_limit:{workspace_id}"
+
+        # Get current count and increment
+        current_count = await RedisService.incr(rate_limit_key)
+
+        if current_count is None:
+            # Redis unavailable - allow request but log warning
+            workspace_logger.warning(
+                f"Rate limit check failed (Redis unavailable) for workspace {workspace_id}"
+            )
+            return RateLimitInfo(
+                limit=rate_limit,
+                remaining=rate_limit - 1,
+                reset_timestamp=int(time.time()) + 60,
+                is_exceeded=False,
+            )
+
+        # If this is the first request in the window, set expiry
+        if current_count == 1:
+            await RedisService.expire(rate_limit_key, 60)
+
+        # Get TTL for reset timestamp
+        ttl = await RedisService.ttl(rate_limit_key)
+        if ttl is None or ttl < 0:
+            ttl = 60  # Default to 60 seconds if TTL lookup fails
+
+        reset_timestamp = int(time.time()) + ttl
+        remaining = max(0, rate_limit - current_count)
+        is_exceeded = current_count > rate_limit
+
+        workspace_logger.debug(
+            f"Rate limit check: workspace={workspace_id}, "
+            f"count={current_count}/{rate_limit}, remaining={remaining}, "
+            f"reset_in={ttl}s, exceeded={is_exceeded}"
+        )
+
+        return RateLimitInfo(
+            limit=rate_limit,
+            remaining=remaining,
+            reset_timestamp=reset_timestamp,
+            is_exceeded=is_exceeded,
+        )
 
     # ========================================================================
     # API Key Management
@@ -372,7 +460,9 @@ class QuotaService:
         client_user_agent: str | None = None,
         usage_estimate: dict[str, Any] | None = None,
         commit_self: bool = True,
-    ) -> tuple[AccessStatus, UUID | None, str, Decimal | None, int, bool]:
+    ) -> tuple[
+        AccessStatus, UUID | None, str, Decimal | None, int, bool, RateLimitInfo | None
+    ]:
         """
         Validate API key and log usage.
 
@@ -401,13 +491,14 @@ class QuotaService:
             commit_self: Whether to commit the transaction.
 
         Returns:
-            Tuple of (access_status, usage_id, message, credits_reserved, status_code, is_test_key).
+            Tuple of (access_status, usage_id, message, credits_reserved, status_code, is_test_key, rate_limit_info).
             - access_status: GRANTED or DENIED
             - usage_id: UUID of usage log (None if denied before logging)
             - message: Human-readable status message
             - credits_reserved: The billable cost in credits (None if denied, 0 for test keys)
             - status_code: HTTP status code for the response
             - is_test_key: Whether a test key was used (for mocked responses)
+            - rate_limit_info: Rate limiting information (None if rate limit check was skipped)
         """
         # Parse client_id first (needed for idempotency check with workspace isolation)
         workspace_id = self._parse_client_id(client_id)
@@ -420,6 +511,7 @@ class QuotaService:
                 None,
                 status.HTTP_400_BAD_REQUEST,
                 False,  # is_test_key
+                None,  # rate_limit_info
             )
 
         # Compute fingerprint for idempotency
@@ -455,6 +547,7 @@ class QuotaService:
                 existing_log.credits_reserved,
                 status.HTTP_200_OK,
                 is_test,
+                None,  # rate_limit_info - not tracked for idempotent requests
             )
 
         # Validate API key format
@@ -467,6 +560,7 @@ class QuotaService:
                 None,
                 status.HTTP_400_BAD_REQUEST,
                 False,  # is_test_key
+                None,  # rate_limit_info
             )
 
         # Hash and lookup API key
@@ -484,6 +578,7 @@ class QuotaService:
                 None,
                 status.HTTP_401_UNAUTHORIZED,
                 False,  # is_test_key
+                None,  # rate_limit_info
             )
 
         # Verify workspace matches
@@ -499,6 +594,7 @@ class QuotaService:
                 None,
                 status.HTTP_403_FORBIDDEN,
                 False,  # is_test_key
+                None,  # rate_limit_info
             )
 
         # Check if this is a test key
@@ -515,6 +611,28 @@ class QuotaService:
         if workspace and workspace.subscription:
             subscription = workspace.subscription
             plan_id = subscription.plan_id
+
+        # ====================================================================
+        # Rate Limiting (workspace-level, applies to all keys including test)
+        # ====================================================================
+        rate_limit_info = await self._check_rate_limit(workspace_id, plan_id)
+
+        if rate_limit_info.is_exceeded:
+            workspace_logger.warning(
+                f"Rate limit exceeded: workspace={workspace_id}, "
+                f"limit={rate_limit_info.limit}/min, "
+                f"reset_at={rate_limit_info.reset_timestamp}"
+            )
+            return (
+                AccessStatus.DENIED,
+                None,
+                f"Rate limit exceeded. Limit: {rate_limit_info.limit} requests/minute. "
+                f"Try again in {rate_limit_info.reset_timestamp - int(time.time())} seconds.",
+                None,
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                is_test_key,
+                rate_limit_info,
+            )
 
         # Test keys don't consume credits
         if is_test_key:
@@ -611,6 +729,7 @@ class QuotaService:
             credits_reserved,
             response_status_code,
             is_test_key,
+            rate_limit_info,
         )
 
     async def commit_usage(
@@ -726,6 +845,7 @@ quota_service = QuotaService()
 __all__ = [
     "QuotaService",
     "quota_service",
+    "RateLimitInfo",
     "APIKeyNotFoundException",
     "APIKeyInvalidException",
     "UsageLogNotFoundException",

@@ -34,6 +34,7 @@ from app.apps.cubex_api.services.workspace import (
 from app.apps.cubex_api.services.quota import (
     QuotaService,
     quota_service,
+    RateLimitInfo,
     APIKeyNotFoundException,
     APIKeyInvalidException,
     UsageLogNotFoundException,
@@ -79,6 +80,7 @@ __all__ = [
     # Quota service
     "QuotaService",
     "quota_service",
+    "RateLimitInfo",
     "APIKeyNotFoundException",
     "APIKeyInvalidException",
     "UsageLogNotFoundException",
