@@ -254,6 +254,9 @@ class QuotaService:
         Uses a sliding window approach with 60-second windows.
         The counter is stored in Redis with key: rate_limit:{workspace_id}
 
+        Optimized to use a Lua script for atomic INCR + EXPIRE + TTL
+        in a single Redis round trip.
+
         Args:
             workspace_id: The workspace UUID to check rate limit for.
             plan_id: The plan UUID for rate limit configuration.
@@ -267,10 +270,10 @@ class QuotaService:
         # Redis key for workspace rate limit
         rate_limit_key = f"rate_limit:{workspace_id}"
 
-        # Get current count and increment
-        current_count = await RedisService.incr(rate_limit_key)
+        # Atomic rate limit operation: INCR + conditional EXPIRE + TTL
+        result = await RedisService.rate_limit_incr(rate_limit_key, 60)
 
-        if current_count is None:
+        if result is None:
             # Redis unavailable - allow request but log warning
             workspace_logger.warning(
                 f"Rate limit check failed (Redis unavailable) for workspace {workspace_id}"
@@ -282,13 +285,8 @@ class QuotaService:
                 is_exceeded=False,
             )
 
-        # If this is the first request in the window, set expiry
-        if current_count == 1:
-            await RedisService.expire(rate_limit_key, 60)
-
-        # Get TTL for reset timestamp
-        ttl = await RedisService.ttl(rate_limit_key)
-        if ttl is None or ttl < 0:
+        current_count, ttl = result
+        if ttl < 0:
             ttl = 60  # Default to 60 seconds if TTL lookup fails
 
         reset_timestamp = int(time.time()) + ttl
@@ -563,54 +561,100 @@ class QuotaService:
                 None,  # rate_limit_info
             )
 
-        # Hash and lookup API key
+        # Hash and lookup API key (with cache optimization)
         key_hash = self._hash_api_key(api_key)
-        api_key_record = await api_key_db.get_active_by_hash(session, key_hash)
 
-        if not api_key_record:
-            workspace_logger.warning(
-                f"API key not found or invalid for client_id: {client_id}"
-            )
-            return (
-                AccessStatus.DENIED,
-                None,
-                "API key not found, expired, or revoked.",
-                None,
-                status.HTTP_401_UNAUTHORIZED,
-                False,  # is_test_key
-                None,  # rate_limit_info
-            )
+        # Try cache first for hot path optimization
+        cached_info = await QuotaCacheService.get_cached_api_key_info(key_hash)
 
-        # Verify workspace matches
-        if api_key_record.workspace_id != workspace_id:
-            workspace_logger.warning(
-                f"API key workspace mismatch: key={api_key_record.workspace_id}, "
-                f"client_id={workspace_id}"
-            )
-            return (
-                AccessStatus.DENIED,
-                None,
-                "API key does not belong to the specified workspace.",
-                None,
-                status.HTTP_403_FORBIDDEN,
-                False,  # is_test_key
-                None,  # rate_limit_info
+        if cached_info:
+            # Cache hit - use cached data (faster path)
+            cached_workspace_id = UUID(cached_info["workspace_id"])
+
+            # Verify workspace matches
+            if cached_workspace_id != workspace_id:
+                workspace_logger.warning(
+                    f"API key workspace mismatch (cached): key={cached_workspace_id}, "
+                    f"client_id={workspace_id}"
+                )
+                return (
+                    AccessStatus.DENIED,
+                    None,
+                    "API key does not belong to the specified workspace.",
+                    None,
+                    status.HTTP_403_FORBIDDEN,
+                    False,  # is_test_key
+                    None,  # rate_limit_info
+                )
+
+            is_test_key = cached_info["is_test_key"] == "1"
+            api_key_id = UUID(cached_info["id"])
+            plan_id = (
+                UUID(cached_info["plan_id"]) if cached_info.get("plan_id") else None
             )
 
-        # Check if this is a test key
-        is_test_key = api_key_record.is_test_key
+            # Update last_used_at timestamp
+            await api_key_db.update_last_used(session, api_key_id, commit_self=False)
 
-        # Update last_used_at
-        await api_key_db.update_last_used(session, api_key_record.id, commit_self=False)
+            workspace_logger.debug(
+                f"API key cache hit: key_hash={key_hash[:16]}..., "
+                f"workspace={workspace_id}, is_test={is_test_key}"
+            )
+        else:
+            # Cache miss - query database
+            api_key_record = await api_key_db.get_active_by_hash(session, key_hash)
 
-        # Calculate billable cost using QuotaCacheService
-        # Get the workspace's subscription plan_id for pricing multiplier
-        workspace = await workspace_db.get_by_id(session, workspace_id)
-        plan_id = None
-        subscription = None
-        if workspace and workspace.subscription:
-            subscription = workspace.subscription
-            plan_id = subscription.plan_id
+            if not api_key_record:
+                workspace_logger.warning(
+                    f"API key not found or invalid for client_id: {client_id}"
+                )
+                return (
+                    AccessStatus.DENIED,
+                    None,
+                    "API key not found, expired, or revoked.",
+                    None,
+                    status.HTTP_401_UNAUTHORIZED,
+                    False,  # is_test_key
+                    None,  # rate_limit_info
+                )
+
+            # Verify workspace matches
+            if api_key_record.workspace_id != workspace_id:
+                workspace_logger.warning(
+                    f"API key workspace mismatch: key={api_key_record.workspace_id}, "
+                    f"client_id={workspace_id}"
+                )
+                return (
+                    AccessStatus.DENIED,
+                    None,
+                    "API key does not belong to the specified workspace.",
+                    None,
+                    status.HTTP_403_FORBIDDEN,
+                    False,  # is_test_key
+                    None,  # rate_limit_info
+                )
+
+            # Check if this is a test key
+            is_test_key = api_key_record.is_test_key
+            api_key_id = api_key_record.id
+
+            # Get plan_id from workspace's subscription (eager-loaded)
+            workspace = api_key_record.workspace
+            plan_id = None
+            if workspace and workspace.subscription:
+                plan_id = workspace.subscription.plan_id
+
+            # Cache API key info for subsequent requests (15s TTL)
+            await QuotaCacheService.cache_api_key_info(
+                key_hash=key_hash,
+                api_key_id=str(api_key_id),
+                workspace_id=str(workspace_id),
+                is_test_key=is_test_key,
+                plan_id=str(plan_id) if plan_id else None,
+            )
+
+            # Update last_used_at timestamp
+            await api_key_db.update_last_used(session, api_key_id, commit_self=False)
 
         # ====================================================================
         # Rate Limiting (workspace-level, applies to all keys including test)
@@ -691,7 +735,7 @@ class QuotaService:
         usage_log = await usage_log_db.create(
             session,
             {
-                "api_key_id": api_key_record.id,
+                "api_key_id": api_key_id,
                 "workspace_id": workspace_id,
                 "request_id": request_id,
                 "fingerprint_hash": fingerprint_hash,
@@ -709,7 +753,7 @@ class QuotaService:
         key_type = "test" if is_test_key else "live"
         workspace_logger.info(
             f"Usage logged (PENDING): workspace={workspace_id}, "
-            f"api_key={api_key_record.key_prefix}*** ({key_type}), "
+            f"api_key_id={api_key_id} ({key_type}), "
             f"usage_id={usage_log.id}, request_id={request_id}, "
             f"fingerprint={fingerprint_hash[:16]}..., "
             f"access_status={access_status.value}, "

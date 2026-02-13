@@ -5,6 +5,8 @@ This module provides a singleton Redis client for async operations
 including caching, rate limiting counters, and distributed state management.
 """
 
+from __future__ import annotations
+
 from redis.asyncio import Redis
 
 from app.shared.config import redis_logger, settings
@@ -415,6 +417,200 @@ class RedisService:
         except Exception as e:
             redis_logger.error(f"Redis delete_pattern({pattern}) failed: {str(e)}")
             return 0
+
+    # Lua script for atomic rate limiting: INCR + conditional EXPIRE + TTL
+    # Returns: [count, ttl]
+    _RATE_LIMIT_SCRIPT = """
+    local count = redis.call('INCR', KEYS[1])
+    if count == 1 then
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+    end
+    local ttl = redis.call('TTL', KEYS[1])
+    return {count, ttl}
+    """
+
+    @classmethod
+    async def rate_limit_incr(
+        cls, key: str, window_seconds: int = 60
+    ) -> tuple[int, int] | None:
+        """
+        Atomically increment rate limit counter and get TTL in one round trip.
+
+        Uses a Lua script to:
+        1. Increment the counter (creates with value 1 if not exists)
+        2. Set expiration only if this is the first request in the window
+        3. Get the remaining TTL
+
+        This is much faster than separate INCR + EXPIRE + TTL calls.
+
+        Args:
+            key: The rate limit key (e.g., "rate_limit:{workspace_id}").
+            window_seconds: The rate limit window in seconds. Defaults to 60.
+
+        Returns:
+            Tuple of (count, ttl) or None if Redis is unavailable.
+            - count: Current request count in the window
+            - ttl: Seconds remaining until window resets
+        """
+        if cls._client is None:
+            redis_logger.warning(
+                f"Redis rate_limit_incr({key}) attempted but client not initialized"
+            )
+            return None
+
+        try:
+            result = await cls._client.eval(
+                cls._RATE_LIMIT_SCRIPT,
+                1,  # number of keys
+                key,  # KEYS[1]
+                str(window_seconds),  # ARGV[1]
+            )
+            count, ttl = int(result[0]), int(result[1])
+            redis_logger.debug(f"Redis rate_limit_incr({key}) count={count}, ttl={ttl}")
+            return (count, ttl)
+        except Exception as e:
+            redis_logger.error(f"Redis rate_limit_incr({key}) failed: {str(e)}")
+            return None
+
+    @classmethod
+    async def hset(
+        cls, key: str, field: str, value: str, ttl: int | None = None
+    ) -> bool:
+        """
+        Set a field in a hash.
+
+        Args:
+            key: The hash key.
+            field: The field name.
+            value: The value to store.
+            ttl: Optional TTL in seconds (applies to entire hash key).
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        if cls._client is None:
+            redis_logger.warning(
+                f"Redis hset({key}, {field}) attempted but client not initialized"
+            )
+            return False
+
+        try:
+            await cls._client.hset(key, field, value)
+            if ttl is not None:
+                await cls._client.expire(key, ttl)
+            redis_logger.debug(f"Redis hset({key}, {field}) successful")
+            return True
+        except Exception as e:
+            redis_logger.error(f"Redis hset({key}, {field}) failed: {str(e)}")
+            return False
+
+    @classmethod
+    async def hget(cls, key: str, field: str) -> str | None:
+        """
+        Get a field from a hash.
+
+        Args:
+            key: The hash key.
+            field: The field name.
+
+        Returns:
+            The value as string if found, None otherwise.
+        """
+        if cls._client is None:
+            redis_logger.warning(
+                f"Redis hget({key}, {field}) attempted but client not initialized"
+            )
+            return None
+
+        try:
+            value = await cls._client.hget(key, field)
+            if value is not None:
+                return value.decode("utf-8") if isinstance(value, bytes) else value
+            return None
+        except Exception as e:
+            redis_logger.error(f"Redis hget({key}, {field}) failed: {str(e)}")
+            return None
+
+    @classmethod
+    async def hgetall(cls, key: str) -> dict[str, str] | None:
+        """
+        Get all fields from a hash.
+
+        Args:
+            key: The hash key.
+
+        Returns:
+            Dict of field -> value if found, None on error.
+        """
+        if cls._client is None:
+            redis_logger.warning(
+                f"Redis hgetall({key}) attempted but client not initialized"
+            )
+            return None
+
+        try:
+            result = await cls._client.hgetall(key)
+            if result:
+                return {
+                    (k.decode("utf-8") if isinstance(k, bytes) else k): (
+                        v.decode("utf-8") if isinstance(v, bytes) else v
+                    )
+                    for k, v in result.items()
+                }
+            return {}
+        except Exception as e:
+            redis_logger.error(f"Redis hgetall({key}) failed: {str(e)}")
+            return None
+
+    @classmethod
+    async def sadd(cls, key: str, *members: str) -> int | None:
+        """
+        Add members to a set.
+
+        Args:
+            key: The set key.
+            members: Values to add to the set.
+
+        Returns:
+            Number of elements added, or None on error.
+        """
+        if cls._client is None:
+            redis_logger.warning(
+                f"Redis sadd({key}) attempted but client not initialized"
+            )
+            return None
+
+        try:
+            result = await cls._client.sadd(key, *members)
+            redis_logger.debug(f"Redis sadd({key}) added {result} members")
+            return result
+        except Exception as e:
+            redis_logger.error(f"Redis sadd({key}) failed: {str(e)}")
+            return None
+
+    @classmethod
+    async def smembers(cls, key: str) -> set[str] | None:
+        """
+        Get all members of a set.
+
+        Args:
+            key: The set key.
+
+        Returns:
+            Set of members, or None on error.
+        """
+        if cls._client is None:
+            redis_logger.warning(
+                f"Redis smembers({key}) attempted but client not initialized"
+            )
+            return None
+
+        try:
+            result = await cls._client.smembers(key)
+            return {m.decode("utf-8") if isinstance(m, bytes) else m for m in result}
+        except Exception as e:
+            redis_logger.error(f"Redis smembers({key}) failed: {str(e)}")
+            return None
 
 
 __all__ = ["RedisService"]

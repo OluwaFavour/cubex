@@ -24,6 +24,7 @@ from app.apps.cubex_api.db.models.workspace import (
     WorkspaceMember,
     WorkspaceInvitation,
 )
+from app.shared.db.models.subscription_context import APISubscriptionContext
 from app.shared.enums import (
     InvitationStatus,
     MemberRole,
@@ -614,7 +615,13 @@ class APIKeyDB(BaseDB[APIKey]):
                     (APIKey.expires_at.is_(None) | (APIKey.expires_at > now)),
                 )
             )
-            .options(selectinload(APIKey.workspace))
+            .options(
+                # Eagerly load workspace -> api_subscription_context -> subscription
+                # This avoids N+1 queries when accessing workspace.subscription
+                selectinload(APIKey.workspace)
+                .selectinload(Workspace.api_subscription_context)
+                .selectinload(APISubscriptionContext.subscription)
+            )
         )
 
         try:
