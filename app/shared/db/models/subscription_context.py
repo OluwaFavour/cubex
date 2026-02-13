@@ -6,9 +6,11 @@ domain entities (workspaces for API, users for Career) via one-to-one
 relationships with unique constraints.
 """
 
+from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,9 +33,13 @@ class APISubscriptionContext(BaseModel):
     one subscription, and each subscription can belong to at most one
     workspace.
 
+    Also tracks quota usage for O(1) lookups instead of aggregating usage logs.
+
     Attributes:
         subscription_id: Foreign key to subscription (unique).
         workspace_id: Foreign key to workspace (unique).
+        credits_used: Running total of credits consumed in current billing period.
+        billing_period_start: Start of current billing period (for reset detection).
     """
 
     __tablename__ = "api_subscription_contexts"
@@ -60,6 +66,21 @@ class APISubscriptionContext(BaseModel):
         nullable=False,
         unique=True,
         index=True,
+    )
+
+    # Quota tracking fields
+    credits_used: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        default=Decimal("0.00"),
+        server_default="0.00",
+        comment="Running total of credits consumed in current billing period",
+    )
+
+    billing_period_start: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Start of current billing period (for reset detection)",
     )
 
     # Relationships

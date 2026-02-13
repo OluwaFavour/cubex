@@ -26,7 +26,7 @@ def upgrade() -> None:
         "plan_pricing_rules",
         sa.Column(
             "credits_allocation",
-            sa.Numeric(precision=12, scale=4),
+            sa.Numeric(precision=12, scale=2),
             nullable=False,
             server_default="5000.0",
             comment="Credits allocated to users on this plan",

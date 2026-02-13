@@ -40,8 +40,10 @@ from app.apps.cubex_api.services import (
     AdminPermissionRequiredException,
     OwnerPermissionRequiredException,
     SubscriptionNotFoundException,
+    QuotaCacheService,
 )
 from app.shared.db.models import Plan, Subscription
+from app.shared.db.crud import api_subscription_context_db
 
 
 router = APIRouter(prefix="/subscriptions")
@@ -78,7 +80,10 @@ def _build_plan_response(plan: Plan) -> PlanResponse:
 
 
 def _build_subscription_response(
-    subscription: Subscription, workspace_id: UUID
+    subscription: Subscription,
+    workspace_id: UUID,
+    credits_allocation: Decimal,
+    credits_used: Decimal,
 ) -> SubscriptionResponse:
     """Build SubscriptionResponse from Subscription model."""
     return SubscriptionResponse(
@@ -91,8 +96,33 @@ def _build_subscription_response(
         current_period_end=subscription.current_period_end,
         cancel_at_period_end=subscription.cancel_at_period_end,
         canceled_at=subscription.canceled_at,
+        credits_allocation=credits_allocation,
+        credits_used=credits_used,
         plan=_build_plan_response(subscription.plan) if subscription.plan else None,
     )
+
+
+async def _get_credits_info(
+    session: AsyncSession, workspace_id: UUID, plan_id: UUID
+) -> tuple[Decimal, Decimal]:
+    """
+    Get credits allocation and usage for a workspace.
+
+    Returns:
+        Tuple of (credits_allocation, credits_used)
+    """
+    # Get credits allocation from plan pricing rules
+    credits_allocation = (
+        await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+            session, plan_id
+        )
+    )
+
+    # Get credits used from subscription context
+    context = await api_subscription_context_db.get_by_workspace(session, workspace_id)
+    credits_used = context.credits_used if context else Decimal("0.00")
+
+    return credits_allocation, credits_used
 
 
 # ============================================================================
@@ -253,6 +283,8 @@ Returns the subscription details including:
 | `current_period_start` | datetime | Billing period start |
 | `current_period_end` | datetime | Billing period end |
 | `cancel_at_period_end` | boolean | Whether subscription will cancel at period end |
+| `credits_allocation` | decimal | Total credits allocated for the billing period |
+| `credits_used` | decimal | Credits consumed in the current billing period |
 | `plan` | object | Full plan details |
 
 ### Error Responses
@@ -299,7 +331,13 @@ async def get_workspace_subscription(
         )
         if not subscription:
             return None
-        return _build_subscription_response(subscription, workspace_id)
+
+        credits_allocation, credits_used = await _get_credits_info(
+            session, workspace_id, subscription.plan_id
+        )
+        return _build_subscription_response(
+            subscription, workspace_id, credits_allocation, credits_used
+        )
 
 
 @router.post(
@@ -499,7 +537,13 @@ async def update_seats(
             new_seat_count=data.seat_count,
             commit_self=False,
         )
-        return _build_subscription_response(subscription, workspace_id)
+
+        credits_allocation, credits_used = await _get_credits_info(
+            session, workspace_id, subscription.plan_id
+        )
+        return _build_subscription_response(
+            subscription, workspace_id, credits_allocation, credits_used
+        )
 
 
 @router.post(
@@ -599,7 +643,13 @@ async def cancel_subscription(
             cancel_at_period_end=data.cancel_at_period_end,
             commit_self=False,
         )
-        return _build_subscription_response(subscription, workspace_id)
+
+        credits_allocation, credits_used = await _get_credits_info(
+            session, workspace_id, subscription.plan_id
+        )
+        return _build_subscription_response(
+            subscription, workspace_id, credits_allocation, credits_used
+        )
 
 
 @router.post(
@@ -923,7 +973,13 @@ async def upgrade_plan(
             new_plan_id=data.new_plan_id,
             commit_self=False,
         )
-        return _build_subscription_response(subscription, workspace_id)
+
+        credits_allocation, credits_used = await _get_credits_info(
+            session, workspace_id, subscription.plan_id
+        )
+        return _build_subscription_response(
+            subscription, workspace_id, credits_allocation, credits_used
+        )
 
 
 __all__ = ["router"]

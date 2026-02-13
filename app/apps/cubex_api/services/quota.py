@@ -26,6 +26,7 @@ from app.apps.cubex_api.db.crud import api_key_db, usage_log_db, workspace_db
 from app.apps.cubex_api.db.models import APIKey
 from app.apps.cubex_api.services.quota_cache import QuotaCacheService
 from app.shared.config import settings, workspace_logger
+from app.shared.db.crud import api_subscription_context_db
 from app.shared.enums import AccessStatus
 from app.shared.exceptions.types import NotFoundException
 from app.shared.utils import create_request_fingerprint, hmac_hash_otp
@@ -499,27 +500,16 @@ class QuotaService:
             )
         )
 
-        # Calculate billing period
-        subscription_period_start = None
-        subscription_period_end = None
-        if subscription is not None:
-            subscription_period_start = subscription.current_period_start
-            subscription_period_end = subscription.current_period_end
-
-        # Use workspace.created_at for fallback period calculation
-        workspace_created_at = (
-            workspace.created_at if workspace else datetime.now(timezone.utc)
-        )
-        period_start, period_end = self._calculate_billing_period(
-            subscription_period_start,
-            subscription_period_end,
-            workspace_created_at,
+        # Get current usage from subscription context (O(1) lookup)
+        context = await api_subscription_context_db.get_by_workspace(
+            session, workspace_id
         )
 
-        # Sum current usage for the period (only SUCCESS logs count)
-        current_usage = await usage_log_db.sum_credits_for_period(
-            session, workspace_id, period_start, period_end
-        )
+        if context:
+            current_usage = context.credits_used
+        else:
+            # Fallback: no context yet (shouldn't happen normally)
+            current_usage = Decimal("0.0000")
 
         # Check quota: current_usage + credits_reserved <= credits_limit
         remaining_credits = credits_limit - current_usage
@@ -649,10 +639,23 @@ class QuotaService:
             success=success,
             metrics=metrics,
             failure=failure,
-            commit_self=commit_self,
+            commit_self=False,  # We'll commit after updating credits counter
         )
 
         if committed_log:
+            # If successfully committed as SUCCESS, increment credits_used counter
+            if success and committed_log.credits_charged is not None:
+                context = await api_subscription_context_db.get_by_workspace(
+                    session, committed_log.workspace_id
+                )
+                if context:
+                    await api_subscription_context_db.increment_credits_used(
+                        session, context.id, committed_log.credits_charged
+                    )
+
+            if commit_self:
+                await session.commit()
+
             status_str = "SUCCESS" if success else "FAILED"
             workspace_logger.info(
                 f"Usage committed as {status_str}: usage_id={usage_id}, "

@@ -890,6 +890,10 @@ class UsageLogDB(BaseDB[UsageLog]):
             "committed_at": datetime.now(timezone.utc),
         }
 
+        # Set credits_charged on success (actual credits consumed)
+        if success:
+            update_data["credits_charged"] = existing.credits_reserved
+
         # Add metrics if provided
         if metrics:
             if metrics.get("model_used") is not None:

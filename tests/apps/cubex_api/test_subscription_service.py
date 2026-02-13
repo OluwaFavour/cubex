@@ -736,7 +736,9 @@ class TestHandleSubscriptionUpdated:
             "app.apps.cubex_api.services.subscription.Stripe"
         ) as mock_stripe, patch(
             "app.apps.cubex_api.services.subscription.workspace_db"
-        ):
+        ), patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_context_db:
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=mock_db_subscription_with_seats
             )
@@ -744,6 +746,7 @@ class TestHandleSubscriptionUpdated:
             mock_stripe.get_subscription = AsyncMock(
                 return_value=mock_stripe_subscription_dual_item
             )
+            mock_context_db.get_by_subscription = AsyncMock(return_value=None)
 
             mock_session = AsyncMock()
             await service.handle_subscription_updated(
@@ -782,7 +785,9 @@ class TestHandleSubscriptionUpdated:
             "app.apps.cubex_api.services.subscription.Stripe"
         ) as mock_stripe, patch(
             "app.apps.cubex_api.services.subscription.workspace_db"
-        ):
+        ), patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_context_db:
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=mock_db_subscription_with_seats
             )
@@ -790,6 +795,7 @@ class TestHandleSubscriptionUpdated:
             mock_stripe.get_subscription = AsyncMock(
                 return_value=mock_stripe_subscription_single_item
             )
+            mock_context_db.get_by_subscription = AsyncMock(return_value=None)
 
             mock_session = AsyncMock()
             await service.handle_subscription_updated(

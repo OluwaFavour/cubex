@@ -5,9 +5,11 @@ This module provides database operations for managing the context tables
 that link subscriptions to workspaces (API) or users (Career).
 """
 
+from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -75,6 +77,62 @@ class APISubscriptionContextDB(BaseDB[APISubscriptionContext]):
         )
         result = await session.execute(stmt)
         return result.unique().scalar_one_or_none()
+
+    async def increment_credits_used(
+        self,
+        session: AsyncSession,
+        context_id: UUID,
+        amount: Decimal,
+    ) -> None:
+        """
+        Atomically increment credits_used.
+
+        Uses UPDATE ... SET credits_used = credits_used + amount
+        for thread-safe atomic increment.
+
+        Args:
+            session: Database session.
+            context_id: Context ID.
+            amount: Amount to add.
+        """
+        stmt = (
+            update(APISubscriptionContext)
+            .where(
+                APISubscriptionContext.id == context_id,
+                APISubscriptionContext.is_deleted.is_(False),
+            )
+            .values(credits_used=APISubscriptionContext.credits_used + amount)
+        )
+        await session.execute(stmt)
+
+    async def reset_credits_used(
+        self,
+        session: AsyncSession,
+        context_id: UUID,
+        new_billing_period_start: datetime,
+    ) -> None:
+        """
+        Reset credits_used to 0 and update billing_period_start.
+
+        Called when billing period changes (subscription renewal).
+
+        Args:
+            session: Database session.
+            context_id: Context ID.
+            new_billing_period_start: New billing period start datetime.
+        """
+        stmt = (
+            update(APISubscriptionContext)
+            .where(
+                APISubscriptionContext.id == context_id,
+                APISubscriptionContext.is_deleted.is_(False),
+            )
+            .values(
+                credits_used=Decimal("0.00"),
+                billing_period_start=new_billing_period_start,
+            )
+        )
+        await session.execute(stmt)
 
 
 class CareerSubscriptionContextDB(BaseDB[CareerSubscriptionContext]):

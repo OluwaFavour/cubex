@@ -128,6 +128,8 @@ class SubscriptionResponse(BaseModel):
                 "current_period_end": "2024-02-15T00:00:00Z",
                 "cancel_at_period_end": False,
                 "canceled_at": None,
+                "credits_allocation": "5000.00",
+                "credits_used": "1250.50",
                 "plan": None,
             }
         },
@@ -142,6 +144,12 @@ class SubscriptionResponse(BaseModel):
     current_period_end: datetime | None
     cancel_at_period_end: bool
     canceled_at: datetime | None
+    credits_allocation: Decimal = Field(
+        description="Total credits allocated for the billing period"
+    )
+    credits_used: Decimal = Field(
+        description="Credits used in the current billing period"
+    )
     plan: PlanResponse | None = None
 
 

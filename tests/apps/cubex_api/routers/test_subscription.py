@@ -583,3 +583,21 @@ class TestSubscriptionEdgeCases:
         assert "current_period_start" in data
         assert "current_period_end" in data
         assert "cancel_at_period_end" in data
+
+    @pytest.mark.asyncio
+    async def test_subscription_response_includes_credits_info(
+        self, authenticated_client: AsyncClient, test_workspace, test_subscription
+    ):
+        """Should include credits allocation and usage in response."""
+        response = await authenticated_client.get(
+            f"/api/subscriptions/workspaces/{test_workspace.id}"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "credits_allocation" in data
+        assert "credits_used" in data
+        # Credits allocation should be a decimal value (default is 5000.0)
+        assert float(data["credits_allocation"]) > 0
+        # Credits used should be 0 for new subscription
+        assert float(data["credits_used"]) == 0.0

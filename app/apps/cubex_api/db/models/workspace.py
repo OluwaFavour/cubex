@@ -652,9 +652,15 @@ class UsageLog(BaseModel):
     )
 
     credits_reserved: Mapped[Decimal] = mapped_column(
-        Numeric(12, 4),
+        Numeric(12, 2),
         nullable=False,
         comment="The billable cost in credits",
+    )
+
+    credits_charged: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2),
+        nullable=True,
+        comment="Actual credits charged on commit (null for pending/failed)",
     )
 
     status: Mapped[UsageLogStatus] = mapped_column(

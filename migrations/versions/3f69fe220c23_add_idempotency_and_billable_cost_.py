@@ -95,7 +95,7 @@ def upgrade() -> None:
         "usage_logs",
         sa.Column(
             "credits_reserved",
-            sa.Numeric(precision=12, scale=4),
+            sa.Numeric(precision=12, scale=2),
             nullable=True,
             comment="The billable cost in credits",
         ),

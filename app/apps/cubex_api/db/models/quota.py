@@ -39,7 +39,7 @@ class EndpointCostConfig(BaseModel):
     )
 
     internal_cost_credits: Mapped[Decimal] = mapped_column(
-        Numeric(precision=12, scale=4),
+        Numeric(precision=12, scale=2),
         nullable=False,
         default=Decimal("1.0"),
         comment="Internal credit cost for this endpoint",
@@ -83,14 +83,14 @@ class PlanPricingRule(BaseModel):
     )
 
     multiplier: Mapped[Decimal] = mapped_column(
-        Numeric(precision=8, scale=4),
+        Numeric(precision=8, scale=2),
         nullable=False,
         default=Decimal("1.0"),
         comment="Pricing multiplier (1.0 = standard rate)",
     )
 
     credits_allocation: Mapped[Decimal] = mapped_column(
-        Numeric(precision=12, scale=4),
+        Numeric(precision=12, scale=2),
         nullable=False,
         default=Decimal("5000.0"),
         comment="Credits allocated to users on this plan",

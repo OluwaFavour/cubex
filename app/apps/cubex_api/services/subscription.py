@@ -503,6 +503,23 @@ class SubscriptionService:
             items_data = stripe_sub.items.data
             first_item = items_data[0]
 
+            # Check if billing period changed (renewal) - reset quota
+            old_period_start = subscription.current_period_start
+            new_period_start = first_item.current_period_start
+
+            if old_period_start != new_period_start and new_period_start is not None:
+                context = await api_subscription_context_db.get_by_subscription(
+                    session, subscription.id
+                )
+                if context:
+                    await api_subscription_context_db.reset_credits_used(
+                        session, context.id, new_period_start
+                    )
+                    stripe_logger.info(
+                        f"Billing period changed for subscription {stripe_subscription_id}: "
+                        f"reset credits_used to 0"
+                    )
+
             # Update billing period from first item
             updates["current_period_start"] = first_item.current_period_start
             updates["current_period_end"] = first_item.current_period_end
