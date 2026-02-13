@@ -930,3 +930,88 @@ class TestValidateUsageE2E:
         limit = int(response.headers["X-RateLimit-Limit"])
         remaining = int(response.headers["X-RateLimit-Remaining"])
         assert remaining < limit
+
+    @pytest.mark.asyncio
+    async def test_validate_usage_benchmark(
+        self,
+        client: AsyncClient,
+        internal_api_headers: dict[str, str],
+        test_api_key,
+        test_workspace,
+    ):
+        """Benchmark test to measure endpoint latency.
+
+        Mocks rate limit to 1000 req/min to avoid hitting limits during benchmark.
+        Run with: pytest -v -s -k benchmark
+        """
+        import time
+        from statistics import mean, stdev
+        from unittest.mock import AsyncMock, patch
+
+        from tests.conftest import make_client_id
+
+        raw_key, api_key = test_api_key
+        client_id = make_client_id(test_workspace)
+
+        num_requests = 50  # More samples for better statistics
+        latencies = []
+
+        # Mock rate limit to 1000 to avoid hitting limits during benchmark
+        with patch(
+            "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+            new_callable=AsyncMock,
+            return_value=1000,
+        ):
+            # Warm-up request (not counted in stats)
+            await client.post(
+                "/api/internal/usage/validate",
+                json=make_validate_request(
+                    api_key=raw_key,
+                    client_id=client_id,
+                    request_id=str(uuid4()),
+                ),
+                headers=internal_api_headers,
+            )
+
+            # Benchmark requests
+            for i in range(num_requests):
+                start = time.perf_counter()
+                response = await client.post(
+                    "/api/internal/usage/validate",
+                    json=make_validate_request(
+                        api_key=raw_key,
+                        client_id=client_id,
+                        request_id=str(uuid4()),
+                    ),
+                    headers=internal_api_headers,
+                )
+                elapsed = (time.perf_counter() - start) * 1000  # ms
+
+                assert (
+                    response.status_code == 200
+                ), f"Request {i+1} got {response.status_code}: {response.json()}"
+                latencies.append(elapsed)
+
+        # Calculate statistics
+        avg_latency = mean(latencies)
+        min_latency = min(latencies)
+        max_latency = max(latencies)
+        std_latency = stdev(latencies) if len(latencies) > 1 else 0
+        p50 = sorted(latencies)[len(latencies) // 2]
+        p95_idx = int(len(latencies) * 0.95)
+        p95 = sorted(latencies)[p95_idx] if p95_idx < len(latencies) else max_latency
+
+        # Print benchmark results
+        print("\n" + "=" * 60)
+        print("VALIDATE_USAGE ENDPOINT BENCHMARK (BEFORE OPTIMIZATION)")
+        print("=" * 60)
+        print(f"Requests:     {num_requests}")
+        print(f"Average:      {avg_latency:.2f} ms")
+        print(f"Std Dev:      {std_latency:.2f} ms")
+        print(f"Min:          {min_latency:.2f} ms")
+        print(f"Max:          {max_latency:.2f} ms")
+        print(f"P50 (median): {p50:.2f} ms")
+        print(f"P95:          {p95:.2f} ms")
+        print("=" * 60)
+
+        assert avg_latency > 0

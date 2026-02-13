@@ -517,6 +517,47 @@ async def basic_api_plan_pricing_rule(db_session: AsyncSession, basic_api_plan):
 
 
 @pytest.fixture
+async def benchmark_plan_pricing_rule(
+    db_session: AsyncSession, basic_api_plan, client: AsyncClient
+):
+    """Create a PlanPricingRule with high rate limit for benchmarking.
+
+    NOTE: Due to test isolation (uncommitted transaction), this fixture cannot
+    reliably update the QuotaCacheService. Tests needing high rate limits
+    should mock get_plan_rate_limit directly.
+    """
+    from decimal import Decimal
+
+    from app.apps.cubex_api.db.models import PlanPricingRule
+
+    # Check if pricing rule already exists
+    result = await db_session.execute(
+        select(PlanPricingRule).where(PlanPricingRule.plan_id == basic_api_plan.id)
+    )
+    pricing_rule = result.scalar_one_or_none()
+
+    high_rate_limit = 1000
+
+    if pricing_rule is None:
+        # Create pricing rule with high rate limit
+        pricing_rule = PlanPricingRule(
+            id=uuid4(),
+            plan_id=basic_api_plan.id,
+            multiplier=Decimal("1.0"),
+            credits_allocation=Decimal("5000.00"),
+            rate_limit_per_minute=high_rate_limit,
+        )
+        db_session.add(pricing_rule)
+    else:
+        # Update existing rule to have high rate limit
+        pricing_rule.rate_limit_per_minute = high_rate_limit
+
+    await db_session.flush()
+
+    return pricing_rule
+
+
+@pytest.fixture
 async def professional_api_plan(db_session: AsyncSession):
     """Get the professional API plan from seeded data."""
     from sqlalchemy import select
