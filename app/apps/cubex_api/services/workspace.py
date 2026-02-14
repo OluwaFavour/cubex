@@ -5,6 +5,7 @@ This module provides business logic for workspace management including
 creating workspaces, managing members, and handling invitations.
 """
 
+from decimal import Decimal
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Sequence
@@ -22,6 +23,7 @@ from app.apps.cubex_api.db.models import (
     WorkspaceMember,
     WorkspaceInvitation,
 )
+from app.apps.cubex_api.services.quota_cache import QuotaCacheService
 from app.shared.config import settings, workspace_logger
 from app.shared.db.crud import (
     api_subscription_context_db,
@@ -672,6 +674,53 @@ class WorkspaceService:
             session, workspace_id
         )
         return subscription.seat_count - enabled_count
+
+    async def get_credits_consumed(
+        self,
+        session: AsyncSession,
+        workspace_id: UUID,
+    ) -> Decimal:
+        """
+        Get total credits consumed in current billing period for workspace.
+
+        Args:
+            session: Database session.
+            workspace_id: Workspace ID.
+
+        Returns:
+            Total credits consumed as Decimal.
+        """
+        context = await api_subscription_context_db.get_by_workspace(
+            session, workspace_id
+        )
+        if not context:
+            return Decimal("0.00")
+        return context.credits_used
+
+    async def get_credits_limit(
+        self,
+        session: AsyncSession,
+        workspace_id: UUID,
+    ) -> Decimal:
+        """
+        Get total credits limit for workspace based on subscription plan.
+
+        Args:
+            session: Database session.
+            workspace_id: Workspace ID.
+
+        Returns:
+            Total credits limit as Decimal.
+        """
+        subscription = await subscription_db.get_by_workspace(session, workspace_id)
+        if not subscription:
+            return Decimal("0.00")
+        credits_limit = (
+            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+                session, subscription.plan_id
+            )
+        )
+        return credits_limit
 
     async def _check_can_add_member(
         self,

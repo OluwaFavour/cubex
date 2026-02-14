@@ -2434,7 +2434,7 @@
                     "API - Workspaces"
                 ],
                 "summary": "Get workspace details",
-                "description": "## Get Workspace Details\n\nRetrieve detailed information about a specific workspace including members and subscription info.\n\n### Authorization\n\n- User must be a **member** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Workspace identifier |\n| `display_name` | string | Workspace name |\n| `slug` | string | URL-friendly identifier |\n| `status` | string | `active` or `frozen` |\n| `is_personal` | boolean | Personal workspace flag |\n| `description` | string | Optional description |\n| `owner_id` | UUID | Owner's user ID |\n| `members` | array | List of workspace members |\n| `seat_count` | integer | Total seats in subscription |\n| `available_seats` | integer | Seats available for new members |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `404 Not Found` | Workspace not found or access denied |\n\n### Notes\n\n- All members can view workspace details\n- Members list includes status (enabled/disabled)",
+                "description": "## Get Workspace Details\n\nRetrieve detailed information about a specific workspace including members and subscription info.\n\n### Authorization\n\n- User must be a **member** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Workspace identifier |\n| `display_name` | string | Workspace name |\n| `slug` | string | URL-friendly identifier |\n| `status` | string | `active` or `frozen` |\n| `is_personal` | boolean | Personal workspace flag |\n| `description` | string | Optional description |\n| `owner_id` | UUID | Owner's user ID |\n| `members` | array | List of workspace members |\n| `seat_count` | integer | Total seats in subscription |\n| `available_seats` | integer | Seats available for new members |\n| `credits_used` | decimal | API credits used in current billing period |\n| `credits_limit` | decimal | Total API credits allocated by subscription |\n| `credits_remaining` | decimal | Remaining API credits (limit - used) |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `404 Not Found` | Workspace not found or access denied |\n\n### Notes\n\n- All members can view workspace details\n- Members list includes status (enabled/disabled)",
                 "operationId": "get_workspace_api_workspaces__workspace_id__get",
                 "security": [
                     {
@@ -9846,6 +9846,18 @@
                         "title": "Available Seats",
                         "default": 0
                     },
+                    "credits_used": {
+                        "type": "string",
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                        "title": "Credits Used",
+                        "default": "0.00"
+                    },
+                    "credits_limit": {
+                        "type": "string",
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                        "title": "Credits Limit",
+                        "default": "0.00"
+                    },
                     "client_id": {
                         "type": "string",
                         "title": "Client Id",
@@ -9871,6 +9883,9 @@
                     "available_seats": 3,
                     "client_id": "ws_550e8400e29b41d4a716446655440000",
                     "created_at": "2024-01-15T10:30:00Z",
+                    "credits_limit": "1000.00",
+                    "credits_remaining": "850.00",
+                    "credits_used": "150.00",
                     "description": "Workspace for our startup team",
                     "display_name": "My Startup",
                     "enabled_member_count": 5,

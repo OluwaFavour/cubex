@@ -185,6 +185,9 @@ class WorkspaceDetailResponse(WorkspaceResponse):
                 ],
                 "seat_count": 10,
                 "available_seats": 3,
+                "credits_used": "150.00",
+                "credits_limit": "1000.00",
+                "credits_remaining": "850.00",
             }
         },
     )
@@ -192,6 +195,14 @@ class WorkspaceDetailResponse(WorkspaceResponse):
     members: list[WorkspaceMemberResponse] = []
     seat_count: int = 0
     available_seats: int = 0
+    credits_used: Decimal = Decimal("0.00")
+    credits_limit: Decimal = Decimal("0.00")
+
+    @property
+    @computed_field
+    def credits_remaining(self) -> Decimal:
+        """Calculate remaining credits."""
+        return self.credits_limit - self.credits_used
 
 
 class WorkspaceListResponse(BaseModel):

@@ -7,12 +7,14 @@ This module provides endpoints for:
 - Invitation management
 """
 
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.apps.cubex_api.services.quota_cache import QuotaCacheService
 from app.core.dependencies import get_async_session
 from app.shared.config import request_logger
 from app.shared.dependencies.auth import CurrentActiveUser
@@ -313,6 +315,9 @@ Retrieve detailed information about a specific workspace including members and s
 | `members` | array | List of workspace members |
 | `seat_count` | integer | Total seats in subscription |
 | `available_seats` | integer | Seats available for new members |
+| `credits_used` | decimal | API credits used in current billing period |
+| `credits_limit` | decimal | Total API credits allocated by subscription |
+| `credits_remaining` | decimal | Remaining API credits (limit - used) |
 
 ### Error Responses
 
@@ -361,6 +366,18 @@ async def get_workspace(
         seat_count = subscription.seat_count if subscription else 0
         enabled_count = len([m for m in members if m.status == MemberStatus.ENABLED])
 
+        # Get credits
+        credits_used = (
+            subscription.api_context.credits_used
+            if subscription and subscription.api_context
+            else Decimal("0.00")
+        )
+        credits_limit = (
+            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+                session, subscription.plan_id if subscription else None
+            )
+        )
+
         return WorkspaceDetailResponse(
             id=workspace.id,
             display_name=workspace.display_name,
@@ -375,6 +392,8 @@ async def get_workspace(
             members=[_build_member_response(m) for m in members],
             seat_count=seat_count,
             available_seats=seat_count - enabled_count,
+            credits_used=credits_used,
+            credits_limit=credits_limit,
         )
 
 
