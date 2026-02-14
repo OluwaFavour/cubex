@@ -1139,6 +1139,7 @@ an invitation URL to accept.
 |-------|------|----------|-------------|
 | `email` | string | ✅ | Email address to invite |
 | `role` | string | ❌ | Role to assign: `admin` or `member` (default) |
+| `callback_url` | string | ✅ | Frontend URL to redirect after accepting (must be in allowed origins) |
 
 ### Response
 
@@ -1152,6 +1153,7 @@ an invitation URL to accept.
 1. Admin sends invitation with this endpoint
 2. System generates invitation token (valid 7 days)
 3. Send `invitation_url` to the invitee
+   - The `invitation_url` is the provided `callback_url` with the token as a query parameter
 4. Invitee logs in and calls `/invitations/accept`
 5. Invitee becomes a workspace member
 
