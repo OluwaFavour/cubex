@@ -895,6 +895,10 @@ class WorkspaceService:
         # Check if expired
         if invitation.is_expired or invitation.status != InvitationStatus.PENDING:
             raise InvitationNotFoundException()
+            
+        # Check if current user is the owner of the invitation
+        if user.email.lower() != invitation.email.lower():
+            raise InvitationNotFoundException()
 
         # Check if already a member
         is_member = await workspace_member_db.is_user_member(
