@@ -136,19 +136,9 @@ class TestCheckRateLimitMethod:
                 return_value=20,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=60,
+                return_value=(1, 60),  # (current_count, ttl)
             ),
         ):
             result = await quota_service._check_rate_limit(workspace_id, plan_id)
@@ -169,26 +159,15 @@ class TestCheckRateLimitMethod:
                 return_value=20,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=1,
-            ) as mock_incr,
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ) as mock_expire,
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=60,
-            ),
+                return_value=(1, 60),  # (current_count, ttl) - first request
+            ) as mock_rate_limit_incr,
         ):
             result = await quota_service._check_rate_limit(workspace_id, plan_id)
 
-        # First request should set expiry
-        mock_incr.assert_called_once()
-        mock_expire.assert_called_once()
+        # Atomic rate_limit_incr should be called
+        mock_rate_limit_incr.assert_called_once()
         assert result.remaining == 19
         assert result.is_exceeded is False
 
@@ -205,25 +184,14 @@ class TestCheckRateLimitMethod:
                 return_value=20,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=5,  # 5th request
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ) as mock_expire,
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=45,
+                return_value=(5, 45),  # (current_count, ttl) - 5th request
             ),
         ):
             result = await quota_service._check_rate_limit(workspace_id, plan_id)
 
-        # Subsequent requests should not set expiry
-        mock_expire.assert_not_called()
+        # 20 - 5 = 15 remaining
         assert result.remaining == 15
         assert result.is_exceeded is False
 
@@ -240,19 +208,9 @@ class TestCheckRateLimitMethod:
                 return_value=20,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=21,  # Over limit
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=30,
+                return_value=(21, 30),  # (current_count, ttl) - over limit
             ),
         ):
             result = await quota_service._check_rate_limit(workspace_id, plan_id)
@@ -273,7 +231,7 @@ class TestCheckRateLimitMethod:
                 return_value=20,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
                 return_value=None,  # Redis unavailable
             ),
@@ -299,24 +257,14 @@ class TestCheckRateLimitMethod:
                 return_value=20,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=1,
-            ) as mock_incr,
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=60,
-            ),
+                return_value=(1, 60),  # (current_count, ttl)
+            ) as mock_rate_limit_incr,
         ):
             await quota_service._check_rate_limit(workspace_id, plan_id)
 
-        mock_incr.assert_called_once_with(expected_key)
+        mock_rate_limit_incr.assert_called_once_with(expected_key, 60)
 
     @pytest.mark.asyncio
     async def test_check_rate_limit_uses_plan_rate_limit(self):
@@ -331,19 +279,9 @@ class TestCheckRateLimitMethod:
                 return_value=50,  # Custom rate limit
             ) as mock_get_rate_limit,
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=60,
+                return_value=(1, 60),  # (current_count, ttl)
             ),
         ):
             result = await quota_service._check_rate_limit(workspace_id, plan_id)
@@ -366,19 +304,9 @@ class TestCheckRateLimitMethod:
                 return_value=20,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=5,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=-1,  # Key has no expiry (error case)
+                return_value=(5, -1),  # (current_count, ttl) - TTL lookup failed
             ),
             patch(
                 "app.apps.cubex_api.services.quota.time.time", return_value=current_time
@@ -402,19 +330,9 @@ class TestCheckRateLimitMethod:
                 return_value=20,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=20,  # Exactly at limit
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=30,
+                return_value=(20, 30),  # (current_count, ttl) - exactly at limit
             ),
         ):
             result = await quota_service._check_rate_limit(workspace_id, plan_id)
@@ -931,19 +849,12 @@ class TestRateLimitingEndToEnd:
         # Simulate rate limit exceeded (count > limit)
         with (
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=21,  # Over the default limit of 20
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=45,  # 45 seconds until reset
+                return_value=(
+                    21,
+                    45,
+                ),  # (current_count, ttl) - over the default limit of 20
             ),
         ):
             response = await client.post(
@@ -982,19 +893,9 @@ class TestRateLimitingEndToEnd:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=60,
+                return_value=(1, 60),  # (current_count, ttl)
             ),
         ):
             response = await client.post(
@@ -1124,19 +1025,9 @@ class TestRateLimitingEndToEnd:
         # Simulate workspace1 at high count, workspace2 at low count
         with (
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=15,  # High usage
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=30,
+                return_value=(15, 30),  # (current_count, ttl) - high usage
             ),
         ):
             response1 = await client.post(
@@ -1154,19 +1045,9 @@ class TestRateLimitingEndToEnd:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=2,  # Low usage
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=55,
+                return_value=(2, 55),  # (current_count, ttl) - low usage
             ),
         ):
             response2 = await client.post(
@@ -1211,19 +1092,9 @@ class TestRateLimitingEndToEnd:
                 return_value=50,  # Custom rate limit
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=10,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=45,
+                return_value=(10, 45),  # (current_count, ttl)
             ),
         ):
             response = await client.post(
@@ -1259,19 +1130,12 @@ class TestRateLimitingEndToEnd:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=25,  # Over default limit of 20
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=30,
+                return_value=(
+                    25,
+                    30,
+                ),  # (current_count, ttl) - over default limit of 20
             ),
         ):
             response = await client.post(
