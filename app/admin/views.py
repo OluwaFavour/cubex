@@ -18,6 +18,7 @@ from sqladmin import ModelView
 from sqladmin.filters import BooleanFilter, StaticValuesFilter
 from sqlalchemy.sql.expression import Select
 from starlette.requests import Request
+import wtforms
 
 from app.apps.cubex_api.db.crud.quota import plan_pricing_rule_db
 from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule
@@ -168,6 +169,49 @@ class PlanAdmin(ModelView, model=Plan):
 
     # Only allow editing is_active (to deactivate plans), and features fields
     form_edit_rules = ["is_active", "features"]
+
+    # Make features field a large textarea
+    form_overrides = {"features": wtforms.TextAreaField}
+
+    # Provide guidance on features field format
+    form_args = {
+        "features": {
+            "description": (
+                "Define plan features in JSON format. "
+                "Each feature can have a title, description, "
+                "value (boolean or string), and category for grouping."
+            ),
+        },
+    }
+
+    # Make the features field wider in the form
+    form_widget_args = {
+        "features": {
+            "rows": 15,
+            "style": "width: 100%; font-family: monospace;",
+            "placeholder": """Example features JSON format:
+[
+    {
+        "title": "Feature 1",
+        "description": "Description of feature 1",
+        "value": true,
+        "category": "General"
+    },
+    {
+        "title": "Feature 2",
+        "description": "Description of feature 2",
+        "value": "Some value",
+        "category": "Limits"
+    },
+    {
+        "title": "Feature 3",
+        "description": "Description of feature 3",
+        "category": "Integrations"
+    }
+]
+            """,
+        }
+    }
 
 
 # ============================================================================
