@@ -166,8 +166,8 @@ class PlanAdmin(ModelView, model=Plan):
     can_view_details = True
     can_export = True
 
-    # Only allow editing is_active field (to deactivate plans)
-    form_edit_rules = ["is_active"]
+    # Only allow editing is_active (to deactivate plans), and features fields
+    form_edit_rules = ["is_active", "features"]
 
 
 # ============================================================================
