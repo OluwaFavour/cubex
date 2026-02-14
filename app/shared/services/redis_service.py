@@ -459,7 +459,7 @@ class RedisService:
             return None
 
         try:
-            result = await cls._client.eval(
+            result = await cls._client.eval(  # type: ignore[misc]
                 cls._RATE_LIMIT_SCRIPT,
                 1,  # number of keys
                 key,  # KEYS[1]
@@ -495,7 +495,7 @@ class RedisService:
             return False
 
         try:
-            await cls._client.hset(key, field, value)
+            await cls._client.hset(key, field, value)  # type: ignore[misc]
             if ttl is not None:
                 await cls._client.expire(key, ttl)
             redis_logger.debug(f"Redis hset({key}, {field}) successful")
@@ -523,7 +523,7 @@ class RedisService:
             return None
 
         try:
-            value = await cls._client.hget(key, field)
+            value = await cls._client.hget(key, field)  # type: ignore[misc]
             if value is not None:
                 return value.decode("utf-8") if isinstance(value, bytes) else value
             return None
@@ -549,7 +549,7 @@ class RedisService:
             return None
 
         try:
-            result = await cls._client.hgetall(key)
+            result = await cls._client.hgetall(key)  # type: ignore[misc]
             if result:
                 return {
                     (k.decode("utf-8") if isinstance(k, bytes) else k): (
@@ -581,7 +581,7 @@ class RedisService:
             return None
 
         try:
-            result = await cls._client.sadd(key, *members)
+            result = await cls._client.sadd(key, *members)  # type: ignore[misc]
             redis_logger.debug(f"Redis sadd({key}) added {result} members")
             return result
         except Exception as e:
@@ -606,7 +606,7 @@ class RedisService:
             return None
 
         try:
-            result = await cls._client.smembers(key)
+            result = await cls._client.smembers(key)  # type: ignore[misc]
             return {m.decode("utf-8") if isinstance(m, bytes) else m for m in result}
         except Exception as e:
             redis_logger.error(f"Redis smembers({key}) failed: {str(e)}")
