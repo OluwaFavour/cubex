@@ -170,9 +170,6 @@ class PlanAdmin(ModelView, model=Plan):
     # Only allow editing is_active (to deactivate plans), and features fields
     form_edit_rules = ["is_active", "features"]
 
-    # Make features field a large textarea
-    form_overrides = {"features": wtforms.TextAreaField}
-
     # Provide guidance on features field format
     form_args = {
         "features": {
