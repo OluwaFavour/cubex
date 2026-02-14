@@ -496,6 +496,28 @@ Returns the updated subscription with new seat count and billing details.
 - Changes update Stripe subscription immediately
 """,
     responses={
+        400: {
+            "description": "Downgrade not allowed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Cannot downgrade from basic to free. "
+                        "Please cancel and resubscribe to a different plan"
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid seat count",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Current seat count (5) exceeds target plan's maximum (3). "
+                        "Reduce seats before upgrading."
+                    }
+                },
+            },
+        },
         403: {
             "description": "Admin permission required",
             "content": {
