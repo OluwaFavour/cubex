@@ -396,7 +396,7 @@ class RateLimiter:
 
 
 def format_rate_limit_key(
-    key_type: Literal["ip", "user", "endpoint"],
+    key_type: Literal["ip", "user", "endpoint", "email"],
     identifier: str,
     endpoint: str,
 ) -> str:
@@ -404,8 +404,8 @@ def format_rate_limit_key(
     Format a rate limit key with consistent structure.
 
     Args:
-        key_type: The type of rate limit ("ip", "user", or "endpoint").
-        identifier: The identifier (IP address, user ID, or endpoint path).
+        key_type: The type of rate limit ("ip", "user", "endpoint", or "email").
+        identifier: The identifier (IP address, user ID, email, or endpoint path).
         endpoint: The endpoint path.
 
     Returns:
@@ -573,6 +573,56 @@ def rate_limit_by_endpoint(
     return dependency
 
 
+def rate_limit_by_email(
+    limit: int | None = None,
+    window: int | None = None,
+    backend: Literal["memory", "redis"] | None = None,
+) -> Callable:
+    """
+    Create a rate limiter for email-based rate limiting.
+
+    This function returns a dependency factory that creates a rate limit
+    check based on the email address. Unlike other rate limiters, this
+    returns a callable that must be invoked with the email address.
+
+    Args:
+        limit: Maximum requests allowed. Defaults to settings.RATE_LIMIT_DEFAULT_REQUESTS.
+        window: Time window in seconds. Defaults to settings.RATE_LIMIT_DEFAULT_WINDOW.
+        backend: Backend type. Defaults to settings.RATE_LIMIT_BACKEND.
+
+    Returns:
+        An async function that takes an email and endpoint, and checks rate limit.
+
+    Example:
+        >>> check_rate_limit = rate_limit_by_email(limit=3, window=3600)
+        >>> @app.post("/contact-sales")
+        >>> async def contact_sales(
+        ...     request: Request,
+        ...     data: ContactSalesRequest,
+        ... ):
+        ...     await check_rate_limit(data.email, request.url.path)
+        ...     # Process request...
+    """
+    _limit = limit if limit is not None else settings.RATE_LIMIT_DEFAULT_REQUESTS
+    _window = window if window is not None else settings.RATE_LIMIT_DEFAULT_WINDOW
+
+    async def check(email: str, endpoint: str) -> RateLimitResult:
+        limiter = RateLimiter(backend=backend)
+        key = format_rate_limit_key("email", email.lower(), endpoint)
+
+        result = await limiter.check(key, _limit, _window)
+
+        if not result.allowed:
+            raise RateLimitExceededException(
+                message=f"Rate limit exceeded. Try again in {result.retry_after} seconds.",
+                retry_after=result.retry_after,
+            )
+
+        return result
+
+    return check
+
+
 __all__ = [
     "RateLimitResult",
     "RateLimitBackend",
@@ -580,6 +630,7 @@ __all__ = [
     "RedisBackend",
     "RateLimiter",
     "format_rate_limit_key",
+    "rate_limit_by_email",
     "rate_limit_by_ip",
     "rate_limit_by_user",
     "rate_limit_by_endpoint",

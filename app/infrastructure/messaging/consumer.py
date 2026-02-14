@@ -4,6 +4,7 @@ from typing import Callable, Any
 import aio_pika
 
 from app.shared.config import rabbitmq_logger
+from app.shared.services.email_manager import EmailManagerService
 
 
 async def process_message(
@@ -76,6 +77,19 @@ async def process_message(
                     routing_key=dead_letter_queue,
                 )
                 rabbitmq_logger.warning(f"Message dead-lettered to {dead_letter_queue}")
+
+                # Send DLQ alert email
+                try:
+                    message_body = message.body.decode()
+                    await EmailManagerService.send_dlq_alert(
+                        queue_name=dead_letter_queue,
+                        message_body=message_body,
+                        attempt_count=attempt,
+                    )
+                except Exception as alert_error:
+                    rabbitmq_logger.error(
+                        f"Failed to send DLQ alert for {dead_letter_queue}: {alert_error}"
+                    )
 
             # Reject the message without requeuing
             await message.reject(requeue=False)

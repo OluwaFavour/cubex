@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workspace Invitation - {{ workspace_name }}</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          sans-serif;
+        line-height: 1.6;
+        color: #333333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 40px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .header h1 {
+        color: #2563eb;
+        margin: 0;
+        font-size: 28px;
+      }
+      .invite-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+      .content {
+        margin-bottom: 30px;
+      }
+      .content p {
+        color: #4b5563;
+        font-size: 16px;
+        margin-bottom: 16px;
+      }
+      .workspace-info {
+        background-color: #f9fafb;
+        border-left: 4px solid #2563eb;
+        padding: 16px 20px;
+        margin: 20px 0;
+        border-radius: 4px;
+      }
+      .workspace-info h3 {
+        color: #1f2937;
+        font-size: 18px;
+        margin: 0 0 8px 0;
+      }
+      .workspace-info p {
+        color: #6b7280;
+        font-size: 14px;
+        margin: 4px 0;
+      }
+      .cta-button {
+        display: inline-block;
+        background-color: #2563eb;
+        color: #ffffff;
+        text-decoration: none;
+        padding: 14px 32px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 16px;
+        margin: 20px 0;
+        text-align: center;
+      }
+      .cta-button:hover {
+        background-color: #1d4ed8;
+      }
+      .expiry-notice {
+        background-color: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 12px 16px;
+        margin: 20px 0;
+        border-radius: 4px;
+        font-size: 14px;
+        color: #92400e;
+      }
+      .footer {
+        text-align: center;
+        color: #9ca3af;
+        font-size: 12px;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="invite-icon">📬</div>
+        <h1>You're Invited!</h1>
+      </div>
+
+      <div class="content">
+        <p>Hi there,</p>
+        <p>
+          <strong>{{ inviter_name }}</strong> has invited you to join their
+          workspace on {{ app_name }}.
+        </p>
+
+        <div class="workspace-info">
+          <h3>{{ workspace_name }}</h3>
+          <p><strong>Role:</strong> {{ role }}</p>
+        </div>
+
+        <p>Click the button below to accept this invitation and get started:</p>
+
+        <div style="text-align: center">
+          <a href="{{ invitation_link }}" class="cta-button"
+            >Accept Invitation</a
+          >
+        </div>
+
+        <div class="expiry-notice">
+          ⏰ <strong>Note:</strong> This invitation expires in {{ expiry_hours
+          }} hours.
+        </div>
+
+        <p style="font-size: 14px; color: #6b7280; margin-top: 24px">
+          If you don't have an account yet, you'll be able to create one when
+          accepting the invitation.
+        </p>
+      </div>
+
+      <div class="footer">
+        <p>
+          This invitation was sent to {{ invitee_email }} by {{ inviter_name }}.
+        </p>
+        <p>&copy; {{ year }} {{ app_name }}. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+</html>

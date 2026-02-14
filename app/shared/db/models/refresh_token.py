@@ -6,7 +6,7 @@ refresh tokens that enable "remember me" functionality and multi-device
 session management.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -94,7 +94,5 @@ class RefreshToken(BaseModel):
     @property
     def is_valid(self) -> bool:
         """Check if the token is still valid (not expired and not revoked)."""
-        from datetime import timezone as tz
-
-        now = datetime.now(tz.utc)
+        now = datetime.now(timezone.utc)
         return self.revoked_at is None and self.expires_at > now and not self.is_deleted

@@ -495,6 +495,83 @@ def hmac_verify_otp(
         return False
 
 
+def create_request_fingerprint(
+    endpoint: str,
+    method: str,
+    payload_hash: str,
+    usage_estimate: dict | None = None,
+) -> str:
+    """
+    Create a deterministic fingerprint hash for request idempotency.
+
+    This function generates a unique fingerprint based on the request's
+    key characteristics. Two requests with identical fingerprints are
+    considered the same request for idempotency purposes.
+
+    The fingerprint is computed as HMAC-SHA256 of a canonical JSON
+    representation of the request components.
+
+    Args:
+        endpoint: The API endpoint path being called.
+        method: HTTP method (GET, POST, etc.).
+        payload_hash: Hash of the request payload (provided by client).
+        usage_estimate: Optional usage estimation dict with keys:
+                       input_chars, max_output_tokens, model.
+
+    Returns:
+        str: 64-character hexadecimal fingerprint hash.
+
+    Examples:
+        >>> fp1 = create_request_fingerprint("/v1/extract", "POST", "abc123")
+        >>> fp2 = create_request_fingerprint("/v1/extract", "POST", "abc123")
+        >>> fp1 == fp2
+        True
+        >>> fp3 = create_request_fingerprint("/v1/extract", "POST", "def456")
+        >>> fp1 == fp3
+        False
+
+    Security Notes:
+        - Uses HMAC-SHA256 with a fixed secret for consistency
+        - JSON serialization is sorted for deterministic output
+        - Same inputs always produce the same fingerprint
+    """
+    # Build canonical data structure
+    data = {
+        "endpoint": endpoint.lower().strip(),
+        "method": method.upper().strip(),
+        "payload_hash": payload_hash,
+        "usage_estimate": None,
+    }
+
+    # Normalize usage_estimate if provided
+    if usage_estimate:
+        data["usage_estimate"] = {
+            "input_chars": usage_estimate.get("input_chars"),
+            "max_output_tokens": usage_estimate.get("max_output_tokens"),
+            "model": usage_estimate.get("model"),
+        }
+
+    # Create canonical JSON string (sorted keys for determinism)
+    canonical = json.dumps(data, sort_keys=True, separators=(",", ":"))
+
+    # Use HMAC-SHA256 with a fixed secret for consistency
+    # The secret doesn't need to be secret here - it's for consistency, not security
+    secret = "request_fingerprint_v1"
+    hash_obj = hmac.new(
+        secret.encode("utf-8"),
+        canonical.encode("utf-8"),
+        hashlib.sha256,
+    )
+
+    fingerprint = hash_obj.hexdigest()
+    utils_logger.debug(
+        f"Created request fingerprint: endpoint={endpoint}, method={method}, "
+        f"fingerprint={fingerprint[:16]}..."
+    )
+
+    return fingerprint
+
+
 def get_device_info(user_agent: str | None) -> str | None:
     """
     Parse user agent string to extract basic device information.

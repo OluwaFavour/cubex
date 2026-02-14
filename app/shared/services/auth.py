@@ -68,6 +68,7 @@ from app.shared.services.oauth import (
     GoogleOAuthService,
 )
 from app.shared.services.oauth.base import BaseOAuthProvider, OAuthUserInfo
+from app.shared.services.payment.stripe.main import Stripe
 from app.shared.utils import create_jwt_token, hmac_hash_otp
 
 
@@ -436,8 +437,30 @@ class AuthService:
                 "full_name": full_name,
                 "email_verified": False,
             },
-            commit_self=commit_self,
+            commit_self=False,
         )
+
+        # Create Stripe customer (non-blocking - don't fail signup if Stripe fails)
+        try:
+            stripe_customer = await Stripe.create_customer(
+                email=email,
+                name=full_name,
+                metadata={"user_id": str(user.id)},
+            )
+            await user_db.update(
+                session=session,
+                id=user.id,
+                updates={"stripe_customer_id": stripe_customer.id},
+                commit_self=False,
+            )
+            auth_logger.info(
+                f"Created Stripe customer {stripe_customer.id} for user {email}"
+            )
+        except Exception as e:
+            auth_logger.warning(f"Failed to create Stripe customer for {email}: {e}")
+
+        if commit_self:
+            await session.commit()
 
         auth_logger.info(f"User signup: email={email}")
         return user
@@ -668,6 +691,27 @@ class AuthService:
             },
             commit_self=False,
         )
+
+        # Create Stripe customer (non-blocking - don't fail signup if Stripe fails)
+        try:
+            stripe_customer = await Stripe.create_customer(
+                email=user_info.email,
+                name=user_info.name,
+                metadata={"user_id": str(new_user.id)},
+            )
+            await user_db.update(
+                session=session,
+                id=new_user.id,
+                updates={"stripe_customer_id": stripe_customer.id},
+                commit_self=False,
+            )
+            auth_logger.info(
+                f"Created Stripe customer {stripe_customer.id} for OAuth user {user_info.email}"
+            )
+        except Exception as e:
+            auth_logger.warning(
+                f"Failed to create Stripe customer for OAuth user {user_info.email}: {e}"
+            )
 
         if commit_self:
             await session.commit()

@@ -20,7 +20,7 @@ from app.shared.db.crud.base import BaseDB
 from app.shared.db.models.refresh_token import RefreshToken
 
 
-class RefreshTokenDB(BaseDB):
+class RefreshTokenDB(BaseDB[RefreshToken]):
     """
     Database operations for RefreshToken model.
 

@@ -316,6 +316,130 @@ def generateopenapi():
     print(f"[green]OpenAPI schema generated at {openapi_path.name}[/green]")
 
 
+async def sync_plans_task(dry_run: bool = False) -> None:
+    """
+    Synchronize subscription plans from plans.json to the database.
+
+    Reads plan definitions from app/shared/data/plans.json and upserts them
+    into the database. Plans are matched by (name, product_type) unique constraint.
+
+    Args:
+        dry_run: If True, only show what would be done without making changes.
+    """
+    from decimal import Decimal
+
+    from app.shared.db import AsyncSessionLocal
+    from app.shared.db.crud import plan_db
+    from app.shared.enums import PlanType, ProductType
+
+    # Load plans from JSON file
+    plans_file = Path(__file__).parent / "app" / "shared" / "data" / "plans.json"
+    if not plans_file.exists():
+        print(f"[red]Error: Plans file not found at {plans_file}[/red]")
+        raise typer.Exit(1)
+
+    with plans_file.open("r", encoding="utf-8") as f:
+        plans_data = json.load(f)
+
+    all_plans = plans_data.get("api_plans", []) + plans_data.get("career_plans", [])
+    if not all_plans:
+        print("[yellow]No plans found in plans.json[/yellow]")
+        return
+
+    print(f"[cyan]Found {len(all_plans)} plans to sync[/cyan]")
+
+    if dry_run:
+        print("[yellow]DRY RUN - No changes will be made[/yellow]")
+        for plan in all_plans:
+            print(f"  - {plan['product_type']}/{plan['name']}: {plan['display_price']}")
+        return
+
+    created_count = 0
+    updated_count = 0
+
+    async with AsyncSessionLocal() as session:
+        for plan_def in all_plans:
+            # Resolve Stripe price IDs from environment variables
+            stripe_price_id = None
+            if env_var := plan_def.get("stripe_price_id_env"):
+                stripe_price_id = getattr(settings, env_var, None)
+
+            seat_stripe_price_id = None
+            if env_var := plan_def.get("seat_stripe_price_id_env"):
+                seat_stripe_price_id = getattr(settings, env_var, None)
+
+            # Build plan data
+            plan_data = {
+                "name": plan_def["name"],
+                "product_type": ProductType(plan_def["product_type"].lower()),
+                "description": plan_def.get("description"),
+                "price": Decimal(plan_def["price"]),
+                "display_price": plan_def.get("display_price"),
+                "stripe_price_id": stripe_price_id,
+                "seat_price": Decimal(plan_def.get("seat_price", "0.00")),
+                "seat_display_price": plan_def.get("seat_display_price"),
+                "seat_stripe_price_id": seat_stripe_price_id,
+                "is_active": plan_def.get("is_active", True),
+                "trial_days": plan_def.get("trial_days"),
+                "type": PlanType(plan_def["type"].lower()),
+                "features": plan_def.get("features", []),
+                "min_seats": plan_def.get("min_seats", 1),
+                "max_seats": plan_def.get("max_seats"),
+            }
+
+            try:
+                plan, created = await plan_db.upsert(
+                    session=session,
+                    data=plan_data,
+                    unique_fields=["name", "product_type"],
+                    commit_self=True,
+                )
+
+                if created:
+                    created_count += 1
+                    print(
+                        f"[green]  ✓ Created:[/green] {plan.product_type.value}/{plan.name}"
+                    )
+                else:
+                    updated_count += 1
+                    print(
+                        f"[blue]  ↻ Updated:[/blue] {plan.product_type.value}/{plan.name}"
+                    )
+
+            except Exception as e:
+                print(
+                    f"[red]  ✗ Error syncing {plan_def['product_type']}/{plan_def['name']}: {e}[/red]"
+                )
+
+    print(
+        f"\n[green]Sync complete:[/green] {created_count} created, {updated_count} updated"
+    )
+
+
+@app.command()
+def syncplans(
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            "-n",
+            help="Show what would be done without making changes",
+        ),
+    ] = False,
+):
+    """
+    Synchronize subscription plans from plans.json to the database.
+
+    Reads plan definitions from app/shared/data/plans.json and upserts them
+    into the database. Plans are matched by (name, product_type) unique constraint.
+
+    Examples:
+        python manage.py syncplans
+        python manage.py syncplans --dry-run
+    """
+    asyncio.run(sync_plans_task(dry_run))
+
+
 @app.callback()
 def main(ctx: typer.Context):
     print(f"Executing the command: {ctx.invoked_subcommand}")

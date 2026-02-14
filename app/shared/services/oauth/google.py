@@ -30,6 +30,7 @@ Example usage:
     await GoogleOAuthService.aclose()
 """
 
+import asyncio
 from urllib.parse import urlencode
 
 import httpx
@@ -334,8 +335,6 @@ class GoogleOAuthService(BaseOAuthProvider):
                 )
                 if attempt < max_retries:
                     # Small delay before retry
-                    import asyncio
-
                     await asyncio.sleep(0.5)
                     continue
 

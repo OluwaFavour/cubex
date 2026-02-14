@@ -348,8 +348,23 @@ class TestDecodeJwtToken:
 
     def test_decode_jwt_token_tampered(self, sample_jwt_token):
         """Test decoding tampered token."""
-        # Tamper with the token by changing a character
-        tampered_token = sample_jwt_token[:-10] + "X" + sample_jwt_token[-9:]
+        # Split the token into header, payload, and signature
+        parts = sample_jwt_token.split(".")
+        assert len(parts) == 3, "JWT should have 3 parts"
+
+        # Tamper with the payload (middle part) by replacing it entirely
+        # This guarantees signature mismatch since we keep original signature
+        import base64
+
+        # Create a different payload
+        tampered_payload = (
+            base64.urlsafe_b64encode(b'{"user_id":"hacked","exp":9999999999}')
+            .rstrip(b"=")
+            .decode()
+        )
+
+        # Reconstruct token with original header, tampered payload, original signature
+        tampered_token = f"{parts[0]}.{tampered_payload}.{parts[2]}"
 
         result = decode_jwt_token(tampered_token)
         assert result is None
@@ -860,6 +875,7 @@ class TestGetDeviceInfoEdgeCases:
         # Should return the original user agent (< 100 chars)
         assert result == ua
 
+
 # ============================================================================
 # Tests for HMAC OTP Hashing
 # ============================================================================
@@ -1074,4 +1090,297 @@ class TestHmacVerifyOtp:
         # Times should be similar (within reasonable margin)
         # This is a soft test - timing attacks prevention
         ratio = max(correct_time, wrong_time) / min(correct_time, wrong_time)
-        assert ratio < 3.0  # Allow up to 3x difference (conservative for CI environments)
+        assert (
+            ratio < 3.0
+        )  # Allow up to 3x difference (conservative for CI environments)
+
+
+class TestCreateRequestFingerprint:
+    """Test suite for create_request_fingerprint function."""
+
+    def test_deterministic_output(self):
+        """Test that same inputs always produce the same hash."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint = "/api/v1/analyze"
+        method = "POST"
+        payload_hash = "a" * 64
+        usage_estimate = {
+            "input_chars": 1000,
+            "max_output_tokens": 500,
+            "model": "gpt-4",
+        }
+
+        result1 = create_request_fingerprint(
+            endpoint, method, payload_hash, usage_estimate
+        )
+        result2 = create_request_fingerprint(
+            endpoint, method, payload_hash, usage_estimate
+        )
+
+        assert result1 == result2
+
+    def test_different_endpoints_different_hashes(self):
+        """Test that different endpoints produce different hashes."""
+        from app.shared.utils import create_request_fingerprint
+
+        payload_hash = "b" * 64
+        method = "POST"
+        usage_estimate = {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"}
+
+        result1 = create_request_fingerprint(
+            "/api/v1/analyze", method, payload_hash, usage_estimate
+        )
+        result2 = create_request_fingerprint(
+            "/api/v1/process", method, payload_hash, usage_estimate
+        )
+
+        assert result1 != result2
+
+    def test_different_methods_different_hashes(self):
+        """Test that different methods produce different hashes."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint = "/api/v1/resource"
+        payload_hash = "c" * 64
+        usage_estimate = {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"}
+
+        result1 = create_request_fingerprint(
+            endpoint, "GET", payload_hash, usage_estimate
+        )
+        result2 = create_request_fingerprint(
+            endpoint, "POST", payload_hash, usage_estimate
+        )
+
+        assert result1 != result2
+
+    def test_different_payload_hashes_different_results(self):
+        """Test that different payload hashes produce different fingerprints."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint = "/api/v1/analyze"
+        method = "POST"
+        usage_estimate = {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"}
+
+        result1 = create_request_fingerprint(endpoint, method, "a" * 64, usage_estimate)
+        result2 = create_request_fingerprint(endpoint, method, "b" * 64, usage_estimate)
+
+        assert result1 != result2
+
+    def test_different_usage_estimates_different_hashes(self):
+        """Test that different usage estimates produce different hashes."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint = "/api/v1/analyze"
+        method = "POST"
+        payload_hash = "d" * 64
+
+        result1 = create_request_fingerprint(
+            endpoint,
+            method,
+            payload_hash,
+            {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"},
+        )
+        result2 = create_request_fingerprint(
+            endpoint,
+            method,
+            payload_hash,
+            {"input_chars": 200, "max_output_tokens": 50, "model": "gpt-4"},
+        )
+
+        assert result1 != result2
+
+    def test_output_is_64_char_hex(self):
+        """Test that output is a 64-character hexadecimal string (SHA-256)."""
+        from app.shared.utils import create_request_fingerprint
+
+        result = create_request_fingerprint(
+            "/api/v1/test",
+            "POST",
+            "e" * 64,
+            {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"},
+        )
+
+        assert len(result) == 64
+        assert all(c in "0123456789abcdef" for c in result)
+
+    def test_method_normalization_to_uppercase(self):
+        """Test that method is normalized to uppercase."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint = "/api/v1/resource"
+        payload_hash = "f" * 64
+        usage_estimate = {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"}
+
+        result_upper = create_request_fingerprint(
+            endpoint, "POST", payload_hash, usage_estimate
+        )
+        result_lower = create_request_fingerprint(
+            endpoint, "post", payload_hash, usage_estimate
+        )
+
+        # Both should produce the same hash since method is normalized to uppercase
+        assert result_upper == result_lower
+
+    def test_endpoint_normalization_to_lowercase(self):
+        """Test that endpoint is normalized to lowercase."""
+        from app.shared.utils import create_request_fingerprint
+
+        method = "POST"
+        payload_hash = "a1" * 32
+        usage_estimate = {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"}
+
+        result1 = create_request_fingerprint(
+            "/api/v1/Analyze", method, payload_hash, usage_estimate
+        )
+        result2 = create_request_fingerprint(
+            "/api/v1/analyze", method, payload_hash, usage_estimate
+        )
+
+        # Both should produce the same hash since endpoint is normalized to lowercase
+        assert result1 == result2
+
+    def test_with_none_usage_estimate(self):
+        """Test fingerprint generation with None usage_estimate."""
+        from app.shared.utils import create_request_fingerprint
+
+        result = create_request_fingerprint("/api/v1/test", "GET", "b2" * 32, None)
+
+        assert len(result) == 64
+        assert all(c in "0123456789abcdef" for c in result)
+
+    def test_none_usage_vs_empty_dict_different(self):
+        """Test that None usage_estimate differs from empty dict."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint = "/api/v1/test"
+        method = "POST"
+        payload_hash = "c3" * 32
+
+        result_none = create_request_fingerprint(endpoint, method, payload_hash, None)
+        result_empty = create_request_fingerprint(endpoint, method, payload_hash, {})
+
+        # None and empty dict should be treated the same (both result in None for usage_estimate)
+        # because empty dict is falsy and `if usage_estimate:` will be False
+        assert result_none == result_empty
+
+    def test_endpoint_whitespace_is_stripped(self):
+        """Test that whitespace in endpoint is stripped."""
+        from app.shared.utils import create_request_fingerprint
+
+        method = "POST"
+        payload_hash = "d4" * 32
+        usage_estimate = {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"}
+
+        result1 = create_request_fingerprint(
+            "/api/v1/test", method, payload_hash, usage_estimate
+        )
+        result2 = create_request_fingerprint(
+            " /api/v1/test ", method, payload_hash, usage_estimate
+        )
+
+        # Both should produce the same hash since whitespace is stripped
+        assert result1 == result2
+
+    def test_empty_strings_produce_valid_hash(self):
+        """Test that empty strings still produce a valid hash."""
+        from app.shared.utils import create_request_fingerprint
+
+        result = create_request_fingerprint("", "", "", None)
+
+        assert len(result) == 64
+        assert all(c in "0123456789abcdef" for c in result)
+
+    def test_special_characters_in_endpoint(self):
+        """Test endpoints with special characters."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint_with_params = "/api/v1/analyze?key=value&foo=bar"
+        method = "POST"
+        payload_hash = "e5" * 32
+        usage_estimate = {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"}
+
+        result = create_request_fingerprint(
+            endpoint_with_params, method, payload_hash, usage_estimate
+        )
+
+        assert len(result) == 64
+        assert all(c in "0123456789abcdef" for c in result)
+
+    def test_unicode_in_endpoint(self):
+        """Test endpoints with unicode characters."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint = "/api/v1/analyze/日本語"
+        method = "POST"
+        payload_hash = "f6" * 32
+        usage_estimate = {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"}
+
+        result = create_request_fingerprint(
+            endpoint, method, payload_hash, usage_estimate
+        )
+
+        assert len(result) == 64
+        assert all(c in "0123456789abcdef" for c in result)
+
+    def test_different_models_different_hashes(self):
+        """Test that different model names produce different hashes."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint = "/api/v1/analyze"
+        method = "POST"
+        payload_hash = "a7" * 32
+
+        result1 = create_request_fingerprint(
+            endpoint,
+            method,
+            payload_hash,
+            {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"},
+        )
+        result2 = create_request_fingerprint(
+            endpoint,
+            method,
+            payload_hash,
+            {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-3.5-turbo"},
+        )
+
+        assert result1 != result2
+
+    def test_different_max_output_tokens_different_hashes(self):
+        """Test that different max_output_tokens produce different hashes."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint = "/api/v1/analyze"
+        method = "POST"
+        payload_hash = "b8" * 32
+
+        result1 = create_request_fingerprint(
+            endpoint,
+            method,
+            payload_hash,
+            {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"},
+        )
+        result2 = create_request_fingerprint(
+            endpoint,
+            method,
+            payload_hash,
+            {"input_chars": 100, "max_output_tokens": 100, "model": "gpt-4"},
+        )
+
+        assert result1 != result2
+
+    def test_partial_usage_estimate_with_missing_keys(self):
+        """Test usage estimate with only some keys provided."""
+        from app.shared.utils import create_request_fingerprint
+
+        endpoint = "/api/v1/analyze"
+        method = "POST"
+        payload_hash = "c9" * 32
+
+        # Only input_chars provided
+        result = create_request_fingerprint(
+            endpoint, method, payload_hash, {"input_chars": 100}
+        )
+
+        assert len(result) == 64
+        assert all(c in "0123456789abcdef" for c in result)

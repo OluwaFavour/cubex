@@ -11,13 +11,19 @@ class Settings(BaseSettings):
     # Application settings
     ENVIRONMENT: str = "development"  # Options: development, production
     API_DOMAIN: str = "http://localhost:8000"
-    APP_NAME: str = "CUEBEX"
+    APP_NAME: str = "CueBX"
     APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = """
-    CUEBEX
+    CueBX
     """
     DEBUG: bool = True
     ROOT_PATH: str = "/v1"
+
+    # Cleanup settings
+    USER_SOFT_DELETE_RETENTION_DAYS: int = 30
+
+    # Usage log settings
+    USAGE_LOG_PENDING_TIMEOUT_MINUTES: int = 15  # Expire pending logs after this
 
     # CORS settings
     CORS_ALLOW_ORIGINS: list[str] = ["http://localhost:3000"]
@@ -43,6 +49,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_BACKEND: Literal["memory", "redis"] = "memory"
     RATE_LIMIT_DEFAULT_REQUESTS: int = 100
     RATE_LIMIT_DEFAULT_WINDOW: int = 60  # seconds
+
+    # Quota cache settings
+    QUOTA_CACHE_BACKEND: Literal["memory", "redis"] = "memory"
 
     # OTP settings
     OTP_LENGTH: int = 6
@@ -79,6 +88,29 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
     SENTRY_ENVIRONMENT: str = "development"
     SENTRY_TRACES_SAMPLE_RATE: float = 1.0
+
+    # Stripe settings
+    STRIPE_API_KEY: str = "your_stripe_api_key"
+    STRIPE_WEBHOOK_SECRET: str = "your_stripe_webhook_secret"
+    STRIPE_API_BASE_URL: str = "https://api.stripe.com"
+    ## Stripe price settings
+    STRIPE_CUBEX_API_PRICE_PROFESSIONAL: str = "price_1NEXAMPLEPROFESSIONAL"
+    STRIPE_CUBEX_API_PRICE_BASIC: str = "price_1NEXAMPLEBASIC"
+    STRIPE_CUBEX_API_SEAT_PRICE_PROFESSIONAL: str = "price_1NEXAMPLEPROFESSIONALSEAT"
+    STRIPE_CUBEX_API_SEAT_PRICE_BASIC: str = "price_1NEXAMPLEBASICSEAT"
+    ## Stripe price settings - Cubex Career
+    STRIPE_CUBEX_CAREER_PRICE_PLUS: str = "price_1NEXAMPLECAREERPLUS"
+    STRIPE_CUBEX_CAREER_PRICE_PRO: str = "price_1NEXAMPLECAREERPRO"
+
+    # Internal API settings (for external API communication)
+    INTERNAL_API_SECRET: str = "internal_api_secret_change_in_production"
+
+    # Admin settings
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "admin_password_change_in_production"
+    ADMIN_ALERT_EMAIL: str | None = (
+        None  # Email for system alerts (DLQ, validation errors)
+    )
 
     model_config: SettingsConfigDict = SettingsConfigDict(  # type: ignore
         env_file=".env",
@@ -174,6 +206,36 @@ email_manager_logger = setup_logger(
     level=logging.INFO,
     sentry_tag="email_manager",
 )
+stripe_logger = setup_logger(
+    name="stripe_logger",
+    log_file="logs/stripe.log",
+    level=logging.INFO,
+    sentry_tag="stripe",
+)
+plan_logger = setup_logger(
+    name="plan_logger",
+    log_file="logs/plan.log",
+    level=logging.INFO,
+    sentry_tag="plan",
+)
+workspace_logger = setup_logger(
+    name="workspace_logger",
+    log_file="logs/workspace.log",
+    level=logging.INFO,
+    sentry_tag="workspace",
+)
+webhook_logger = setup_logger(
+    name="webhook_logger",
+    log_file="logs/webhook.log",
+    level=logging.INFO,
+    sentry_tag="webhook",
+)
+usage_logger = setup_logger(
+    name="usage_logger",
+    log_file="logs/usage.log",
+    level=logging.INFO,
+    sentry_tag="usage",
+)
 
 __all__ = [
     "settings",
@@ -189,4 +251,9 @@ __all__ = [
     "redis_logger",
     "rate_limit_logger",
     "email_manager_logger",
+    "stripe_logger",
+    "plan_logger",
+    "workspace_logger",
+    "webhook_logger",
+    "usage_logger",
 ]

@@ -24,7 +24,7 @@ Example usage:
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +32,7 @@ from app.core.dependencies import get_async_session
 from app.shared.config import auth_logger
 from app.shared.db.crud import user_db
 from app.shared.db.models import User
+from app.shared.exceptions.types import AuthenticationException, ForbiddenException
 from app.shared.utils import decode_jwt_token
 
 
@@ -76,31 +77,19 @@ async def get_current_user(
 
     if payload is None:
         auth_logger.warning("Authentication failed: invalid or expired token")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired access token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("Invalid or expired access token")
 
     # Extract user ID from token
     user_id_str = payload.get("sub")
     if not user_id_str:
         auth_logger.warning("Authentication failed: token missing 'sub' claim")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid access token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("Invalid access token")
 
     # Validate token type
     token_type = payload.get("type")
     if token_type != "access":
         auth_logger.warning(f"Authentication failed: wrong token type '{token_type}'")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid access token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("Invalid access token")
 
     # Parse user ID
     try:
@@ -109,11 +98,7 @@ async def get_current_user(
         auth_logger.warning(
             f"Authentication failed: invalid user ID format '{user_id_str}'"
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid access token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("Invalid access token")
 
     # Fetch user from database (use transaction to avoid leaving implicit transaction open)
     async with session.begin():
@@ -121,20 +106,12 @@ async def get_current_user(
 
     if user is None:
         auth_logger.warning(f"Authentication failed: user not found {user_id}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("User not found")
 
     # Check if user is deleted
     if user.is_deleted:
         auth_logger.warning(f"Authentication failed: user deleted {user_id}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account has been deleted",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("User account has been deleted")
 
     auth_logger.debug(f"User authenticated: {user.email}")
     return user
@@ -166,10 +143,7 @@ async def get_current_active_user(
     """
     if not user.is_active:
         auth_logger.warning(f"Access denied: user deactivated {user.email}")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is deactivated",
-        )
+        raise ForbiddenException("User account is deactivated")
 
     return user
 
@@ -200,10 +174,7 @@ async def get_current_verified_user(
     """
     if not user.email_verified:
         auth_logger.warning(f"Access denied: email not verified {user.email}")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email verification required",
-        )
+        raise ForbiddenException("Email verification required")
 
     return user
 

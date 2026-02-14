@@ -112,11 +112,104 @@ class BadRequestException(AppException):
         super().__init__(message, status.HTTP_400_BAD_REQUEST)
 
 
+class ForbiddenException(AppException):
+    """Exception raised when access is forbidden."""
+
+    def __init__(self, message: str = "Access forbidden."):
+        super().__init__(message, status.HTTP_403_FORBIDDEN)
+
+
+class PaymentRequiredException(AppException):
+    """Exception raised when payment is required."""
+
+    def __init__(self, message: str = "Payment required."):
+        super().__init__(message, status.HTTP_402_PAYMENT_REQUIRED)
+
+
 class InvalidStateException(BadRequestException):
     """Exception raised when OAuth state parameter is invalid."""
 
     def __init__(self, message: str = "Invalid state parameter."):
         super().__init__(message)
+
+
+# =============================================================================
+# Stripe Payment Exceptions
+# =============================================================================
+
+
+class StripeAPIException(AppException):
+    """Exception raised for Stripe API errors."""
+
+    def __init__(
+        self,
+        message: str = "A Stripe API error occurred.",
+        status_code: int = status.HTTP_502_BAD_GATEWAY,
+        stripe_code: str | None = None,
+        error_type: str = "api_error",
+        param: str | None = None,
+        request_id: str | None = None,
+        details: dict | None = None,
+    ):
+        super().__init__(message, status_code, details)
+        self.stripe_code = stripe_code
+        self.error_type = error_type
+        self.param = param
+        self.request_id = request_id
+
+
+class StripeCardException(AppException):
+    """Exception raised for Stripe card errors (declined, invalid, etc.)."""
+
+    def __init__(
+        self,
+        message: str = "Card was declined.",
+        stripe_code: str | None = None,
+        decline_code: str | None = None,
+        param: str | None = None,
+        request_id: str | None = None,
+        details: dict | None = None,
+    ):
+        super().__init__(message, status.HTTP_402_PAYMENT_REQUIRED, details)
+        self.stripe_code = stripe_code
+        self.decline_code = decline_code
+        self.param = param
+        self.request_id = request_id
+
+
+class IdempotencyException(AppException):
+    """Exception raised for Stripe idempotency errors."""
+
+    def __init__(
+        self,
+        message: str = "Idempotency key was used with different parameters.",
+        request_id: str | None = None,
+        details: dict | None = None,
+    ):
+        super().__init__(message, status.HTTP_409_CONFLICT, details)
+        self.request_id = request_id
+
+
+class RateLimitException(AppException):
+    """Exception raised when Stripe rate limit is exceeded."""
+
+    def __init__(
+        self,
+        message: str = "Stripe rate limit exceeded. Please try again later.",
+        details: dict | None = None,
+    ):
+        super().__init__(message, status.HTTP_429_TOO_MANY_REQUESTS, details)
+
+
+class NotImplementedException(AppException):
+    """Exception raised when a feature is not yet implemented."""
+
+    def __init__(
+        self,
+        message: str = "This feature is not yet implemented.",
+        details: dict | None = None,
+    ):
+        super().__init__(message, status.HTTP_501_NOT_IMPLEMENTED, details)
 
 
 __all__ = [
@@ -134,5 +227,12 @@ __all__ = [
     "ConflictException",
     "UserAlreadyExistsException",
     "BadRequestException",
+    "ForbiddenException",
+    "PaymentRequiredException",
     "InvalidStateException",
+    "StripeAPIException",
+    "StripeCardException",
+    "IdempotencyException",
+    "RateLimitException",
+    "NotImplementedException",
 ]

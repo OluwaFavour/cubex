@@ -18,8 +18,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
+
+from app.shared.exceptions.types import AuthenticationException, ForbiddenException
 
 
 class TestGetCurrentUser:
@@ -75,14 +76,14 @@ class TestGetCurrentUser:
         with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = None  # Invalid token
 
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(AuthenticationException) as exc_info:
                 await get_current_user(
                     credentials=mock_credentials,
                     session=mock_session,
                 )
 
             assert exc_info.value.status_code == 401
-            assert "Invalid or expired access token" in exc_info.value.detail
+            assert "Invalid or expired access token" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_token_missing_sub_claim_raises_401(self):
@@ -101,14 +102,14 @@ class TestGetCurrentUser:
                 # Missing 'sub' claim
             }
 
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(AuthenticationException) as exc_info:
                 await get_current_user(
                     credentials=mock_credentials,
                     session=mock_session,
                 )
 
             assert exc_info.value.status_code == 401
-            assert "Invalid access token" in exc_info.value.detail
+            assert "Invalid access token" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_wrong_token_type_raises_401(self):
@@ -128,14 +129,14 @@ class TestGetCurrentUser:
                 "exp": 9999999999,
             }
 
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(AuthenticationException) as exc_info:
                 await get_current_user(
                     credentials=mock_credentials,
                     session=mock_session,
                 )
 
             assert exc_info.value.status_code == 401
-            assert "Invalid access token" in exc_info.value.detail
+            assert "Invalid access token" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_invalid_user_id_format_raises_401(self):
@@ -154,14 +155,14 @@ class TestGetCurrentUser:
                 "exp": 9999999999,
             }
 
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(AuthenticationException) as exc_info:
                 await get_current_user(
                     credentials=mock_credentials,
                     session=mock_session,
                 )
 
             assert exc_info.value.status_code == 401
-            assert "Invalid access token" in exc_info.value.detail
+            assert "Invalid access token" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_user_not_found_raises_401(self):
@@ -186,14 +187,14 @@ class TestGetCurrentUser:
             with patch("app.shared.dependencies.auth.user_db") as mock_user_db:
                 mock_user_db.get_by_id = AsyncMock(return_value=None)  # User not found
 
-                with pytest.raises(HTTPException) as exc_info:
+                with pytest.raises(AuthenticationException) as exc_info:
                     await get_current_user(
                         credentials=mock_credentials,
                         session=mock_session,
                     )
 
                 assert exc_info.value.status_code == 401
-                assert "User not found" in exc_info.value.detail
+                assert "User not found" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_deleted_user_raises_401(self):
@@ -222,14 +223,14 @@ class TestGetCurrentUser:
             with patch("app.shared.dependencies.auth.user_db") as mock_user_db:
                 mock_user_db.get_by_id = AsyncMock(return_value=mock_user)
 
-                with pytest.raises(HTTPException) as exc_info:
+                with pytest.raises(AuthenticationException) as exc_info:
                     await get_current_user(
                         credentials=mock_credentials,
                         session=mock_session,
                     )
 
                 assert exc_info.value.status_code == 401
-                assert "User account has been deleted" in exc_info.value.detail
+                assert "User account has been deleted" in str(exc_info.value)
 
 
 class TestGetCurrentActiveUser:
@@ -257,11 +258,11 @@ class TestGetCurrentActiveUser:
         mock_user.is_active = False
         mock_user.email = "inactive@example.com"
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(ForbiddenException) as exc_info:
             await get_current_active_user(user=mock_user)
 
         assert exc_info.value.status_code == 403
-        assert "User account is deactivated" in exc_info.value.detail
+        assert "User account is deactivated" in str(exc_info.value)
 
 
 class TestGetCurrentVerifiedUser:
@@ -289,11 +290,11 @@ class TestGetCurrentVerifiedUser:
         mock_user.email_verified = False
         mock_user.email = "unverified@example.com"
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(ForbiddenException) as exc_info:
             await get_current_verified_user(user=mock_user)
 
         assert exc_info.value.status_code == 403
-        assert "Email verification required" in exc_info.value.detail
+        assert "Email verification required" in str(exc_info.value)
 
 
 class TestGetOptionalUser:

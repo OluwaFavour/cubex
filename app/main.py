@@ -9,19 +9,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_async_session
 from app.shared.config import settings, app_logger
-from app.shared.db import init_db, dispose_db
 from app.shared.exceptions.handlers import (
     authentication_exception_handler,
     bad_request_exception_handler,
     conflict_exception_handler,
     database_exception_handler,
     exception_schema,
+    forbidden_exception_handler,
     general_exception_handler,
+    idempotency_exception_handler,
     not_found_exception_handler,
+    not_implemented_exception_handler,
     oauth_exception_handler,
     otp_expired_exception_handler,
     otp_invalid_exception_handler,
+    payment_required_exception_handler,
     rate_limit_exception_handler,
+    stripe_api_exception_handler,
+    stripe_card_exception_handler,
+    stripe_rate_limit_exception_handler,
     too_many_attempts_exception_handler,
 )
 from app.shared.exceptions.types import (
@@ -30,20 +36,39 @@ from app.shared.exceptions.types import (
     BadRequestException,
     ConflictException,
     DatabaseException,
+    ForbiddenException,
+    IdempotencyException,
     NotFoundException,
+    NotImplementedException,
     OAuthException,
     OTPExpiredException,
     OTPInvalidException,
+    PaymentRequiredException,
+    RateLimitException,
     RateLimitExceededException,
+    StripeAPIException,
+    StripeCardException,
     TooManyAttemptsException,
 )
 from app.infrastructure.messaging import start_consumers
-from app.infrastructure.scheduler import scheduler
+from app.infrastructure.scheduler import scheduler, initialize_scheduler
 from app.shared.services import BrevoService, CloudinaryService, Renderer, RedisService
 from app.shared.services.auth import AuthService
 from app.shared.services.oauth import GoogleOAuthService, GitHubOAuthService
-from app.shared.routers import auth_router
+from app.shared.routers import auth_router, webhook_router
+from app.apps.cubex_api.routers import (
+    internal_router,
+    support_router,
+    workspace_router,
+    subscription_router as api_subscription_router,
+)
+from app.apps.cubex_career.routers import (
+    subscription_router as career_subscription_router,
+)
+from app.apps.cubex_api.services import QuotaCacheService
+from app.shared.db import AsyncSessionLocal
 from app.shared.utils import generate_openapi_json, write_to_file_async
+from app.admin import init_admin
 
 
 @asynccontextmanager
@@ -51,15 +76,17 @@ async def lifespan(app: FastAPI):
     app_logger.info("Starting application...")
     consumer_connection = None
 
-    # Initialize the database
-    app_logger.info("Initializing database...")
-    await init_db()
-    app_logger.info("Database initialized successfully.")
-
     # Initialize Redis service
     app_logger.info("Initializing Redis service...")
     await RedisService.init(settings.REDIS_URL)
     app_logger.info("Redis service initialized successfully.")
+
+    # Initialize Quota Cache service
+    app_logger.info("Initializing Quota Cache service...")
+    async with AsyncSessionLocal() as session:
+        # Use "redis" backend for distributed deployments, "memory" for single instance
+        await QuotaCacheService.init(session, backend=settings.QUOTA_CACHE_BACKEND)
+    app_logger.info("Quota Cache service initialized successfully.")
 
     # Initialize Auth service
     app_logger.info("Initializing Auth service...")
@@ -83,6 +110,7 @@ async def lifespan(app: FastAPI):
         app_logger.info("Starting scheduler...")
         scheduler.start()
         app_logger.info("Scheduler started successfully.")
+        initialize_scheduler()  # Schedule jobs after starting the scheduler
     else:
         app_logger.info("Scheduler disabled via ENABLE_SCHEDULER setting.")
 
@@ -151,11 +179,6 @@ async def lifespan(app: FastAPI):
     await RedisService.aclose()
     app_logger.info("Redis service closed successfully.")
 
-    app_logger.info("Disposing database...")
-    await dispose_db()
-    app_logger.info("Database disposed successfully.")
-    app_logger.info("Application shutdown complete.")
-
 
 app = FastAPI(
     lifespan=lifespan,
@@ -182,10 +205,20 @@ app.add_exception_handler(TooManyAttemptsException, too_many_attempts_exception_
 app.add_exception_handler(RateLimitExceededException, rate_limit_exception_handler)
 app.add_exception_handler(OAuthException, oauth_exception_handler)
 app.add_exception_handler(AuthenticationException, authentication_exception_handler)
+app.add_exception_handler(ForbiddenException, forbidden_exception_handler)
+app.add_exception_handler(PaymentRequiredException, payment_required_exception_handler)
 app.add_exception_handler(NotFoundException, not_found_exception_handler)
 app.add_exception_handler(ConflictException, conflict_exception_handler)
 app.add_exception_handler(BadRequestException, bad_request_exception_handler)
 app.add_exception_handler(DatabaseException, database_exception_handler)
+# Stripe-specific exception handlers
+app.add_exception_handler(StripeCardException, stripe_card_exception_handler)
+app.add_exception_handler(IdempotencyException, idempotency_exception_handler)
+app.add_exception_handler(RateLimitException, stripe_rate_limit_exception_handler)
+app.add_exception_handler(StripeAPIException, stripe_api_exception_handler)
+# Not implemented exception handler
+app.add_exception_handler(NotImplementedException, not_implemented_exception_handler)
+# Generic fallback
 app.add_exception_handler(AppException, general_exception_handler)
 
 # CORS configuration
@@ -208,13 +241,24 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+app.include_router(webhook_router, tags=["Webhooks"])
+app.include_router(workspace_router, prefix="/api", tags=["API - Workspaces"])
+app.include_router(api_subscription_router, prefix="/api", tags=["API - Subscriptions"])
+app.include_router(support_router, prefix="/api", tags=["API - Support"])
+app.include_router(internal_router, prefix="/api", tags=["API - Internal API"])
+app.include_router(
+    career_subscription_router, prefix="/career", tags=["Career - Subscriptions"]
+)
+
+# Mount admin interface
+init_admin(app)
 
 
 @app.get("/", include_in_schema=False)
 async def root(request: Request):
     base_url = request.base_url._url.rstrip("/")
     return {
-        "message": "Welcome to CUEBEX API",
+        "message": "Welcome to CueBX API",
         "documentations": {
             "swagger": f"{base_url}/docs",
             "redoc": f"{base_url}/redoc",
@@ -235,7 +279,7 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
     """
     health_status = {
         "status": "ok",
-        "message": "CUEBEX API is running.",
+        "message": "CueBX API is running.",
         "checks": {
             "database": "ok",
             "redis": "ok",

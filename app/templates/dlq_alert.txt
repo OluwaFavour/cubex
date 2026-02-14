@@ -1,0 +1,19 @@
+[CueBX ALERT] Dead Letter Queue Alert
+=====================================
+
+A message has been moved to the dead-letter queue after exhausting all retry attempts.
+
+DETAILS
+-------
+Queue Name:     {{ queue_name }}
+Attempt Count:  {{ attempt_count }}
+Timestamp:      {{ timestamp }}
+Environment:    {{ environment }}
+
+MESSAGE BODY
+------------
+{{ message_body }}
+
+---
+This is an automated alert from {{ app_name }}.
+Please investigate and take appropriate action.

@@ -16,10 +16,12 @@ All endpoints are prefixed with /auth when mounted in the main app.
 from typing import Annotated
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.apps.cubex_api.services.workspace import WorkspaceService
+from app.apps.cubex_career.services.subscription import CareerSubscriptionService
 from app.core.dependencies import get_async_session
 from app.shared.config import auth_logger, settings
 from app.shared.db.crud import user_db
@@ -27,6 +29,7 @@ from app.shared.db.models import User
 from app.shared.dependencies.auth import (
     CurrentActiveUser,
 )
+from app.shared.services.rate_limit import rate_limit_by_email, rate_limit_by_ip
 from app.shared.enums import OAuthProviders, OTPPurpose
 from app.shared.exceptions.types import (
     AuthenticationException,
@@ -34,6 +37,7 @@ from app.shared.exceptions.types import (
     ConflictException,
     InvalidCredentialsException,
     InvalidStateException,
+    NotFoundException,
     OAuthException,
     OTPInvalidException,
     TooManyAttemptsException,
@@ -59,11 +63,44 @@ from app.shared.schemas.auth import (
     OTPVerifyRequest,
 )
 from app.shared.services.auth import AuthService
+from app.shared.services.cloudinary import (
+    CloudinaryService,
+    CloudinaryUploadCredentials,
+)
 from app.shared.services.oauth import OAuthStateManager
 from app.shared.utils import get_device_info
 
 
-router = APIRouter(tags=["Authentication"])
+router = APIRouter()
+
+# Service instances for product setup
+_workspace_service = WorkspaceService()
+_career_subscription_service = CareerSubscriptionService()
+
+# =============================================================================
+# Rate Limiters
+# =============================================================================
+
+# Signup: 5 requests per hour per IP (prevent mass account creation)
+_signup_rate_limit = rate_limit_by_ip(limit=5, window=3600)
+
+# OTP verification: 10 requests per minute per IP (prevent brute-force)
+_verify_rate_limit = rate_limit_by_ip(limit=10, window=60)
+
+# OTP resend: 3 requests per hour per email (prevent OTP spam)
+_resend_rate_limit = rate_limit_by_email(limit=3, window=3600)
+
+# Signin: 10 requests per minute per IP (prevent credential stuffing)
+_signin_rate_limit = rate_limit_by_ip(limit=10, window=60)
+
+# Password reset request: 3 requests per hour per email (prevent email bombing)
+_password_reset_rate_limit = rate_limit_by_email(limit=3, window=3600)
+
+# Password reset confirm: 10 requests per minute per IP (prevent OTP brute-force)
+_password_reset_confirm_rate_limit = rate_limit_by_ip(limit=10, window=60)
+
+# OAuth: 20 requests per minute per IP (prevent abuse)
+_oauth_rate_limit = rate_limit_by_ip(limit=20, window=60)
 
 
 # =============================================================================
@@ -93,6 +130,41 @@ def _build_profile_response(user: User) -> ProfileResponse:
             [acc.provider for acc in user.oauth_accounts] if user.oauth_accounts else []
         ),
     )
+
+
+async def _setup_user_products(session: AsyncSession, user: User) -> None:
+    """
+    Set up product resources for a user (personal workspace + Career subscription).
+
+    This is called after:
+    - Email signup verification
+    - OAuth signup/signin
+
+    The operations are idempotent - they check for existing resources before creating.
+
+    Args:
+        session: Database session (should be within a transaction).
+        user: User to set up products for.
+    """
+    try:
+        # Create personal workspace with free API subscription
+        await _workspace_service.create_personal_workspace(
+            session, user, commit_self=False
+        )
+        auth_logger.debug(f"Personal workspace ensured for user {user.id}")
+    except Exception as e:
+        auth_logger.warning(f"Failed to create personal workspace for {user.id}: {e}")
+        # Don't fail the signup flow - user can manually activate later
+
+    try:
+        # Create free Career subscription
+        await _career_subscription_service.create_free_subscription(
+            session, user, commit_self=False
+        )
+        auth_logger.debug(f"Career subscription ensured for user {user.id}")
+    except Exception as e:
+        auth_logger.warning(f"Failed to create Career subscription for {user.id}: {e}")
+        # Don't fail the signup flow - user can manually activate later
 
 
 # =============================================================================
@@ -171,8 +243,10 @@ Returns confirmation that verification code was sent:
     },
 )
 async def signup(
+    request: Request,
     request_data: SignupRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: None = Depends(_signup_rate_limit),
 ) -> SignupResponse:
     """
     Handle user signup and send email verification OTP.
@@ -309,9 +383,10 @@ Returns JWT tokens for authentication:
     },
 )
 async def verify_signup(
-    request_data: OTPVerifyRequest,
     request: Request,
+    request_data: OTPVerifyRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: None = Depends(_verify_rate_limit),
 ) -> TokenResponse:
     """
     Verify user email with OTP code and return authentication tokens.
@@ -373,6 +448,10 @@ async def verify_signup(
                 updates={"email_verified": True},
                 commit_self=False,
             )
+
+            # Set up product resources (workspace + Career subscription)
+            # This is idempotent - safe to call on existing users
+            await _setup_user_products(session, user)
 
             # Generate tokens
             device_info = _get_device_info_from_request(request)
@@ -448,6 +527,7 @@ This prevents email enumeration attacks.
 """,
 )
 async def resend_verification(
+    request: Request,
     request_data: ResendOTPRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> MessageResponse:
@@ -459,6 +539,7 @@ async def resend_verification(
     any previous OTP codes for security.
 
     Args:
+        request (Request): The FastAPI request object.
         request_data (ResendOTPRequest): The resend request containing:
             - email: The email address to resend verification to
         session (AsyncSession): The async database session injected via
@@ -478,6 +559,9 @@ async def resend_verification(
         even if the email doesn't exist, preventing email enumeration attacks.
         Previous OTP codes are invalidated when a new one is generated.
     """
+    # Apply email-based rate limiting
+    await _resend_rate_limit(request_data.email, request.url.path)
+
     async with session.begin():
         user = await user_db.get_one_by_conditions(
             session=session,
@@ -599,9 +683,10 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
     },
 )
 async def signin(
-    request_data: LoginRequest,
     request: Request,
+    request_data: LoginRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: None = Depends(_signin_rate_limit),
 ) -> TokenResponse:
     """
     Authenticate user with email and password credentials.
@@ -611,12 +696,12 @@ async def signin(
     is captured from the request headers.
 
     Args:
+        request (Request): The FastAPI request object used to extract
+            device information from User-Agent header for session tracking.
         request_data (LoginRequest): The signin request containing:
             - email: The user's registered email address
             - password: The user's password
             - remember_me: Optional flag for extended token lifetime (30 days)
-        request (Request): The FastAPI request object used to extract
-            device information from User-Agent header for session tracking.
         session (AsyncSession): The async database session injected via
             dependency injection.
 
@@ -1127,13 +1212,14 @@ If `callback_url` is provided:
     },
 )
 async def oauth_init(
-    provider: OAuthProviders,
     request: Request,
+    provider: OAuthProviders,
     remember_me: bool = Query(False, description="Extend session to 30 days"),
     callback_url: str | None = Query(
         None,
         description="Frontend callback URL for redirect after OAuth. Must be in CORS origins.",
     ),
+    _: None = Depends(_oauth_rate_limit),
 ) -> OAuthInitResponse:
     """
     Generate the OAuth authorization URL for the specified provider.
@@ -1215,8 +1301,10 @@ Handle the OAuth provider callback after user authorization. This endpoint:
 
 | Parameter | Type | Source | Description |
 |-----------|------|--------|-------------|
-| `code` | string | Provider | Authorization code from OAuth provider |
+| `code` | string | Provider | Authorization code from OAuth provider (absent on cancel) |
 | `state` | string | Provider | CSRF state from `/oauth/{provider}` init |
+| `error` | string | Provider | Error code if user cancelled or provider error (e.g., `access_denied`) |
+| `error_description` | string | Provider | Human-readable error description (optional) |
 
 ### Response Behavior
 
@@ -1264,8 +1352,14 @@ Redirects to:
 
 When `callback_url` is set and an error occurs:
 ```
-{callback_url}?error=oauth_error
+{callback_url}?error=oauth_error&error_description=...
 ```
+
+### User Cancellation
+
+If the user cancels on the provider's consent page, the provider redirects back
+with an `error` parameter (e.g., `access_denied`). This endpoint detects the
+cancellation and redirects to `callback_url` with the error details passed through.
 
 ### Security Notes
 
@@ -1304,11 +1398,23 @@ When `callback_url` is set and an error occurs:
     },
 )
 async def oauth_callback(
-    provider: OAuthProviders,
     request: Request,
+    provider: OAuthProviders,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    code: Annotated[str, Query(description="Authorization code from provider")],
-    state: Annotated[str, Query(description="State parameter for CSRF validation")],
+    code: Annotated[
+        str | None, Query(description="Authorization code from provider")
+    ] = None,
+    state: Annotated[
+        str | None, Query(description="State parameter for CSRF validation")
+    ] = None,
+    error: Annotated[
+        str | None,
+        Query(description="Error code from provider (e.g., access_denied)"),
+    ] = None,
+    error_description: Annotated[
+        str | None, Query(description="Human-readable error description")
+    ] = None,
+    _: None = Depends(_oauth_rate_limit),
 ) -> TokenResponse | RedirectResponse:
     """
     Complete OAuth flow by exchanging authorization code for tokens.
@@ -1319,16 +1425,20 @@ async def oauth_callback(
     user or links to an existing account.
 
     Args:
-        provider (OAuthProviders): The OAuth provider that initiated the callback.
-            Must match the provider used in oauth_init.
         request (Request): The FastAPI request object used to extract
             device information from User-Agent header.
+        provider (OAuthProviders): The OAuth provider that initiated the callback.
+            Must match the provider used in oauth_init.
         session (AsyncSession): The async database session injected via
             dependency injection.
-        code (str): The authorization code received from the OAuth provider
-            after user consent.
-        state (str): The signed CSRF protection token that was passed through
+        code (str | None): The authorization code received from the OAuth provider
+            after user consent. None if user cancelled or error occurred.
+        state (str | None): The signed CSRF protection token that was passed through
             the OAuth flow. Contains encoded callback_url and remember_me.
+        error (str | None): Error code from the provider if user cancelled or
+            an error occurred (e.g., "access_denied", "consent_required").
+        error_description (str | None): Human-readable description of the error
+            from the provider. Optional, not all providers include this.
 
     Returns:
         TokenResponse | RedirectResponse: Either:
@@ -1347,6 +1457,34 @@ async def oauth_callback(
         When callback_url is set, tokens are returned in URL fragment (#)
         to prevent server-side logging of sensitive tokens.
     """
+    # Handle provider error or user cancellation (e.g., access_denied)
+    if error:
+        auth_logger.info(
+            f"OAuth callback: provider returned error for {provider.value}: "
+            f"{error} - {error_description}"
+        )
+        # Try to decode state to get callback_url for redirect
+        if state:
+            state_data = OAuthStateManager.decode_state(state)
+            if state_data and state_data.callback_url:
+                # Build error redirect URL with provider error details
+                error_params = {"error": error}
+                if error_description:
+                    error_params["error_description"] = error_description
+                return RedirectResponse(
+                    url=f"{state_data.callback_url}?{urlencode(error_params)}",
+                    status_code=307,
+                )
+        # No valid state or callback_url - raise exception
+        raise BadRequestException(message=f"OAuth error: {error}")
+
+    # Validate required params for success flow
+    if not code or not state:
+        auth_logger.warning(
+            f"OAuth callback: missing code or state for {provider.value}"
+        )
+        raise BadRequestException(message="Missing required OAuth parameters")
+
     # Decode and validate state
     state_data = OAuthStateManager.decode_state(state)
     if not state_data:
@@ -1394,6 +1532,11 @@ async def oauth_callback(
                 options=[user_db.oauth_accounts_loader],
             )
 
+            # Set up product resources (workspace + Career subscription)
+            # This is idempotent - safe to call on existing users
+            if user:
+                await _setup_user_products(session, user)
+
             # Generate tokens
             device_info = _get_device_info_from_request(request)
             tokens = await AuthService.create_token_pair(
@@ -1430,8 +1573,9 @@ async def oauth_callback(
     except OAuthException as e:
         auth_logger.error(f"OAuth callback failed: {e}")
         if callback_url:
+            error_params = {"error": "oauth_error", "error_description": e.message}
             return RedirectResponse(
-                url=f"{callback_url}?error={e.message}",
+                url=f"{callback_url}?{urlencode(error_params)}",
                 status_code=307,
             )
         raise
@@ -1439,8 +1583,12 @@ async def oauth_callback(
     except Exception as e:
         auth_logger.error(f"OAuth callback failed unexpectedly: {e}")
         if callback_url:
+            error_params = {
+                "error": "oauth_error",
+                "error_description": "OAuth authentication failed",
+            }
             return RedirectResponse(
-                url=f"{callback_url}?error=oauth_error",
+                url=f"{callback_url}?{urlencode(error_params)}",
                 status_code=307,
             )
         raise OAuthException(message="OAuth authentication failed")
@@ -1507,6 +1655,7 @@ discover which emails are registered.
 """,
 )
 async def request_password_reset(
+    request: Request,
     request_data: PasswordResetRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> MessageResponse:
@@ -1518,6 +1667,7 @@ async def request_password_reset(
     intentionally vague to prevent email enumeration attacks.
 
     Args:
+        request (Request): The FastAPI request object.
         request_data (PasswordResetRequest): The reset request containing:
             - email: The email address associated with the account
         session (AsyncSession): The async database session injected via
@@ -1537,6 +1687,9 @@ async def request_password_reset(
         OTP is only sent if the email exists AND the user has a password
         (not OAuth-only). The OTP is valid for 10 minutes.
     """
+    # Apply email-based rate limiting
+    await _password_reset_rate_limit(request_data.email, request.url.path)
+
     async with session.begin():
         user = await user_db.get_one_by_conditions(
             session=session,
@@ -1636,8 +1789,10 @@ a new password. All existing sessions are revoked for security.
     },
 )
 async def confirm_password_reset(
+    request: Request,
     request_data: PasswordResetConfirmRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: None = Depends(_password_reset_confirm_rate_limit),
 ) -> MessageResponse:
     """
     Verify OTP and set a new password, revoking all existing sessions.
@@ -1647,6 +1802,7 @@ async def confirm_password_reset(
     tokens for security.
 
     Args:
+        request (Request): The FastAPI request object.
         request_data (PasswordResetConfirmRequest): The confirmation request
             containing:
             - email: The email address for the account
@@ -1977,9 +2133,173 @@ async def get_profile(
         options=[user_db.oauth_accounts_loader],
     )
     if reloaded_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise NotFoundException("User not found")
 
     return _build_profile_response(reloaded_user)
+
+
+@router.get(
+    "/me/avatar/upload-credentials",
+    response_model=CloudinaryUploadCredentials,
+    summary="Get avatar upload credentials",
+    description="""
+## Get Avatar Upload Credentials
+
+Generate signed Cloudinary credentials for secure client-side profile picture upload.
+The frontend can use these credentials to upload directly to Cloudinary without
+exposing sensitive API secrets.
+
+### Authentication Required
+
+```http
+Authorization: Bearer <access_token>
+```
+
+### Success Response (200)
+
+```json
+{
+  "upload_url": "https://api.cloudinary.com/v1_1/your-cloud/image/upload",
+  "api_key": "123456789012345",
+  "timestamp": 1706745600,
+  "signature": "abcdef1234567890abcdef1234567890abcdef12",
+  "cloud_name": "your-cloud",
+  "folder": "avatars",
+  "resource_type": "image",
+  "upload_preset": null,
+  "eager": null
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `upload_url` | string | Cloudinary upload endpoint URL |
+| `api_key` | string | Cloudinary API key (safe for frontend) |
+| `timestamp` | integer | Unix timestamp for signature validation |
+| `signature` | string | Signed hash for secure upload authentication |
+| `cloud_name` | string | Your Cloudinary cloud name |
+| `folder` | string | Target folder for uploaded avatars |
+| `resource_type` | string | Resource type (`image`) |
+| `upload_preset` | string | Upload preset (if configured) |
+| `eager` | string | Eager transformations (if any) |
+
+### Frontend Usage Example
+
+```javascript
+// 1. Get credentials from this endpoint
+const response = await fetch('/auth/me/avatar/upload-credentials', {
+  headers: { 'Authorization': `Bearer ${accessToken}` }
+});
+const credentials = await response.json();
+
+// 2. Upload directly to Cloudinary
+const formData = new FormData();
+formData.append('file', selectedFile);
+formData.append('api_key', credentials.api_key);
+formData.append('timestamp', credentials.timestamp);
+formData.append('signature', credentials.signature);
+formData.append('folder', credentials.folder);
+
+const uploadResponse = await fetch(credentials.upload_url, {
+  method: 'POST',
+  body: formData
+});
+const result = await uploadResponse.json();
+
+// 3. Update profile with the returned URL
+await fetch('/auth/me', {
+  method: 'PATCH',
+  headers: {
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ avatar_url: result.secure_url })
+});
+```
+
+### Error Responses
+
+| Status | Reason |
+|--------|--------|
+| `401 Unauthorized` | Missing or invalid access token |
+| `500 Internal Server Error` | Cloudinary not configured |
+| `503 Service Unavailable` | Failed to generate credentials |
+
+### Notes
+
+- Credentials are **time-limited** (signature includes timestamp)
+- Files are uploaded to the `avatars` folder in Cloudinary
+- Only **image** uploads are allowed with these credentials
+- After upload, use `PATCH /auth/me` to update `avatar_url`
+""",
+    responses={
+        401: {
+            "description": "Not authenticated",
+            "content": {
+                "application/json": {"example": {"detail": "Not authenticated"}}
+            },
+        },
+        500: {
+            "description": "Cloudinary not configured",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Cloudinary is not properly configured."}
+                }
+            },
+        },
+        503: {
+            "description": "Failed to generate credentials",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Failed to generate upload credentials"}
+                }
+            },
+        },
+    },
+)
+async def get_avatar_upload_credentials(
+    user: CurrentActiveUser,
+) -> CloudinaryUploadCredentials:
+    """
+    Generate signed Cloudinary credentials for secure client-side avatar upload.
+
+    This endpoint generates all necessary parameters (signature, timestamp,
+    api_key, etc.) that the frontend needs to upload a profile picture
+    directly to Cloudinary without exposing the API secret.
+
+    Args:
+        user (CurrentActiveUser): The currently authenticated user, injected
+            via FastAPI dependency. Used to ensure only authenticated users
+            can generate upload credentials.
+
+    Returns:
+        CloudinaryUploadCredentials: A Pydantic model containing:
+            - upload_url: The Cloudinary upload endpoint URL
+            - api_key: The Cloudinary API key (safe to expose)
+            - timestamp: Unix timestamp used for signing
+            - signature: The generated signature for the upload
+            - cloud_name: The Cloudinary cloud name
+            - folder: Target folder ("avatars")
+            - resource_type: Set to "image" for profile pictures
+
+    Raises:
+        HTTPException (401): If the user is not authenticated.
+        AppException (500): If Cloudinary is not properly configured.
+        AppException (503): If signature generation fails.
+
+    Note:
+        The generated credentials are time-sensitive. The frontend should
+        use them promptly after receiving them. After uploading to Cloudinary,
+        the frontend should call PATCH /auth/me with the returned secure_url
+        to update the user's avatar_url.
+    """
+    auth_logger.info(f"Generating avatar upload credentials for user {user.id}")
+    return CloudinaryService.generate_upload_credentials(
+        folder="avatars",
+        resource_type="image",
+    )
 
 
 @router.patch(
@@ -2121,7 +2441,7 @@ async def update_profile(
             options=[user_db.oauth_accounts_loader],
         )
         if reloaded_user is None:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise NotFoundException("User not found")
 
     return _build_profile_response(reloaded_user)
 

@@ -9,6 +9,7 @@ from alembic import context
 from app.shared.db import Base
 
 from app.shared.db.models import *
+from app.apps.cubex_api.db.models import *
 from app.shared.config import settings
 
 # this is the Alembic Config object, which provides
