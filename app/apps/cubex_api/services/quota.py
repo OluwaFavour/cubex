@@ -95,6 +95,20 @@ class RateLimitInfo:
     is_exceeded: bool = False
 
 
+@dataclass
+class ResolvedAPIKey:
+    """Container for resolved API key information.
+
+    Used by _resolve_api_key helper to return all necessary data
+    for subsequent processing steps.
+    """
+
+    api_key_id: UUID
+    workspace_id: UUID
+    is_test_key: bool
+    plan_id: UUID | None
+
+
 # ============================================================================
 # Service
 # ============================================================================
@@ -306,6 +320,249 @@ class QuotaService:
             is_exceeded=is_exceeded,
         )
 
+    async def _check_idempotency(
+        self,
+        session: AsyncSession,
+        workspace_id: UUID,
+        request_id: str,
+        fingerprint_hash: str,
+    ) -> (
+        tuple[
+            AccessStatus,
+            UUID | None,
+            str,
+            Decimal | None,
+            int,
+            bool,
+            RateLimitInfo | None,
+        ]
+        | None
+    ):
+        """
+        Check if this is an idempotent (duplicate) request.
+
+        Args:
+            session: Database session.
+            workspace_id: The workspace UUID.
+            request_id: The request ID from client.
+            fingerprint_hash: Hash of request parameters.
+
+        Returns:
+            Full response tuple if duplicate found, None otherwise.
+        """
+        existing_log = await usage_log_db.get_by_request_id_and_fingerprint(
+            session, workspace_id, request_id, fingerprint_hash
+        )
+        if not existing_log:
+            return None
+
+        # True duplicate - return the stored access_status
+        access = AccessStatus(existing_log.access_status)
+        existing_api_key = await api_key_db.get_by_id(session, existing_log.api_key_id)
+        is_test = existing_api_key.is_test_key if existing_api_key else False
+
+        workspace_logger.info(
+            f"Idempotent request: workspace={workspace_id}, request_id={request_id}, "
+            f"fingerprint={fingerprint_hash[:16]}..., "
+            f"returning existing access_status={access.value}, "
+            f"usage_id={existing_log.id}, is_test={is_test}"
+        )
+        return (
+            access,
+            existing_log.id,
+            f"Request already processed (idempotent). Access: {access.value}",
+            existing_log.credits_reserved,
+            status.HTTP_200_OK,
+            is_test,
+            None,  # rate_limit_info - not tracked for idempotent requests
+        )
+
+    async def _resolve_api_key(
+        self,
+        session: AsyncSession,
+        api_key: str,
+        workspace_id: UUID,
+    ) -> (
+        ResolvedAPIKey
+        | tuple[
+            AccessStatus,
+            UUID | None,
+            str,
+            Decimal | None,
+            int,
+            bool,
+            RateLimitInfo | None,
+        ]
+    ):
+        """
+        Resolve and validate an API key, returning key info or error response.
+
+        Uses cache for hot path optimization, falls back to DB on cache miss.
+
+        Args:
+            session: Database session.
+            api_key: The raw API key string.
+            workspace_id: Expected workspace UUID from client_id.
+
+        Returns:
+            ResolvedAPIKey on success, or error response tuple on failure.
+        """
+        key_hash = self._hash_api_key(api_key)
+
+        # Try cache first for hot path optimization
+        cached_info = await QuotaCacheService.get_cached_api_key_info(key_hash)
+
+        if cached_info:
+            # Cache hit - validate workspace matches
+            cached_workspace_id = UUID(cached_info["workspace_id"])
+            if cached_workspace_id != workspace_id:
+                workspace_logger.warning(
+                    f"API key workspace mismatch (cached): key={cached_workspace_id}, "
+                    f"client_id={workspace_id}"
+                )
+                return (
+                    AccessStatus.DENIED,
+                    None,
+                    "API key does not belong to the specified workspace.",
+                    None,
+                    status.HTTP_403_FORBIDDEN,
+                    False,
+                    None,
+                )
+
+            api_key_id = UUID(cached_info["id"])
+            is_test_key = cached_info["is_test_key"] == "1"
+            plan_id = (
+                UUID(cached_info["plan_id"]) if cached_info.get("plan_id") else None
+            )
+
+            # Update last_used_at timestamp
+            await api_key_db.update_last_used(session, api_key_id, commit_self=False)
+
+            workspace_logger.debug(
+                f"API key cache hit: key_hash={key_hash[:16]}..., "
+                f"workspace={workspace_id}, is_test={is_test_key}"
+            )
+
+            return ResolvedAPIKey(
+                api_key_id=api_key_id,
+                workspace_id=workspace_id,
+                is_test_key=is_test_key,
+                plan_id=plan_id,
+            )
+
+        # Cache miss - query database
+        api_key_record = await api_key_db.get_active_by_hash(session, key_hash)
+
+        if not api_key_record:
+            workspace_logger.warning(
+                f"API key not found or invalid for workspace: {workspace_id}"
+            )
+            return (
+                AccessStatus.DENIED,
+                None,
+                "API key not found, expired, or revoked.",
+                None,
+                status.HTTP_401_UNAUTHORIZED,
+                False,
+                None,
+            )
+
+        # Verify workspace matches
+        if api_key_record.workspace_id != workspace_id:
+            workspace_logger.warning(
+                f"API key workspace mismatch: key={api_key_record.workspace_id}, "
+                f"client_id={workspace_id}"
+            )
+            return (
+                AccessStatus.DENIED,
+                None,
+                "API key does not belong to the specified workspace.",
+                None,
+                status.HTTP_403_FORBIDDEN,
+                False,
+                None,
+            )
+
+        # Extract key info
+        api_key_id = api_key_record.id
+        is_test_key = api_key_record.is_test_key
+
+        # Get plan_id from workspace's subscription (eager-loaded)
+        workspace = api_key_record.workspace
+        plan_id = None
+        if workspace and workspace.subscription:
+            plan_id = workspace.subscription.plan_id
+
+        # Cache API key info for subsequent requests (15s TTL)
+        await QuotaCacheService.cache_api_key_info(
+            key_hash=key_hash,
+            api_key_id=str(api_key_id),
+            workspace_id=str(workspace_id),
+            is_test_key=is_test_key,
+            plan_id=str(plan_id) if plan_id else None,
+        )
+
+        # Update last_used_at timestamp
+        await api_key_db.update_last_used(session, api_key_id, commit_self=False)
+
+        return ResolvedAPIKey(
+            api_key_id=api_key_id,
+            workspace_id=workspace_id,
+            is_test_key=is_test_key,
+            plan_id=plan_id,
+        )
+
+    async def _check_quota_for_live_key(
+        self,
+        session: AsyncSession,
+        workspace_id: UUID,
+        plan_id: UUID | None,
+        credits_reserved: Decimal,
+    ) -> tuple[AccessStatus, str, int]:
+        """
+        Check quota for a live API key.
+
+        Args:
+            session: Database session.
+            workspace_id: The workspace UUID.
+            plan_id: The plan UUID (or None for default).
+            credits_reserved: Credits required for this request.
+
+        Returns:
+            Tuple of (access_status, message, http_status_code).
+        """
+        # Get credits limit for the plan (with DB fallback if cache unavailable)
+        credits_limit = (
+            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+                session, plan_id
+            )
+        )
+
+        # Get current usage from subscription context (O(1) lookup)
+        context = await api_subscription_context_db.get_by_workspace(
+            session, workspace_id
+        )
+
+        current_usage = context.credits_used if context else Decimal("0.0000")
+
+        # Check quota: current_usage + credits_reserved <= credits_limit
+        remaining_credits = credits_limit - current_usage
+        if current_usage + credits_reserved <= credits_limit:
+            return (
+                AccessStatus.GRANTED,
+                f"Access granted. {remaining_credits - credits_reserved:.2f} credits "
+                f"remaining after this request.",
+                status.HTTP_200_OK,
+            )
+        else:
+            return (
+                AccessStatus.DENIED,
+                f"Quota exceeded. Used {current_usage:.2f}/{credits_limit:.2f} credits. "
+                f"This request requires {credits_reserved:.2f} credits.",
+                status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
     # ========================================================================
     # API Key Management
     # ========================================================================
@@ -498,7 +755,9 @@ class QuotaService:
             - is_test_key: Whether a test key was used (for mocked responses)
             - rate_limit_info: Rate limiting information (None if rate limit check was skipped)
         """
-        # Parse client_id first (needed for idempotency check with workspace isolation)
+        # ================================================================
+        # Step 1: Parse and validate client_id
+        # ================================================================
         workspace_id = self._parse_client_id(client_id)
         if workspace_id is None:
             workspace_logger.warning(f"Invalid client_id format: {client_id}")
@@ -508,47 +767,28 @@ class QuotaService:
                 "Invalid client_id format. Expected: ws_<uuid_hex>",
                 None,
                 status.HTTP_400_BAD_REQUEST,
-                False,  # is_test_key
-                None,  # rate_limit_info
+                False,
+                None,
             )
 
-        # Compute fingerprint for idempotency
+        # ================================================================
+        # Step 2: Check idempotency (duplicate request detection)
+        # ================================================================
         fingerprint_hash = create_request_fingerprint(
             endpoint=endpoint,
             method=method,
             payload_hash=payload_hash,
             usage_estimate=usage_estimate,
         )
-
-        # Check for existing request with same workspace + request_id + fingerprint (true idempotency)
-        existing_log = await usage_log_db.get_by_request_id_and_fingerprint(
+        idempotent_result = await self._check_idempotency(
             session, workspace_id, request_id, fingerprint_hash
         )
-        if existing_log:
-            # True duplicate - return the stored access_status
-            access = AccessStatus(existing_log.access_status)
-            # Get the API key to check if it's a test key
-            existing_api_key = await api_key_db.get_by_id(
-                session, existing_log.api_key_id
-            )
-            is_test = existing_api_key.is_test_key if existing_api_key else False
-            workspace_logger.info(
-                f"Idempotent request: workspace={workspace_id}, request_id={request_id}, "
-                f"fingerprint={fingerprint_hash[:16]}..., "
-                f"returning existing access_status={access.value}, "
-                f"usage_id={existing_log.id}, is_test={is_test}"
-            )
-            return (
-                access,
-                existing_log.id,
-                f"Request already processed (idempotent). Access: {access.value}",
-                existing_log.credits_reserved,
-                status.HTTP_200_OK,
-                is_test,
-                None,  # rate_limit_info - not tracked for idempotent requests
-            )
+        if idempotent_result is not None:
+            return idempotent_result
 
-        # Validate API key format
+        # ================================================================
+        # Step 3: Validate API key format
+        # ================================================================
         if not self._validate_api_key_format(api_key):
             workspace_logger.warning(f"Invalid API key format: {api_key[:20]}...")
             return (
@@ -557,115 +797,30 @@ class QuotaService:
                 "Invalid API key format.",
                 None,
                 status.HTTP_400_BAD_REQUEST,
-                False,  # is_test_key
-                None,  # rate_limit_info
+                False,
+                None,
             )
 
-        # Hash and lookup API key (with cache optimization)
-        key_hash = self._hash_api_key(api_key)
+        # ================================================================
+        # Step 4: Resolve API key (cache or DB lookup)
+        # ================================================================
+        key_result = await self._resolve_api_key(session, api_key, workspace_id)
+        if isinstance(key_result, tuple):
+            return key_result  # Error response
 
-        # Try cache first for hot path optimization
-        cached_info = await QuotaCacheService.get_cached_api_key_info(key_hash)
+        # Extract resolved key info
+        api_key_id = key_result.api_key_id
+        is_test_key = key_result.is_test_key
+        plan_id = key_result.plan_id
 
-        if cached_info:
-            # Cache hit - use cached data (faster path)
-            cached_workspace_id = UUID(cached_info["workspace_id"])
-
-            # Verify workspace matches
-            if cached_workspace_id != workspace_id:
-                workspace_logger.warning(
-                    f"API key workspace mismatch (cached): key={cached_workspace_id}, "
-                    f"client_id={workspace_id}"
-                )
-                return (
-                    AccessStatus.DENIED,
-                    None,
-                    "API key does not belong to the specified workspace.",
-                    None,
-                    status.HTTP_403_FORBIDDEN,
-                    False,  # is_test_key
-                    None,  # rate_limit_info
-                )
-
-            is_test_key = cached_info["is_test_key"] == "1"
-            api_key_id = UUID(cached_info["id"])
-            plan_id = (
-                UUID(cached_info["plan_id"]) if cached_info.get("plan_id") else None
-            )
-
-            # Update last_used_at timestamp
-            await api_key_db.update_last_used(session, api_key_id, commit_self=False)
-
-            workspace_logger.debug(
-                f"API key cache hit: key_hash={key_hash[:16]}..., "
-                f"workspace={workspace_id}, is_test={is_test_key}"
-            )
-        else:
-            # Cache miss - query database
-            api_key_record = await api_key_db.get_active_by_hash(session, key_hash)
-
-            if not api_key_record:
-                workspace_logger.warning(
-                    f"API key not found or invalid for client_id: {client_id}"
-                )
-                return (
-                    AccessStatus.DENIED,
-                    None,
-                    "API key not found, expired, or revoked.",
-                    None,
-                    status.HTTP_401_UNAUTHORIZED,
-                    False,  # is_test_key
-                    None,  # rate_limit_info
-                )
-
-            # Verify workspace matches
-            if api_key_record.workspace_id != workspace_id:
-                workspace_logger.warning(
-                    f"API key workspace mismatch: key={api_key_record.workspace_id}, "
-                    f"client_id={workspace_id}"
-                )
-                return (
-                    AccessStatus.DENIED,
-                    None,
-                    "API key does not belong to the specified workspace.",
-                    None,
-                    status.HTTP_403_FORBIDDEN,
-                    False,  # is_test_key
-                    None,  # rate_limit_info
-                )
-
-            # Check if this is a test key
-            is_test_key = api_key_record.is_test_key
-            api_key_id = api_key_record.id
-
-            # Get plan_id from workspace's subscription (eager-loaded)
-            workspace = api_key_record.workspace
-            plan_id = None
-            if workspace and workspace.subscription:
-                plan_id = workspace.subscription.plan_id
-
-            # Cache API key info for subsequent requests (15s TTL)
-            await QuotaCacheService.cache_api_key_info(
-                key_hash=key_hash,
-                api_key_id=str(api_key_id),
-                workspace_id=str(workspace_id),
-                is_test_key=is_test_key,
-                plan_id=str(plan_id) if plan_id else None,
-            )
-
-            # Update last_used_at timestamp
-            await api_key_db.update_last_used(session, api_key_id, commit_self=False)
-
-        # ====================================================================
-        # Rate Limiting (workspace-level, applies to all keys including test)
-        # ====================================================================
+        # ================================================================
+        # Step 5: Rate limiting (workspace-level)
+        # ================================================================
         rate_limit_info = await self._check_rate_limit(workspace_id, plan_id)
-
         if rate_limit_info.is_exceeded:
             workspace_logger.warning(
                 f"Rate limit exceeded: workspace={workspace_id}, "
-                f"limit={rate_limit_info.limit}/min, "
-                f"reset_at={rate_limit_info.reset_timestamp}"
+                f"limit={rate_limit_info.limit}/min"
             )
             return (
                 AccessStatus.DENIED,
@@ -678,60 +833,27 @@ class QuotaService:
                 rate_limit_info,
             )
 
-        # Test keys don't consume credits
+        # ================================================================
+        # Step 6: Calculate credits and check quota
+        # ================================================================
         if is_test_key:
             credits_reserved = Decimal("0.00")
-        else:
-            credits_reserved = await QuotaCacheService.calculate_billable_cost(
-                endpoint, plan_id
-            )
-
-        # ====================================================================
-        # Quota Checking (skipped for test keys)
-        # ====================================================================
-
-        if is_test_key:
-            # Test keys always get access and don't consume credits
             access_status = AccessStatus.GRANTED
             message = "Access granted (test key - no credits charged)."
             response_status_code = status.HTTP_200_OK
         else:
-            # Get credits limit for the plan (with DB fallback if cache unavailable)
-            credits_limit = (
-                await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-                    session, plan_id
+            credits_reserved = await QuotaCacheService.calculate_billable_cost(
+                endpoint, plan_id
+            )
+            access_status, message, response_status_code = (
+                await self._check_quota_for_live_key(
+                    session, workspace_id, plan_id, credits_reserved
                 )
             )
 
-            # Get current usage from subscription context (O(1) lookup)
-            context = await api_subscription_context_db.get_by_workspace(
-                session, workspace_id
-            )
-
-            if context:
-                current_usage = context.credits_used
-            else:
-                # Fallback: no context yet (shouldn't happen normally)
-                current_usage = Decimal("0.0000")
-
-            # Check quota: current_usage + credits_reserved <= credits_limit
-            remaining_credits = credits_limit - current_usage
-            if current_usage + credits_reserved <= credits_limit:
-                access_status = AccessStatus.GRANTED
-                message = (
-                    f"Access granted. {remaining_credits - credits_reserved:.2f} credits "
-                    f"remaining after this request."
-                )
-                response_status_code = status.HTTP_200_OK
-            else:
-                access_status = AccessStatus.DENIED
-                message = (
-                    f"Quota exceeded. Used {current_usage:.2f}/{credits_limit:.2f} credits. "
-                    f"This request requires {credits_reserved:.2f} credits."
-                )
-                response_status_code = status.HTTP_429_TOO_MANY_REQUESTS
-
-        # Create usage log with PENDING status and store access decision
+        # ================================================================
+        # Step 7: Create usage log
+        # ================================================================
         usage_log = await usage_log_db.create(
             session,
             {
