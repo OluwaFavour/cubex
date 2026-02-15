@@ -718,8 +718,8 @@ class CareerSubscriptionService:
         if current_plan.id == new_plan.id:
             raise CareerSamePlanException()
 
-        # Validate upgrade only (higher price = upgrade)
-        if new_plan.price <= current_plan.price:
+        # Validate upgrade only (higher rank = upgrade)
+        if new_plan.rank <= current_plan.rank:
             raise CareerPlanDowngradeNotAllowedException(
                 f"Cannot downgrade from {current_plan.name} to {new_plan.name}. "
                 "Please cancel and resubscribe to a different plan."
@@ -785,8 +785,8 @@ class CareerSubscriptionService:
         if current_plan.id == new_plan.id:
             raise CareerSamePlanException()
 
-        # Validate upgrade only (higher price = upgrade)
-        if new_plan.price <= current_plan.price:
+        # Validate upgrade only (higher rank = upgrade)
+        if new_plan.rank <= current_plan.rank:
             raise CareerPlanDowngradeNotAllowedException(
                 f"Cannot downgrade from {current_plan.name} to {new_plan.name}. "
                 "Please cancel and resubscribe to a different plan."

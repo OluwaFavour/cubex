@@ -44,7 +44,7 @@ class PlanDB(BaseDB[Plan]):
             filters["product_type"] = product_type
 
         plans = await self.get_by_filters(
-            session, filters, order_by=[self.model.price.asc()]
+            session, filters, order_by=[self.model.rank.asc()]
         )
         return list(plans)
 

@@ -497,17 +497,6 @@ Returns the updated subscription with new seat count and billing details.
 """,
     responses={
         400: {
-            "description": "Downgrade not allowed",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Cannot downgrade from basic to free. "
-                        "Please cancel and resubscribe to a different plan"
-                    }
-                }
-            },
-        },
-        400: {
             "description": "Invalid seat count",
             "content": {
                 "application/json": {
@@ -776,11 +765,11 @@ async def reactivate_workspace(
 @router.post(
     "/workspaces/{workspace_id}/preview-upgrade",
     response_model=UpgradePreviewResponse,
-    summary="Preview plan upgrade",
+    summary="Preview subscription change",
     description="""
-## Preview Plan Upgrade Cost
+## Preview Subscription Change Cost
 
-Preview the cost of upgrading to a different plan before committing.
+Preview the cost of changing subscription plan or seat count before committing.
 Returns detailed proration information showing charges and credits.
 
 ### Authorization
@@ -797,7 +786,10 @@ Returns detailed proration information showing charges and credits.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `new_plan_id` | UUID | ✅ | The plan to upgrade/downgrade to |
+| `new_plan_id` | UUID | ❌ | The plan to upgrade/downgrade to |
+| `new_seat_count` | integer | ❌ | Optional new seat count (for upgrades/downgrades) |
+
+At least one of `new_plan_id` or `new_seat_count` must be provided.
 
 ### Response
 
@@ -805,6 +797,8 @@ Returns detailed proration information showing charges and credits.
 |-------|------|-------------|
 | `current_plan_name` | string | Name of current plan |
 | `new_plan_name` | string | Name of new plan |
+| `current_seat_count` | integer | Current number of seats |
+| `new_seat_count` | integer | New number of seats (if changing) |
 | `proration_date` | datetime | When proration is calculated |
 | `amount_due` | integer | Amount to charge (in cents) |
 | `credit` | integer | Credit from unused time (in cents) |
@@ -827,10 +821,32 @@ The preview shows:
 ### Notes
 
 - This is a **preview only** - no changes are made
-- Use the `/upgrade` endpoint to execute the upgrade
-- Amounts are in the smallest currency unit (cents for USD)
+- Use the `/upgrade` endpoint to execute the upgrade or `/seats` endpoint to change seats
+- Amounts are in the main currency unit (dollars for USD)
 """,
     responses={
+        400: {
+            "description": "Downgrade not allowed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Cannot downgrade from basic to free. "
+                        "Please cancel and resubscribe to a different plan"
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid seat count",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Current seat count (5) exceeds target plan's maximum (3). "
+                        "Reduce seats before upgrading."
+                    }
+                },
+            },
+        },
         403: {
             "description": "Admin permission required",
             "content": {
@@ -849,7 +865,7 @@ The preview shows:
         },
     },
 )
-async def preview_upgrade(
+async def preview_subscription_change(
     workspace_id: UUID,
     data: UpgradePreviewRequest,
     current_user: CurrentActiveUser,
@@ -874,13 +890,18 @@ async def preview_upgrade(
             raise SubscriptionNotFoundException()
 
         current_plan = current_sub.plan
-        new_plan = await subscription_service.get_plan(session, data.new_plan_id)
+        new_plan = (
+            await subscription_service.get_plan(session, data.new_plan_id)
+            if data.new_plan_id
+            else None
+        )
 
         # Get preview from Stripe
-        invoice_preview = await subscription_service.preview_upgrade(
+        invoice_preview = await subscription_service.preview_subscription_change(
             session,
             workspace_id=workspace_id,
             new_plan_id=data.new_plan_id,
+            new_seat_count=data.new_seat_count,
         )
 
         # Convert cents to dollars for response
@@ -954,6 +975,28 @@ Returns the updated subscription with the new plan details.
 - Changes are reflected immediately in Stripe
 """,
     responses={
+        400: {
+            "description": "Downgrade not allowed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Cannot downgrade from basic to free. "
+                        "Please cancel and resubscribe to a different plan"
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid seat count",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Current seat count (5) exceeds target plan's maximum (3). "
+                        "Reduce seats before upgrading."
+                    }
+                },
+            },
+        },
         403: {
             "description": "Admin permission required",
             "content": {

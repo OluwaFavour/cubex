@@ -279,7 +279,7 @@ class SubscriptionService:
                 "product_type": "api",
             }
         )
-
+        idempotency_key = f"checkout:{workspace_id}:{plan_id}:{seat_count}"
         checkout_session = await Stripe.create_checkout_session(
             success_url=success_url,
             cancel_url=cancel_url,
@@ -293,6 +293,7 @@ class SubscriptionService:
                 "product_type": "api",
             },
             subscription_data=subscription_data,
+            idempotency_key=idempotency_key,
         )
 
         stripe_logger.info(
@@ -350,6 +351,12 @@ class SubscriptionService:
                 commit_self=False,
             )
 
+        # Get plan details
+        plan = await plan_db.get_by_id(session, plan_id)
+        if not plan:
+            stripe_logger.error(f"Plan not found: {plan_id}")
+            raise PlanNotFoundException()  # This should not happen since plan_id is from our metadata, but just in case
+
         # Create new subscription
         # Get billing period and amount from subscription items
         current_period_start = None
@@ -357,9 +364,14 @@ class SubscriptionService:
         amount = None
         if stripe_sub.items and stripe_sub.items.data:
             items_data = stripe_sub.items.data
-            first_item = items_data[0]
-            current_period_start = first_item.current_period_start
-            current_period_end = first_item.current_period_end
+            base_item = next(
+                (item for item in items_data if item.price.id == plan.stripe_price_id),
+                items_data[
+                    0
+                ],  # Fallback to first item if we can't find the base item (should not happen)
+            )
+            current_period_start = base_item.current_period_start
+            current_period_end = base_item.current_period_end
 
             # Calculate total amount from all line items
             # For dual-line-item subscriptions: base_price + (seat_price * seat_count)
@@ -464,6 +476,13 @@ class SubscriptionService:
         Returns:
             Updated subscription or None if not found.
         """
+        # Validate parameters
+        if not session or not isinstance(session, AsyncSession):
+            stripe_logger.error("Invalid database session provided.")
+            raise ValueError("Invalid database session.")
+        if not stripe_subscription_id or not isinstance(stripe_subscription_id, str):
+            stripe_logger.error("Invalid Stripe subscription ID provided.")
+            raise ValueError("Invalid Stripe subscription ID.")
         # Get our subscription record
         subscription = await subscription_db.get_by_stripe_subscription_id(
             session, stripe_subscription_id
@@ -786,6 +805,74 @@ class SubscriptionService:
         )
         return stripe_customer.id
 
+    async def preview_seat_update(
+        self,
+        session: AsyncSession,
+        workspace_id: UUID,
+        new_seat_count: int,
+    ) -> Invoice:
+        """
+        Preview the effect of updating subscription seat count.
+
+        Args:
+            session: Database session.
+            workspace_id: Workspace ID.
+            new_seat_count: New number of seats.
+
+        Returns:
+            Stripe invoice preview showing prorated charges for the seat count change.
+
+        Raises:
+            SubscriptionNotFoundException: If no active subscription.
+            InvalidSeatCountException: If seat count invalid.
+            SeatDowngradeBlockedException: If enabled members exceed new count.
+        """
+        subscription = await subscription_db.get_by_workspace(session, workspace_id)
+        if not subscription:
+            raise SubscriptionNotFoundException()
+
+        plan = subscription.plan
+        if new_seat_count < plan.min_seats:
+            raise InvalidSeatCountException(f"Minimum {plan.min_seats} seats required.")
+        if plan.max_seats and new_seat_count > plan.max_seats:
+            raise InvalidSeatCountException(f"Maximum {plan.max_seats} seats allowed.")
+
+        # Check enabled member count
+        enabled_count = await workspace_member_db.get_enabled_member_count(
+            session, workspace_id
+        )
+        if new_seat_count < enabled_count:
+            raise SeatDowngradeBlockedException(
+                f"Cannot reduce to {new_seat_count} seats. "
+                f"Currently {enabled_count} members enabled. "
+                f"Disable members first."
+            )
+
+        # Determine proration behavior based on upgrade vs downgrade
+        # - Upgrades (add seats): charge immediately with proration
+        # - Downgrades (remove seats): effective at next billing period (no proration)
+        is_downgrade = new_seat_count < subscription.seat_count
+        proration_behavior = "none" if is_downgrade else "create_prorations"
+
+        # Preview Stripe invoice for seat count change
+        if subscription.stripe_subscription_id is None:
+            raise SubscriptionNotFoundException("Subscription has no Stripe ID.")
+
+        invoice_preview = await Stripe.preview_invoice(
+            subscription.stripe_subscription_id,
+            quantity=new_seat_count,
+            seat_price_id=plan.seat_stripe_price_id,
+            proration_behavior=proration_behavior,  # type: ignore[arg-type]
+        )
+
+        stripe_logger.info(
+            f"Preview seat count update for workspace {workspace_id}: "
+            f"{subscription.seat_count} -> {new_seat_count}, "
+            f"proration: {invoice_preview.proration_amount}"
+        )
+
+        return invoice_preview
+
     async def update_seat_count(
         self,
         session: AsyncSession,
@@ -840,11 +927,21 @@ class SubscriptionService:
         # Update Stripe subscription first (if exists)
         # If Stripe fails, exception propagates and transaction auto-rollbacks
         if subscription.stripe_subscription_id:
+            # Generate idempotency key for this operation
+            idempotency_key = (
+                f"seat_update:{workspace_id}:{new_seat_count}:"
+                f"{int(subscription.current_period_start.timestamp()) if subscription.current_period_start else ''}"
+            )
+            if plan.seat_stripe_price_id is None:
+                raise PlanNotFoundException(
+                    "Plan does not have seat pricing configured."
+                )
             await Stripe.update_subscription(
                 subscription.stripe_subscription_id,
                 quantity=new_seat_count,
                 seat_price_id=plan.seat_stripe_price_id,
                 proration_behavior=proration_behavior,  # type: ignore[arg-type]
+                idempotency_key=idempotency_key,
             )
 
         subscription_id = subscription.id
@@ -898,9 +995,15 @@ class SubscriptionService:
 
         # Cancel in Stripe if exists
         if subscription.stripe_subscription_id:
+            idempotency_key = (
+                f"cancel_subscription:{subscription.stripe_subscription_id}:"
+                f"{cancel_at_period_end}:"
+                f"{subscription.current_period_start.timestamp() if subscription.current_period_start else ''}"
+            )
             await Stripe.cancel_subscription(
                 subscription.stripe_subscription_id,
                 cancel_at_period_end=cancel_at_period_end,
+                idempotency_key=idempotency_key,
             )
 
         # Update our record
@@ -1007,21 +1110,23 @@ class SubscriptionService:
 
         return workspace  # type: ignore
 
-    async def preview_upgrade(
+    async def preview_subscription_change(
         self,
         session: AsyncSession,
         workspace_id: UUID,
-        new_plan_id: UUID,
+        new_plan_id: UUID | None = None,
+        new_seat_count: int | None = None,
     ) -> Invoice:
         """
-        Preview the cost of upgrading to a new plan.
+        Preview the cost of changing subscription plan and/or seat count.
 
         Returns a Stripe invoice preview showing prorated charges.
 
         Args:
             session: Database session.
             workspace_id: Workspace ID.
-            new_plan_id: Target plan ID to upgrade to.
+            new_plan_id: Optional Target plan ID to upgrade to (if changing plans).
+            new_seat_count: Optional new seat count (if changing seats with the upgrade).
 
         Returns:
             Stripe Invoice preview with proration details.
@@ -1030,6 +1135,8 @@ class SubscriptionService:
             SubscriptionNotFoundException: If no active subscription.
             PlanNotFoundException: If target plan not found.
             PlanDowngradeNotAllowedException: If target plan is lower tier.
+            SeatDowngradeBlockedException: If reducing seats below enabled members.
+            InvalidSeatCountException: If seat count invalid.
             SamePlanException: If already on target plan.
         """
         subscription = await subscription_db.get_by_workspace(session, workspace_id)
@@ -1041,39 +1148,95 @@ class SubscriptionService:
 
         # Get current and target plans
         current_plan = subscription.plan
-        new_plan = await self.get_plan(session, new_plan_id)
+        new_plan = await self.get_plan(session, new_plan_id) if new_plan_id else None
 
         # Validate not same plan
-        if current_plan.id == new_plan.id:
+        if new_plan and current_plan.id == new_plan.id:
             raise SamePlanException()
 
-        # Validate upgrade only (higher price = upgrade)
-        if new_plan.price <= current_plan.price:
+        # Validate upgrade only (higher rank = upgrade)
+        if new_plan and new_plan.rank <= current_plan.rank:
             raise PlanDowngradeNotAllowedException(
                 f"Cannot downgrade from {current_plan.name} to {new_plan.name}. "
                 "Please cancel and resubscribe to a different plan."
             )
 
-        # Validate new plan's seat limits
-        if new_plan.max_seats and subscription.seat_count > new_plan.max_seats:
-            raise InvalidSeatCountException(
-                f"Current seat count ({subscription.seat_count}) exceeds "
-                f"target plan's maximum ({new_plan.max_seats}). "
-                "Reduce seats before upgrading."
+        if new_seat_count is not None:
+            # Check enabled member count
+            enabled_count = await workspace_member_db.get_enabled_member_count(
+                session, workspace_id
             )
+            if new_seat_count < enabled_count:
+                raise SeatDowngradeBlockedException(
+                    f"Cannot reduce to {new_seat_count} seats. "
+                    f"Currently {enabled_count} members enabled. "
+                    f"Disable members first."
+                )
+
+        # Plan upgrades always prorate immediately, even if seat count decreases.
+        proration_behavior = "create_prorations"
+        # Validate new plan's seat limits
+        if new_plan:
+            # If changing to a new plan, validate against new plan limits
+            if new_seat_count is not None:
+                # If new_seat_count is provided, validate it against new plan limits
+                if new_seat_count < new_plan.min_seats:
+                    raise InvalidSeatCountException(
+                        f"New seat count ({new_seat_count}) cannot be less than target plan's "
+                        f"minimum ({new_plan.min_seats})."
+                    )
+                if new_plan.max_seats and new_seat_count > new_plan.max_seats:
+                    raise InvalidSeatCountException(
+                        f"New seat count ({new_seat_count}) cannot exceed target plan's "
+                        f"maximum ({new_plan.max_seats})."
+                    )
+            else:
+                # If new_seat_count is not provided, validate current seat count against new plan's max_seats
+                if new_plan.max_seats and subscription.seat_count > new_plan.max_seats:
+                    raise InvalidSeatCountException(
+                        f"Current seat count ({subscription.seat_count}) exceeds "
+                        f"target plan's maximum ({new_plan.max_seats}). "
+                        "Reduce seats before upgrading."
+                    )
+        else:
+            if new_seat_count is not None:
+                # If not changing plans but changing seats, validate against current plan limits
+                if new_seat_count < current_plan.min_seats:
+                    raise InvalidSeatCountException(
+                        f"New seat count ({new_seat_count}) cannot be less than current plan's "
+                        f"minimum ({current_plan.min_seats})."
+                    )
+                if current_plan.max_seats and new_seat_count > current_plan.max_seats:
+                    raise InvalidSeatCountException(
+                        f"New seat count ({new_seat_count}) cannot exceed current plan's "
+                        f"maximum ({current_plan.max_seats})."
+                    )
+                # Determine proration behavior based on upgrade vs downgrade
+                # - Upgrades (add seats): charge immediately with proration
+                # - Downgrades (remove seats): effective at next billing period (no proration)
+                is_downgrade = new_seat_count < subscription.seat_count
+                proration_behavior = "none" if is_downgrade else "create_prorations"
 
         # Get Stripe preview
-        if not new_plan.stripe_price_id:
+        if new_plan and not new_plan.stripe_price_id:
             raise PlanNotFoundException("Target plan has no Stripe price.")
 
         invoice_preview = await Stripe.preview_invoice(
             subscription.stripe_subscription_id,
-            new_plan.stripe_price_id,
+            new_price_id=new_plan.stripe_price_id if new_plan else None,
+            quantity=(
+                new_seat_count
+                if new_seat_count is not None
+                else subscription.seat_count
+            ),
+            seat_price_id=current_plan.seat_stripe_price_id,
+            new_seat_price_id=new_plan.seat_stripe_price_id if new_plan else None,
+            proration_behavior=proration_behavior,  # type: ignore[arg-type]
         )
 
         stripe_logger.info(
-            f"Preview upgrade for workspace {workspace_id}: "
-            f"{current_plan.name} -> {new_plan.name}, "
+            f"Preview subscription change for workspace {workspace_id}: "
+            f"{current_plan.name} -> {new_plan.name if new_plan else 'None'}, "
             f"proration: {invoice_preview.proration_amount}"
         )
 
@@ -1123,8 +1286,8 @@ class SubscriptionService:
         if current_plan.id == new_plan.id:
             raise SamePlanException()
 
-        # Validate upgrade only (higher price = upgrade)
-        if new_plan.price <= current_plan.price:
+        # Validate upgrade only (higher rank = upgrade)
+        if new_plan.rank <= current_plan.rank:
             raise PlanDowngradeNotAllowedException(
                 f"Cannot downgrade from {current_plan.name} to {new_plan.name}. "
                 "Please cancel and resubscribe to a different plan."
@@ -1137,15 +1300,27 @@ class SubscriptionService:
                 f"target plan's maximum ({new_plan.max_seats}). "
                 "Reduce seats before upgrading."
             )
-
+        if not current_plan.stripe_price_id:
+            raise PlanNotFoundException(
+                "Current plan has no Stripe price. "
+                "Use the checkout flow to subscribe to this plan."
+            )
         if not new_plan.stripe_price_id:
             raise PlanNotFoundException("Target plan has no Stripe price.")
+        if not current_plan.seat_stripe_price_id:
+            raise PlanNotFoundException("Current plan has no seat Stripe price.")
+        if not new_plan.seat_stripe_price_id:
+            raise PlanNotFoundException("Target plan has no seat Stripe price.")
 
         # Update Stripe subscription with new price
         # Proration is handled automatically by Stripe
         # For dual line item subscriptions (base + seats), update both:
         # - Base plan price: current_plan.stripe_price_id -> new_plan.stripe_price_id
         # - Seat price: current_plan.seat_stripe_price_id -> new_plan.seat_stripe_price_id
+        idempotency_key = (
+            f"plan_upgrade:{workspace_id}:{current_plan.id}:{new_plan.id}:"
+            f"{int(subscription.current_period_start.timestamp()) if subscription.current_period_start else ''}"
+        )
         await Stripe.update_subscription(
             subscription.stripe_subscription_id,
             new_price_id=new_plan.stripe_price_id,
@@ -1153,6 +1328,7 @@ class SubscriptionService:
             seat_price_id=current_plan.seat_stripe_price_id,
             new_seat_price_id=new_plan.seat_stripe_price_id,
             proration_behavior="create_prorations",
+            idempotency_key=idempotency_key,
         )
 
         # Update our database record

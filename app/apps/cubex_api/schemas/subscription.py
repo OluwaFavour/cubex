@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from app.shared.enums import PlanType, SubscriptionStatus
 
@@ -260,11 +260,25 @@ class UpgradePreviewRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "new_plan_id": "550e8400-e29b-41d4-a716-446655440000",
+                "new_seat_count": 10,
             }
         }
     )
 
-    new_plan_id: UUID
+    new_plan_id: UUID | None = None
+    new_seat_count: (
+        Annotated[int, Field(ge=1, le=100, description="New seat count")] | None
+    ) = None
+
+    @model_validator(mode="after")
+    def at_least_one_field_required(self) -> "UpgradePreviewRequest":
+        """Ensure at least one field is provided."""
+        if self.new_plan_id is None and self.new_seat_count is None:
+            raise ValueError(
+                "At least one field must be provided in upgrade_preview "
+                "(new_plan_id or new_seat_count)"
+            )
+        return self
 
 
 class UpgradePreviewResponse(BaseModel):
@@ -275,6 +289,8 @@ class UpgradePreviewResponse(BaseModel):
             "example": {
                 "current_plan": "Basic",
                 "new_plan": "Professional",
+                "current_seat_count": 5,
+                "new_seat_count": 10,
                 "proration_amount": "15.50",
                 "total_due": "29.99",
                 "currency": "usd",
@@ -285,6 +301,8 @@ class UpgradePreviewResponse(BaseModel):
 
     current_plan: str
     new_plan: str
+    current_seat_count: int
+    new_seat_count: int
     proration_amount: Decimal = Field(
         description="Amount credited/charged for unused time on current plan"
     )

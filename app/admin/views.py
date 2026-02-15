@@ -57,6 +57,7 @@ class PlanAdmin(ModelView, model=Plan):
         Plan.name,
         Plan.type,
         Plan.product_type,
+        Plan.rank,
         Plan.price,
         Plan.seat_price,
         Plan.is_active,
@@ -68,6 +69,7 @@ class PlanAdmin(ModelView, model=Plan):
     column_searchable_list = ["name", "description"]
     column_sortable_list = [
         Plan.name,
+        Plan.rank,
         Plan.price,
         Plan.is_active,
         Plan.type,
@@ -97,6 +99,7 @@ class PlanAdmin(ModelView, model=Plan):
         Plan.description,
         Plan.type,
         Plan.product_type,
+        Plan.rank,
         Plan.price,
         Plan.display_price,
         Plan.stripe_price_id,
@@ -117,6 +120,7 @@ class PlanAdmin(ModelView, model=Plan):
         Plan.description,
         Plan.type,
         Plan.product_type,
+        Plan.rank,
         Plan.price,
         Plan.display_price,
         Plan.stripe_price_id,
@@ -139,6 +143,7 @@ class PlanAdmin(ModelView, model=Plan):
         Plan.description: "Description",
         Plan.type: "Plan Type",
         Plan.product_type: "Product",
+        Plan.rank: "Rank",
         Plan.price: "Base Price ($)",
         Plan.display_price: "Display Price",
         Plan.stripe_price_id: "Stripe Price ID",
@@ -160,7 +165,7 @@ class PlanAdmin(ModelView, model=Plan):
         Plan.seat_price: lambda m, a: f"${m.seat_price:.2f}",
     }
 
-    # Permissions - Plans are immutable except for is_active
+    # Permissions - Plans are immutable except for is_active and features
     can_create = True
     can_edit = True
     can_delete = True
