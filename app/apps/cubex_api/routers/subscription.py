@@ -910,6 +910,8 @@ async def preview_subscription_change(
         return UpgradePreviewResponse(
             current_plan=current_plan.name,
             new_plan=new_plan.name,
+            current_seat_count=current_sub.seat_count,
+            new_seat_count=data.new_seat_count or current_sub.seat_count,
             proration_amount=invoice_preview.proration_amount,
             total_due=total_due,
             currency=invoice_preview.currency,
