@@ -222,13 +222,35 @@ def makemigrations(comment: Annotated[str, typer.Argument()] = "auto"):
         Prints status messages to the console.
     """
     try:
-        revision_command = f"alembic revision --autogenerate -m {comment}"
+        revision_command = f'alembic revision --autogenerate -m "{comment}"'
         print(f"Running Alembic migrations: {revision_command}")
         subprocess.run(revision_command, shell=True, check=True)
     except subprocess.CalledProcessError as e:
         print(f"[red]Error:[/red] {e}")
         raise
     print("[green]Make migrations complete[/green]")
+
+
+@app.command()
+def showmigrations():
+    """
+    Shows the current Alembic migration history.
+
+    This function runs the "alembic history" command to display the list of
+    migration revisions that have been applied to the database. It provides
+    console output to indicate the operation's status and handles errors gracefully.
+
+    Raises:
+        subprocess.CalledProcessError: If the Alembic command fails.
+    """
+    try:
+        history_command = "alembic history"
+        print(f"Running Alembic history: {history_command}")
+        subprocess.run(history_command, shell=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"[red]Error:[/red] {e}")
+        raise
+    print("[green]Show migrations complete[/green]")
 
 
 @app.command()
