@@ -139,6 +139,7 @@ def _build_member_response(member: WorkspaceMember) -> WorkspaceMemberResponse:
         joined_at=member.joined_at,
         user_email=member.user.email if member.user else None,
         user_name=member.user.full_name if member.user else None,
+        user_avatar_url=member.user.avatar_url if member.user else None,
     )
 
 
@@ -559,6 +560,7 @@ Array of member objects:
 | `joined_at` | datetime | When member joined |
 | `user_email` | string | Member's email |
 | `user_name` | string | Member's full name |
+| `user_avatar_url` | string | URL to member's avatar image |
 
 ### Error Responses
 

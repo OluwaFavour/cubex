@@ -101,6 +101,7 @@ class WorkspaceMemberResponse(BaseModel):
                 "joined_at": "2024-01-15T10:30:00Z",
                 "user_email": "john@example.com",
                 "user_name": "John Doe",
+                "user_avatar_url": "https://example.com/avatar.jpg",
             }
         },
     )
@@ -112,6 +113,7 @@ class WorkspaceMemberResponse(BaseModel):
     joined_at: datetime
     user_email: str | None = None
     user_name: str | None = None
+    user_avatar_url: str | None = None
 
 
 class WorkspaceResponse(BaseModel):
@@ -196,6 +198,7 @@ class WorkspaceDetailResponse(WorkspaceResponse):
                         "joined_at": "2024-01-15T10:30:00Z",
                         "user_email": "owner@example.com",
                         "user_name": "Owner Name",
+                        "user_avatar_url": "https://example.com/avatar_owner.jpg",
                     }
                 ],
                 "seat_count": 10,
