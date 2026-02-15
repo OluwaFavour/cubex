@@ -68,6 +68,7 @@ from app.apps.cubex_api.services import (
 from app.shared.enums import MemberRole, MemberStatus
 from app.shared.services.oauth.base import OAuthStateManager
 from app.apps.cubex_api.db.models import (
+    Workspace,
     WorkspaceMember,
     WorkspaceInvitation,
 )
@@ -81,8 +82,35 @@ router = APIRouter(prefix="/workspaces")
 # ============================================================================
 
 
-def _build_workspace_response(workspace, enabled_count: int = 0) -> WorkspaceResponse:
+async def _build_workspace_response(
+    session: AsyncSession, workspace: Workspace
+) -> WorkspaceResponse:
     """Build WorkspaceResponse from Workspace model."""
+    # Get seat count
+    seat_count = (
+        workspace.api_subscription_context.subscription.seat_count
+        if workspace.api_subscription_context
+        else 0
+    )
+    enabled_count = len(
+        [m for m in workspace.members if m.status == MemberStatus.ENABLED]
+    )
+    available_seats = seat_count - enabled_count
+
+    # Get credits
+    credits_used = (
+        workspace.api_subscription_context.credits_used
+        if workspace.api_subscription_context
+        else Decimal("0.00")
+    )
+    credits_limit = await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+        session,
+        (
+            workspace.api_subscription_context.subscription.plan_id
+            if workspace.api_subscription_context
+            else None
+        ),
+    )
     return WorkspaceResponse(
         id=workspace.id,
         display_name=workspace.display_name,
@@ -92,9 +120,12 @@ def _build_workspace_response(workspace, enabled_count: int = 0) -> WorkspaceRes
         description=workspace.description,
         created_at=workspace.created_at,
         owner_id=workspace.owner_id,
-        enabled_member_count=enabled_count
-        or len([m for m in workspace.members if m.status == MemberStatus.ENABLED]),
+        enabled_member_count=enabled_count,
         total_member_count=len(workspace.members) if workspace.members else 0,
+        seat_count=seat_count,
+        available_seats=available_seats,
+        credits_used=credits_used,
+        credits_limit=credits_limit,
     )
 
 
@@ -185,9 +216,10 @@ async def list_workspaces(
         request_logger.info(
             f"GET /workspaces - user={current_user.id} returned {len(workspaces)} workspaces"
         )
-        return WorkspaceListResponse(
-            workspaces=[_build_workspace_response(w) for w in workspaces]
-        )
+        workspaces_response = [
+            await _build_workspace_response(session, w) for w in workspaces
+        ]
+        return WorkspaceListResponse(workspaces=workspaces_response)
 
 
 @router.post(
@@ -357,11 +389,13 @@ async def get_workspace(
             raise NotFoundException("Workspace not found or access denied.")
 
         workspace = await workspace_service.get_workspace(session, workspace_id)
-        members = await workspace_member_db.get_workspace_members(session, workspace_id)
+        members = workspace.members if workspace.members else []
 
         # Get subscription info
-        subscription = await subscription_service.get_subscription(
-            session, workspace_id
+        subscription = (
+            workspace.api_subscription_context.subscription
+            if workspace.api_subscription_context
+            else None
         )
         seat_count = subscription.seat_count if subscription else 0
         enabled_count = len([m for m in members if m.status == MemberStatus.ENABLED])
@@ -474,7 +508,8 @@ async def update_workspace(
                 description=data.description,
                 commit_self=False,
             )
-            return _build_workspace_response(workspace)
+            workspace_response = await _build_workspace_response(session, workspace)
+            return workspace_response
     except PermissionDeniedException as e:
         raise ForbiddenException(str(e.message)) from e
     except WorkspaceNotFoundException as e:
@@ -1041,7 +1076,8 @@ async def transfer_ownership(
                 new_owner_id=new_owner_id,
                 commit_self=False,
             )
-            return _build_workspace_response(workspace)
+            workspace_response = await _build_workspace_response(session, workspace)
+            return workspace_response
     except PermissionDeniedException as e:
         raise ForbiddenException(str(e.message)) from e
     except MemberNotFoundException as e:
@@ -1515,11 +1551,12 @@ async def activate_personal_workspace(
                 commit_self=False,
             )
         )
+        workspace_response = await _build_workspace_response(session, workspace)
 
     request_logger.info(
         f"POST /workspaces/activate - workspace={workspace.id} for user={current_user.id}"
     )
-    return _build_workspace_response(workspace)
+    return workspace_response
 
 
 # ============================================================================

@@ -165,7 +165,12 @@ class WorkspaceDB(BaseDB[Workspace]):
             select(Workspace)
             .join(WorkspaceMember, Workspace.id == WorkspaceMember.workspace_id)
             .where(and_(*conditions))
-            .options(selectinload(Workspace.members))
+            .options(
+                selectinload(Workspace.members),
+                selectinload(Workspace.api_subscription_context).selectinload(
+                    APISubscriptionContext.subscription
+                ),
+            )
         )
 
         try:
