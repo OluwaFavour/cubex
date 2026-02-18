@@ -22,13 +22,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apps.cubex_api.services.workspace import WorkspaceService
 from app.apps.cubex_career.services.subscription import CareerSubscriptionService
-from app.core.dependencies.db import get_async_session
+from app.core.dependencies import CurrentActiveUser, get_async_session
 from app.core.config import auth_logger, settings
 from app.core.db.crud import user_db
 from app.core.db.models import User
-from app.core.dependencies.auth import (
-    CurrentActiveUser,
-)
 from app.core.services.rate_limit import rate_limit_by_email, rate_limit_by_ip
 from app.core.enums import OAuthProviders, OTPPurpose
 from app.core.exceptions.types import (

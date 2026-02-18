@@ -15,7 +15,7 @@ from app.apps.cubex_api.schemas.support import (
     ContactSalesRequest,
     ContactSalesResponse,
 )
-from app.core.dependencies.db import get_async_session
+from app.core.dependencies import get_async_session
 from app.core.config import request_logger
 from app.core.services import rate_limit_by_email
 

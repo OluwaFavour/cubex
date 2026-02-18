@@ -270,7 +270,7 @@ async def client(app, db_session: AsyncSession) -> AsyncGenerator[AsyncClient, N
     session as the test fixtures. This allows tests to set up data
     that the app can see within the same transaction.
     """
-    from app.core.dependencies.db import get_async_session
+    from app.core.dependencies import get_async_session
 
     # Override to yield the test session (no transaction management here)
     async def override_get_session():

@@ -29,7 +29,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_valid_token_returns_user(self):
         """Test that valid token returns the user object."""
-        from app.core.dependencies.auth import get_current_user
+        from app.core.dependencies import get_current_user
 
         user_id = uuid4()
         mock_user = MagicMock()
@@ -66,7 +66,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_invalid_token_raises_401(self):
         """Test that invalid token raises 401 Unauthorized."""
-        from app.core.dependencies.auth import get_current_user
+        from app.core.dependencies import get_current_user
 
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "invalid_token"
@@ -88,7 +88,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_token_missing_sub_claim_raises_401(self):
         """Test that token without 'sub' claim raises 401."""
-        from app.core.dependencies.auth import get_current_user
+        from app.core.dependencies import get_current_user
 
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "token_no_sub"
@@ -114,7 +114,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_wrong_token_type_raises_401(self):
         """Test that refresh token used as access token raises 401."""
-        from app.core.dependencies.auth import get_current_user
+        from app.core.dependencies import get_current_user
 
         user_id = uuid4()
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
@@ -141,7 +141,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_invalid_user_id_format_raises_401(self):
         """Test that invalid user ID format raises 401."""
-        from app.core.dependencies.auth import get_current_user
+        from app.core.dependencies import get_current_user
 
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "token_bad_id"
@@ -167,7 +167,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_user_not_found_raises_401(self):
         """Test that non-existent user raises 401."""
-        from app.core.dependencies.auth import get_current_user
+        from app.core.dependencies import get_current_user
 
         user_id = uuid4()
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
@@ -199,7 +199,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_deleted_user_raises_401(self):
         """Test that deleted user raises 401."""
-        from app.core.dependencies.auth import get_current_user
+        from app.core.dependencies import get_current_user
 
         user_id = uuid4()
         mock_user = MagicMock()
@@ -239,7 +239,7 @@ class TestGetCurrentActiveUser:
     @pytest.mark.asyncio
     async def test_active_user_returns_user(self):
         """Test that active user is returned successfully."""
-        from app.core.dependencies.auth import get_current_active_user
+        from app.core.dependencies import get_current_active_user
 
         mock_user = MagicMock()
         mock_user.is_active = True
@@ -252,7 +252,7 @@ class TestGetCurrentActiveUser:
     @pytest.mark.asyncio
     async def test_inactive_user_raises_403(self):
         """Test that inactive user raises 403 Forbidden."""
-        from app.core.dependencies.auth import get_current_active_user
+        from app.core.dependencies import get_current_active_user
 
         mock_user = MagicMock()
         mock_user.is_active = False
@@ -271,7 +271,7 @@ class TestGetCurrentVerifiedUser:
     @pytest.mark.asyncio
     async def test_verified_user_returns_user(self):
         """Test that verified user is returned successfully."""
-        from app.core.dependencies.auth import get_current_verified_user
+        from app.core.dependencies import get_current_verified_user
 
         mock_user = MagicMock()
         mock_user.email_verified = True
@@ -284,7 +284,7 @@ class TestGetCurrentVerifiedUser:
     @pytest.mark.asyncio
     async def test_unverified_user_raises_403(self):
         """Test that unverified user raises 403 Forbidden."""
-        from app.core.dependencies.auth import get_current_verified_user
+        from app.core.dependencies import get_current_verified_user
 
         mock_user = MagicMock()
         mock_user.email_verified = False
@@ -303,7 +303,7 @@ class TestGetOptionalUser:
     @pytest.mark.asyncio
     async def test_valid_token_returns_user(self):
         """Test that valid token returns user."""
-        from app.core.dependencies.auth import get_optional_user
+        from app.core.dependencies import get_optional_user
 
         user_id = uuid4()
         mock_user = MagicMock()
@@ -337,7 +337,7 @@ class TestGetOptionalUser:
     @pytest.mark.asyncio
     async def test_no_credentials_returns_none(self):
         """Test that missing credentials returns None."""
-        from app.core.dependencies.auth import get_optional_user
+        from app.core.dependencies import get_optional_user
 
         mock_session = AsyncMock()
 
@@ -351,7 +351,7 @@ class TestGetOptionalUser:
     @pytest.mark.asyncio
     async def test_invalid_token_returns_none(self):
         """Test that invalid token returns None instead of raising."""
-        from app.core.dependencies.auth import get_optional_user
+        from app.core.dependencies import get_optional_user
 
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "invalid_token"
@@ -371,7 +371,7 @@ class TestGetOptionalUser:
     @pytest.mark.asyncio
     async def test_user_not_found_returns_none(self):
         """Test that user not found returns None instead of raising."""
-        from app.core.dependencies.auth import get_optional_user
+        from app.core.dependencies import get_optional_user
 
         user_id = uuid4()
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
@@ -404,13 +404,13 @@ class TestBearerScheme:
 
     def test_bearer_scheme_auto_error_true(self):
         """Test that bearer_scheme has auto_error=True."""
-        from app.core.dependencies.auth import bearer_scheme
+        from app.core.dependencies import bearer_scheme
 
         assert bearer_scheme.auto_error is True
 
     def test_optional_bearer_scheme_auto_error_false(self):
         """Test that optional_bearer_scheme has auto_error=False."""
-        from app.core.dependencies.auth import optional_bearer_scheme
+        from app.core.dependencies import optional_bearer_scheme
 
         assert optional_bearer_scheme.auto_error is False
 
@@ -420,7 +420,7 @@ class TestTypeAliases:
 
     def test_type_aliases_are_defined(self):
         """Test that type aliases are properly defined."""
-        from app.core.dependencies.auth import (
+        from app.core.dependencies import (
             CurrentUser,
             CurrentActiveUser,
             CurrentVerifiedUser,
@@ -439,7 +439,7 @@ class TestModuleExports:
 
     def test_all_exports_available(self):
         """Test that all expected exports are available."""
-        from app.core.dependencies.auth import (
+        from app.core.dependencies import (
             bearer_scheme,
             optional_bearer_scheme,
             get_current_user,

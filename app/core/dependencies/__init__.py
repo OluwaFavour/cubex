@@ -17,6 +17,12 @@ from app.core.dependencies.auth import (
     bearer_scheme,
     optional_bearer_scheme,
 )
+from app.core.dependencies.db import get_async_session
+from app.core.dependencies.internal import (
+    verify_internal_api_key,
+    InternalAPIKeyDep,
+    InvalidInternalAPIKeyException,
+)
 
 __all__ = [
     "get_current_user",
@@ -29,4 +35,11 @@ __all__ = [
     "OptionalUser",
     "bearer_scheme",
     "optional_bearer_scheme",
+    # Dependency functions
+    "verify_internal_api_key",
+    # Type aliases
+    "InternalAPIKeyDep",
+    # Exceptions
+    "InvalidInternalAPIKeyException",
+    "get_async_session",
 ]

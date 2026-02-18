@@ -21,7 +21,6 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.apps.cubex_api.dependencies import InternalAPIKeyDep
 from app.apps.cubex_api.schemas.workspace import (
     UsageCommitRequest,
     UsageCommitResponse,
@@ -29,7 +28,7 @@ from app.apps.cubex_api.schemas.workspace import (
     UsageValidateResponse,
 )
 from app.apps.cubex_api.services.quota import quota_service
-from app.core.dependencies.db import get_async_session
+from app.core.dependencies import get_async_session, InternalAPIKeyDep
 
 
 router = APIRouter(prefix="/internal", tags=["Internal API"])

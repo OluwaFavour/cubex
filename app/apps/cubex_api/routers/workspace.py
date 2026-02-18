@@ -15,9 +15,8 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apps.cubex_api.services.quota_cache import QuotaCacheService
-from app.core.dependencies.db import get_async_session
+from app.core.dependencies import CurrentActiveUser, get_async_session
 from app.core.config import request_logger
-from app.core.dependencies.auth import CurrentActiveUser
 from app.core.exceptions.types import (
     BadRequestException,
     ConflictException,

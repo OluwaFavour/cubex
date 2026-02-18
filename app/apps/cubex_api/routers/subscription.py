@@ -15,9 +15,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies.db import get_async_session
+from app.core.dependencies import CurrentActiveUser, get_async_session
 from app.core.config import request_logger
-from app.core.dependencies.auth import CurrentActiveUser
 from app.apps.cubex_api.db.crud import workspace_member_db
 from app.apps.cubex_api.schemas import (
     PlanResponse,

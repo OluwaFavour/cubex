@@ -7,7 +7,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies.db import get_async_session
+from app.core.dependencies import get_async_session
 from app.core.config import settings, app_logger
 from app.core.exceptions.handlers import (
     authentication_exception_handler,
