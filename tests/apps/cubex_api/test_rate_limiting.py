@@ -562,7 +562,7 @@ class TestRateLimitEdgeCases:
 @pytest.fixture
 def internal_api_headers() -> dict[str, str]:
     """Return headers with valid internal API key."""
-    from app.shared.config import settings
+    from app.core.config import settings
 
     return {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
 
@@ -575,13 +575,13 @@ def internal_api_headers() -> dict[str, str]:
 @pytest.fixture
 async def workspace_with_subscription(db_session, test_user, free_api_plan):
     """Create a workspace with an active subscription for testing."""
-    from app.shared.db.models import (
+    from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
         Workspace,
         WorkspaceMember,
     )
-    from app.shared.enums import (
+    from app.core.enums import (
         MemberRole,
         MemberStatus,
         SubscriptionStatus,
@@ -928,13 +928,13 @@ class TestRateLimitingEndToEnd:
         """Test that rate limits are isolated per workspace."""
         from app.apps.cubex_api.db.models import APIKey
         from app.apps.cubex_api.services.quota import quota_service
-        from app.shared.db.models import (
+        from app.core.db.models import (
             APISubscriptionContext,
             Subscription,
             Workspace,
             WorkspaceMember,
         )
-        from app.shared.enums import (
+        from app.core.enums import (
             MemberRole,
             MemberStatus,
             SubscriptionStatus,

@@ -9,7 +9,7 @@ Run all tests:
     pytest tests/shared/db/crud/test_subscription_context.py -v
 
 Run with coverage:
-    pytest tests/shared/db/crud/test_subscription_context.py --cov=app.shared.db.crud.subscription_context --cov-report=term-missing -v
+    pytest tests/shared/db/crud/test_subscription_context.py --cov=app.core.db.crud.subscription_context --cov-report=term-missing -v
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -20,11 +20,11 @@ import pytest
 # Import workspace models first to avoid mapper configuration issues
 from app.apps.cubex_api.db.models.workspace import Workspace  # noqa: F401
 
-from app.shared.db.crud.subscription_context import (
+from app.core.db.crud.subscription_context import (
     APISubscriptionContextDB,
     CareerSubscriptionContextDB,
 )
-from app.shared.db.models.subscription_context import (
+from app.core.db.models.subscription_context import (
     APISubscriptionContext,
     CareerSubscriptionContext,
 )
@@ -39,7 +39,7 @@ class TestAPISubscriptionContextDBImport:
 
     def test_import_from_crud_module(self):
         """Test that api_subscription_context_db can be imported from crud module."""
-        from app.shared.db.crud import api_subscription_context_db
+        from app.core.db.crud import api_subscription_context_db
 
         assert api_subscription_context_db is not None
 
@@ -59,7 +59,7 @@ class TestCareerSubscriptionContextDBImport:
 
     def test_import_from_crud_module(self):
         """Test that career_subscription_context_db can be imported from crud module."""
-        from app.shared.db.crud import career_subscription_context_db
+        from app.core.db.crud import career_subscription_context_db
 
         assert career_subscription_context_db is not None
 

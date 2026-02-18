@@ -18,7 +18,7 @@ from pydantic import (
     model_validator,
 )
 
-from app.shared.enums import (
+from app.core.enums import (
     AccessStatus,
     FailureType,
     InvitationStatus,

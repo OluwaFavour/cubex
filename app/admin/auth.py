@@ -17,7 +17,7 @@ from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
-from app.shared.config import settings
+from app.core.config import settings
 
 # Token expiry in seconds (24 hours)
 TOKEN_MAX_AGE = 86400

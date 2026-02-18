@@ -11,7 +11,7 @@ Run all tests:
     pytest tests/shared/dependencies/test_auth.py -v
 
 Run with coverage:
-    pytest tests/shared/dependencies/test_auth.py --cov=app.shared.dependencies.auth --cov-report=term-missing -v
+    pytest tests/shared/dependencies/test_auth.py --cov=app.core.dependencies.auth --cov-report=term-missing -v
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -20,7 +20,7 @@ from uuid import uuid4
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
 
-from app.shared.exceptions.types import AuthenticationException, ForbiddenException
+from app.core.exceptions.types import AuthenticationException, ForbiddenException
 
 
 class TestGetCurrentUser:
@@ -29,7 +29,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_valid_token_returns_user(self):
         """Test that valid token returns the user object."""
-        from app.shared.dependencies.auth import get_current_user
+        from app.core.dependencies.auth import get_current_user
 
         user_id = uuid4()
         mock_user = MagicMock()
@@ -44,14 +44,14 @@ class TestGetCurrentUser:
         mock_session = MagicMock()
         mock_session.begin = MagicMock(return_value=AsyncMock())
 
-        with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
+        with patch("app.core.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
                 "sub": str(user_id),
                 "type": "access",
                 "exp": 9999999999,
             }
 
-            with patch("app.shared.dependencies.auth.user_db") as mock_user_db:
+            with patch("app.core.dependencies.auth.user_db") as mock_user_db:
                 mock_user_db.get_by_id = AsyncMock(return_value=mock_user)
 
                 result = await get_current_user(
@@ -66,14 +66,14 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_invalid_token_raises_401(self):
         """Test that invalid token raises 401 Unauthorized."""
-        from app.shared.dependencies.auth import get_current_user
+        from app.core.dependencies.auth import get_current_user
 
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "invalid_token"
 
         mock_session = AsyncMock()
 
-        with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
+        with patch("app.core.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = None  # Invalid token
 
             with pytest.raises(AuthenticationException) as exc_info:
@@ -88,14 +88,14 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_token_missing_sub_claim_raises_401(self):
         """Test that token without 'sub' claim raises 401."""
-        from app.shared.dependencies.auth import get_current_user
+        from app.core.dependencies.auth import get_current_user
 
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "token_no_sub"
 
         mock_session = AsyncMock()
 
-        with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
+        with patch("app.core.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
                 "type": "access",
                 "exp": 9999999999,
@@ -114,7 +114,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_wrong_token_type_raises_401(self):
         """Test that refresh token used as access token raises 401."""
-        from app.shared.dependencies.auth import get_current_user
+        from app.core.dependencies.auth import get_current_user
 
         user_id = uuid4()
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
@@ -122,7 +122,7 @@ class TestGetCurrentUser:
 
         mock_session = AsyncMock()
 
-        with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
+        with patch("app.core.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
                 "sub": str(user_id),
                 "type": "refresh",  # Wrong type
@@ -141,14 +141,14 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_invalid_user_id_format_raises_401(self):
         """Test that invalid user ID format raises 401."""
-        from app.shared.dependencies.auth import get_current_user
+        from app.core.dependencies.auth import get_current_user
 
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "token_bad_id"
 
         mock_session = AsyncMock()
 
-        with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
+        with patch("app.core.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
                 "sub": "not-a-valid-uuid",  # Invalid UUID
                 "type": "access",
@@ -167,7 +167,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_user_not_found_raises_401(self):
         """Test that non-existent user raises 401."""
-        from app.shared.dependencies.auth import get_current_user
+        from app.core.dependencies.auth import get_current_user
 
         user_id = uuid4()
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
@@ -177,14 +177,14 @@ class TestGetCurrentUser:
         mock_session = MagicMock()
         mock_session.begin = MagicMock(return_value=AsyncMock())
 
-        with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
+        with patch("app.core.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
                 "sub": str(user_id),
                 "type": "access",
                 "exp": 9999999999,
             }
 
-            with patch("app.shared.dependencies.auth.user_db") as mock_user_db:
+            with patch("app.core.dependencies.auth.user_db") as mock_user_db:
                 mock_user_db.get_by_id = AsyncMock(return_value=None)  # User not found
 
                 with pytest.raises(AuthenticationException) as exc_info:
@@ -199,7 +199,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_deleted_user_raises_401(self):
         """Test that deleted user raises 401."""
-        from app.shared.dependencies.auth import get_current_user
+        from app.core.dependencies.auth import get_current_user
 
         user_id = uuid4()
         mock_user = MagicMock()
@@ -213,14 +213,14 @@ class TestGetCurrentUser:
         mock_session = MagicMock()
         mock_session.begin = MagicMock(return_value=AsyncMock())
 
-        with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
+        with patch("app.core.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
                 "sub": str(user_id),
                 "type": "access",
                 "exp": 9999999999,
             }
 
-            with patch("app.shared.dependencies.auth.user_db") as mock_user_db:
+            with patch("app.core.dependencies.auth.user_db") as mock_user_db:
                 mock_user_db.get_by_id = AsyncMock(return_value=mock_user)
 
                 with pytest.raises(AuthenticationException) as exc_info:
@@ -239,7 +239,7 @@ class TestGetCurrentActiveUser:
     @pytest.mark.asyncio
     async def test_active_user_returns_user(self):
         """Test that active user is returned successfully."""
-        from app.shared.dependencies.auth import get_current_active_user
+        from app.core.dependencies.auth import get_current_active_user
 
         mock_user = MagicMock()
         mock_user.is_active = True
@@ -252,7 +252,7 @@ class TestGetCurrentActiveUser:
     @pytest.mark.asyncio
     async def test_inactive_user_raises_403(self):
         """Test that inactive user raises 403 Forbidden."""
-        from app.shared.dependencies.auth import get_current_active_user
+        from app.core.dependencies.auth import get_current_active_user
 
         mock_user = MagicMock()
         mock_user.is_active = False
@@ -271,7 +271,7 @@ class TestGetCurrentVerifiedUser:
     @pytest.mark.asyncio
     async def test_verified_user_returns_user(self):
         """Test that verified user is returned successfully."""
-        from app.shared.dependencies.auth import get_current_verified_user
+        from app.core.dependencies.auth import get_current_verified_user
 
         mock_user = MagicMock()
         mock_user.email_verified = True
@@ -284,7 +284,7 @@ class TestGetCurrentVerifiedUser:
     @pytest.mark.asyncio
     async def test_unverified_user_raises_403(self):
         """Test that unverified user raises 403 Forbidden."""
-        from app.shared.dependencies.auth import get_current_verified_user
+        from app.core.dependencies.auth import get_current_verified_user
 
         mock_user = MagicMock()
         mock_user.email_verified = False
@@ -303,7 +303,7 @@ class TestGetOptionalUser:
     @pytest.mark.asyncio
     async def test_valid_token_returns_user(self):
         """Test that valid token returns user."""
-        from app.shared.dependencies.auth import get_optional_user
+        from app.core.dependencies.auth import get_optional_user
 
         user_id = uuid4()
         mock_user = MagicMock()
@@ -317,14 +317,14 @@ class TestGetOptionalUser:
         mock_session = MagicMock()
         mock_session.begin = MagicMock(return_value=AsyncMock())
 
-        with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
+        with patch("app.core.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
                 "sub": str(user_id),
                 "type": "access",
                 "exp": 9999999999,
             }
 
-            with patch("app.shared.dependencies.auth.user_db") as mock_user_db:
+            with patch("app.core.dependencies.auth.user_db") as mock_user_db:
                 mock_user_db.get_by_id = AsyncMock(return_value=mock_user)
 
                 result = await get_optional_user(
@@ -337,7 +337,7 @@ class TestGetOptionalUser:
     @pytest.mark.asyncio
     async def test_no_credentials_returns_none(self):
         """Test that missing credentials returns None."""
-        from app.shared.dependencies.auth import get_optional_user
+        from app.core.dependencies.auth import get_optional_user
 
         mock_session = AsyncMock()
 
@@ -351,14 +351,14 @@ class TestGetOptionalUser:
     @pytest.mark.asyncio
     async def test_invalid_token_returns_none(self):
         """Test that invalid token returns None instead of raising."""
-        from app.shared.dependencies.auth import get_optional_user
+        from app.core.dependencies.auth import get_optional_user
 
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
         mock_credentials.credentials = "invalid_token"
 
         mock_session = AsyncMock()
 
-        with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
+        with patch("app.core.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = None  # Invalid token
 
             result = await get_optional_user(
@@ -371,7 +371,7 @@ class TestGetOptionalUser:
     @pytest.mark.asyncio
     async def test_user_not_found_returns_none(self):
         """Test that user not found returns None instead of raising."""
-        from app.shared.dependencies.auth import get_optional_user
+        from app.core.dependencies.auth import get_optional_user
 
         user_id = uuid4()
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
@@ -381,14 +381,14 @@ class TestGetOptionalUser:
         mock_session = MagicMock()
         mock_session.begin = MagicMock(return_value=AsyncMock())
 
-        with patch("app.shared.dependencies.auth.decode_jwt_token") as mock_decode:
+        with patch("app.core.dependencies.auth.decode_jwt_token") as mock_decode:
             mock_decode.return_value = {
                 "sub": str(user_id),
                 "type": "access",
                 "exp": 9999999999,
             }
 
-            with patch("app.shared.dependencies.auth.user_db") as mock_user_db:
+            with patch("app.core.dependencies.auth.user_db") as mock_user_db:
                 mock_user_db.get_by_id = AsyncMock(return_value=None)
 
                 result = await get_optional_user(
@@ -404,13 +404,13 @@ class TestBearerScheme:
 
     def test_bearer_scheme_auto_error_true(self):
         """Test that bearer_scheme has auto_error=True."""
-        from app.shared.dependencies.auth import bearer_scheme
+        from app.core.dependencies.auth import bearer_scheme
 
         assert bearer_scheme.auto_error is True
 
     def test_optional_bearer_scheme_auto_error_false(self):
         """Test that optional_bearer_scheme has auto_error=False."""
-        from app.shared.dependencies.auth import optional_bearer_scheme
+        from app.core.dependencies.auth import optional_bearer_scheme
 
         assert optional_bearer_scheme.auto_error is False
 
@@ -420,7 +420,7 @@ class TestTypeAliases:
 
     def test_type_aliases_are_defined(self):
         """Test that type aliases are properly defined."""
-        from app.shared.dependencies.auth import (
+        from app.core.dependencies.auth import (
             CurrentUser,
             CurrentActiveUser,
             CurrentVerifiedUser,
@@ -439,7 +439,7 @@ class TestModuleExports:
 
     def test_all_exports_available(self):
         """Test that all expected exports are available."""
-        from app.shared.dependencies.auth import (
+        from app.core.dependencies.auth import (
             bearer_scheme,
             optional_bearer_scheme,
             get_current_user,
@@ -462,7 +462,7 @@ class TestModuleExports:
 
     def test_dependencies_init_exports(self):
         """Test that dependencies __init__ exports auth functions."""
-        from app.shared.dependencies import (
+        from app.core.dependencies import (
             get_current_user,
             get_current_active_user,
             get_current_verified_user,

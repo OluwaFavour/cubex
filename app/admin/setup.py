@@ -19,7 +19,7 @@ from app.admin.views import (
     WorkspaceAdmin,
     WorkspaceMemberAdmin,
 )
-from app.shared.db import async_engine
+from app.core.db import async_engine
 
 # Admin instance will be created when init_admin is called
 admin: Admin | None = None

@@ -8,7 +8,7 @@ import pytest
 from httpx import AsyncClient
 from uuid import uuid4
 
-from app.shared.enums import SubscriptionStatus
+from app.core.enums import SubscriptionStatus
 
 
 # ============================================================================
@@ -142,7 +142,7 @@ class TestGetWorkspaceSubscription:
         self, client: AsyncClient, test_workspace, db_session
     ):
         """Should return 404 (not found) for non-members to hide workspace existence."""
-        from app.shared.db.models import User
+        from app.core.db.models import User
         from tests.conftest import create_test_access_token
 
         other_user = User(

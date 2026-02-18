@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from app.shared.enums import PlanType, SubscriptionStatus
+from app.core.enums import PlanType, SubscriptionStatus
 
 
 # ============================================================================

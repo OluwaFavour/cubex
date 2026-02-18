@@ -10,7 +10,7 @@ from uuid import uuid4, UUID
 
 from pydantic import ValidationError
 
-from app.shared.enums import (
+from app.core.enums import (
     WorkspaceStatus,
     MemberStatus,
     MemberRole,

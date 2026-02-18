@@ -30,8 +30,8 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.associationproxy import AssociationProxy, association_proxy
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.shared.db.models.base import BaseModel
-from app.shared.enums import (
+from app.core.db.models.base import BaseModel
+from app.core.enums import (
     FailureType,
     InvitationStatus,
     MemberRole,
@@ -41,9 +41,9 @@ from app.shared.enums import (
 )
 
 if TYPE_CHECKING:
-    from app.shared.db.models.user import User
-    from app.shared.db.models.subscription import Subscription
-    from app.shared.db.models.subscription_context import APISubscriptionContext
+    from app.core.db.models.user import User
+    from app.core.db.models.subscription import Subscription
+    from app.core.db.models.subscription_context import APISubscriptionContext
 
 
 class Workspace(BaseModel):

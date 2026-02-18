@@ -13,7 +13,7 @@ Run all tests:
     pytest tests/shared/db/crud/test_refresh_token.py -v
 
 Run with coverage:
-    pytest tests/shared/db/crud/test_refresh_token.py --cov=app.shared.db.crud.refresh_token --cov-report=term-missing -v
+    pytest tests/shared/db/crud/test_refresh_token.py --cov=app.core.db.crud.refresh_token --cov-report=term-missing -v
 """
 
 import hashlib
@@ -23,7 +23,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.shared.db.crud.refresh_token import RefreshTokenDB
+from app.core.db.crud.refresh_token import RefreshTokenDB
 
 
 class TestRefreshTokenDBCreate:
@@ -326,7 +326,7 @@ class TestRefreshTokenModel:
 
     def test_is_valid_property_returns_true_for_valid_token(self):
         """Test is_valid returns True for non-expired, non-revoked token."""
-        from app.shared.db.models.refresh_token import RefreshToken
+        from app.core.db.models.refresh_token import RefreshToken
 
         # Create mock token with valid attributes
         token = MagicMock(spec=RefreshToken)

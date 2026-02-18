@@ -9,7 +9,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import uuid4
 
-from app.shared.enums import OTPPurpose
+from app.core.enums import OTPPurpose
 
 
 # ============================================================================
@@ -98,10 +98,10 @@ class TestVerifySignupEndpoint:
     ):
         """Should verify email and return tokens."""
         from datetime import datetime, timedelta, timezone
-        from app.shared.db.models import OTPToken, User
-        from app.shared.services.auth import AuthService
-        from app.shared.utils import hmac_hash_otp
-        from app.shared.config import settings
+        from app.core.db.models import OTPToken, User
+        from app.core.services.auth import AuthService
+        from app.core.utils import hmac_hash_otp
+        from app.core.config import settings
 
         # Create unverified user
         user = User(
@@ -143,9 +143,9 @@ class TestVerifySignupEndpoint:
     ):
         """Should return 400 for invalid OTP."""
         from datetime import datetime, timedelta, timezone
-        from app.shared.db.models import OTPToken, User
-        from app.shared.utils import hmac_hash_otp
-        from app.shared.config import settings
+        from app.core.db.models import OTPToken, User
+        from app.core.utils import hmac_hash_otp
+        from app.core.config import settings
 
         # Create unverified user
         user = User(
@@ -181,7 +181,7 @@ class TestVerifySignupEndpoint:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         """Should return 400 when no OTP exists."""
-        from app.shared.db.models import User
+        from app.core.db.models import User
 
         # Create unverified user without OTP
         user = User(
@@ -213,7 +213,7 @@ class TestResendVerificationEndpoint:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         """Should resend verification email."""
-        from app.shared.db.models import User
+        from app.core.db.models import User
 
         # Create unverified user
         user = User(
@@ -267,8 +267,8 @@ class TestSigninEndpoint:
     @pytest.mark.asyncio
     async def test_signin_success(self, client: AsyncClient, db_session: AsyncSession):
         """Should return tokens for valid credentials."""
-        from app.shared.db.models import User
-        from app.shared.utils import hash_password
+        from app.core.db.models import User
+        from app.core.utils import hash_password
 
         # Create verified user with known password
         password = "TestPassword123!"
@@ -297,8 +297,8 @@ class TestSigninEndpoint:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         """Should return 401 for wrong password."""
-        from app.shared.db.models import User
-        from app.shared.utils import hash_password
+        from app.core.db.models import User
+        from app.core.utils import hash_password
 
         user = User(
             id=uuid4(),
@@ -329,8 +329,8 @@ class TestSigninEndpoint:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         """Should still allow signin for unverified user (API allows this)."""
-        from app.shared.db.models import User
-        from app.shared.utils import hash_password
+        from app.core.db.models import User
+        from app.core.utils import hash_password
 
         password = "TestPassword123!"
         user = User(
@@ -390,8 +390,8 @@ class TestSignoutEndpoint:
         """Should sign out with valid refresh token."""
         import hashlib
         from datetime import datetime, timedelta, timezone
-        from app.shared.db.models import RefreshToken, User
-        from app.shared.utils import create_jwt_token, hash_password
+        from app.core.db.models import RefreshToken, User
+        from app.core.utils import create_jwt_token, hash_password
 
         # Create user
         user = User(
@@ -499,10 +499,10 @@ class TestPasswordResetConfirmEndpoint:
     ):
         """Should reset password with valid OTP."""
         from datetime import datetime, timedelta, timezone
-        from app.shared.db.models import OTPToken
-        from app.shared.services.auth import AuthService
-        from app.shared.utils import hmac_hash_otp
-        from app.shared.config import settings
+        from app.core.db.models import OTPToken
+        from app.core.services.auth import AuthService
+        from app.core.utils import hmac_hash_otp
+        from app.core.config import settings
 
         # Create password reset OTP
         otp_code = AuthService.generate_otp()
@@ -550,8 +550,8 @@ class TestPasswordChangeEndpoint:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         """Should change password with valid current password."""
-        from app.shared.db.models import User
-        from app.shared.utils import hash_password, create_jwt_token
+        from app.core.db.models import User
+        from app.core.utils import hash_password, create_jwt_token
         from datetime import timedelta
 
         password = "CurrentPassword123!"
@@ -694,8 +694,8 @@ class TestGetSessionsEndpoint:
         """Should return list of active sessions."""
         import hashlib
         from datetime import datetime, timedelta, timezone
-        from app.shared.db.models import RefreshToken, User
-        from app.shared.utils import create_jwt_token, hash_password
+        from app.core.db.models import RefreshToken, User
+        from app.core.utils import create_jwt_token, hash_password
 
         # Create user
         user = User(
@@ -809,19 +809,19 @@ class TestRouterConfiguration:
     def test_router_is_api_router(self):
         """Test that router is an APIRouter instance."""
         from fastapi import APIRouter
-        from app.shared.routers.auth import router
+        from app.core.routers.auth import router
 
         assert isinstance(router, APIRouter)
 
     def test_router_prefix_is_empty(self):
         """Test that router has no prefix (set at include time)."""
-        from app.shared.routers.auth import router
+        from app.core.routers.auth import router
 
         assert router.prefix == ""
 
     def test_router_has_expected_routes(self):
         """Test that router has expected endpoints."""
-        from app.shared.routers.auth import router
+        from app.core.routers.auth import router
 
         paths = [route.path for route in router.routes]
 
@@ -832,7 +832,7 @@ class TestRouterConfiguration:
 
     def test_router_oauth_routes_exist(self):
         """Test that OAuth routes are configured."""
-        from app.shared.routers.auth import router
+        from app.core.routers.auth import router
 
         paths = [route.path for route in router.routes]
 
@@ -841,7 +841,7 @@ class TestRouterConfiguration:
 
     def test_router_password_routes_exist(self):
         """Test that password routes are configured."""
-        from app.shared.routers.auth import router
+        from app.core.routers.auth import router
 
         paths = [route.path for route in router.routes]
 
@@ -860,12 +860,12 @@ class TestModuleExports:
 
     def test_router_is_exported(self):
         """Test that router is exported from module."""
-        from app.shared.routers.auth import router
+        from app.core.routers.auth import router
 
         assert router is not None
 
     def test_router_exported_from_init(self):
         """Test router is exported from __init__."""
-        from app.shared.routers import auth_router
+        from app.core.routers import auth_router
 
         assert auth_router is not None

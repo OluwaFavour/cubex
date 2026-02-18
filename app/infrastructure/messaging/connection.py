@@ -1,6 +1,6 @@
 import aio_pika
 
-from app.shared.config import settings
+from app.core.config import settings
 
 _connection: aio_pika.RobustConnection | None = None
 

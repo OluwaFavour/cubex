@@ -16,9 +16,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session
-from app.shared.config import request_logger
-from app.shared.dependencies.auth import CurrentActiveUser
+from app.core.dependencies.db import get_async_session
+from app.core.config import request_logger
+from app.core.dependencies.auth import CurrentActiveUser
 from app.apps.cubex_api.schemas.subscription import (
     PlanResponse,
     PlanListResponse,
@@ -38,7 +38,7 @@ from app.apps.cubex_career.services.subscription import (
     career_subscription_service,
     CareerSubscriptionNotFoundException,
 )
-from app.shared.db.models import Plan, Subscription
+from app.core.db.models import Plan, Subscription
 
 
 router = APIRouter(prefix="/subscriptions")

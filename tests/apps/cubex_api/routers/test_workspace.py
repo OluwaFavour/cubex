@@ -8,7 +8,7 @@ import pytest
 from httpx import AsyncClient
 from uuid import uuid4
 
-from app.shared.enums import (
+from app.core.enums import (
     MemberRole,
     MemberStatus,
     WorkspaceStatus,
@@ -250,7 +250,7 @@ class TestGetWorkspace:
     ):
         """Should return 404 if user is not a member."""
         # Create a different authenticated user
-        from app.shared.db.models import User
+        from app.core.db.models import User
         from tests.conftest import create_test_access_token
 
         other_user = User(
@@ -404,7 +404,7 @@ class TestListMembers:
         self, client: AsyncClient, test_workspace, db_session
     ):
         """Should return 404 if user is not a member."""
-        from app.shared.db.models import User
+        from app.core.db.models import User
         from tests.conftest import create_test_access_token
 
         other_user = User(
@@ -673,7 +673,7 @@ class TestLeaveWorkspace:
         self, client: AsyncClient, test_workspace, db_session
     ):
         """Should return 404 if not a member."""
-        from app.shared.db.models import User
+        from app.core.db.models import User
         from tests.conftest import create_test_access_token
 
         other_user = User(
@@ -982,11 +982,11 @@ class TestAcceptInvitation:
         """Should accept invitation and join workspace."""
         import secrets
         from datetime import datetime, timedelta, timezone
-        from app.shared.db.models import User, WorkspaceInvitation
-        from app.shared.config import settings
-        from app.shared.utils import hmac_hash_otp
+        from app.core.db.models import User, WorkspaceInvitation
+        from app.core.config import settings
+        from app.core.utils import hmac_hash_otp
         from tests.conftest import create_test_access_token
-        from app.shared.enums import InvitationStatus, MemberRole
+        from app.core.enums import InvitationStatus, MemberRole
 
         # Create new user to accept invitation
         new_user = User(
@@ -1046,7 +1046,7 @@ class TestAcceptInvitation:
         self, client: AsyncClient, test_workspace, expired_invitation, db_session
     ):
         """Should return 404 for expired invitation."""
-        from app.shared.db.models import User
+        from app.core.db.models import User
         from tests.conftest import create_test_access_token
 
         invitation, raw_token = expired_invitation  # Unpack tuple from fixture

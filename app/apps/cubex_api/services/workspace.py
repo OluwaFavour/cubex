@@ -24,15 +24,15 @@ from app.apps.cubex_api.db.models import (
     WorkspaceInvitation,
 )
 from app.apps.cubex_api.services.quota_cache import QuotaCacheService
-from app.shared.config import settings, workspace_logger
-from app.shared.db.crud import (
+from app.core.config import settings, workspace_logger
+from app.core.db.crud import (
     api_subscription_context_db,
     plan_db,
     subscription_db,
     user_db,
 )
-from app.shared.db.models import User, Subscription, Plan
-from app.shared.enums import (
+from app.core.db.models import User, Subscription, Plan
+from app.core.enums import (
     InvitationStatus,
     MemberRole,
     MemberStatus,
@@ -40,12 +40,12 @@ from app.shared.enums import (
     SubscriptionStatus,
     WorkspaceStatus,
 )
-from app.shared.exceptions.types import (
+from app.core.exceptions.types import (
     AppException,
     ConflictException,
     NotFoundException,
 )
-from app.shared.utils import hmac_hash_otp
+from app.core.utils import hmac_hash_otp
 from app.infrastructure.messaging.publisher import publish_event
 
 
@@ -895,7 +895,7 @@ class WorkspaceService:
         # Check if expired
         if invitation.is_expired or invitation.status != InvitationStatus.PENDING:
             raise InvitationNotFoundException()
-            
+
         # Check if current user is the owner of the invitation
         if user.email.lower() != invitation.email.lower():
             raise InvitationNotFoundException()

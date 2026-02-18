@@ -20,7 +20,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.shared.enums import (
+from app.core.enums import (
     PlanType,
     ProductType,
     SubscriptionStatus,
@@ -166,8 +166,8 @@ class TestSubscriptionServiceMethods:
 
     def test_has_preview_upgrade_method(self, service):
         """Test that preview_upgrade method exists."""
-        assert hasattr(service, "preview_upgrade")
-        assert callable(service.preview_upgrade)
+        assert hasattr(service, "preview_subscription_change")
+        assert callable(service.preview_subscription_change)
 
     def test_has_upgrade_plan_method(self, service):
         """Test that upgrade_plan method exists."""
@@ -180,19 +180,19 @@ class TestSubscriptionModelIntegration:
 
     def test_subscription_model_import(self):
         """Test that Subscription model can be imported."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         assert Subscription is not None
 
     def test_stripe_event_log_model_import(self):
         """Test that StripeEventLog model can be imported."""
-        from app.shared.db.models.subscription import StripeEventLog
+        from app.core.db.models.subscription import StripeEventLog
 
         assert StripeEventLog is not None
 
     def test_plan_model_import(self):
         """Test that Plan model can be imported."""
-        from app.shared.db.models.plan import Plan
+        from app.core.db.models.plan import Plan
 
         assert Plan is not None
 
@@ -202,31 +202,31 @@ class TestSubscriptionCRUDIntegration:
 
     def test_subscription_db_import(self):
         """Test that subscription_db can be imported."""
-        from app.shared.db.crud import subscription_db
+        from app.core.db.crud import subscription_db
 
         assert subscription_db is not None
 
     def test_plan_db_import(self):
         """Test that plan_db can be imported."""
-        from app.shared.db.crud import plan_db
+        from app.core.db.crud import plan_db
 
         assert plan_db is not None
 
     def test_stripe_event_log_db_import(self):
         """Test that stripe_event_log_db can be imported."""
-        from app.shared.db.crud import stripe_event_log_db
+        from app.core.db.crud import stripe_event_log_db
 
         assert stripe_event_log_db is not None
 
     def test_api_subscription_context_db_import(self):
         """Test that api_subscription_context_db can be imported."""
-        from app.shared.db.crud import api_subscription_context_db
+        from app.core.db.crud import api_subscription_context_db
 
         assert api_subscription_context_db is not None
 
     def test_career_subscription_context_db_import(self):
         """Test that career_subscription_context_db can be imported."""
-        from app.shared.db.crud import career_subscription_context_db
+        from app.core.db.crud import career_subscription_context_db
 
         assert career_subscription_context_db is not None
 
@@ -249,33 +249,33 @@ class TestSubscriptionServiceContextIntegration:
 
     def test_api_subscription_context_model_import(self):
         """Test that APISubscriptionContext can be imported."""
-        from app.shared.db.models.subscription_context import APISubscriptionContext
+        from app.core.db.models.subscription_context import APISubscriptionContext
 
         assert APISubscriptionContext is not None
 
     def test_career_subscription_context_model_import(self):
         """Test that CareerSubscriptionContext can be imported."""
-        from app.shared.db.models.subscription_context import CareerSubscriptionContext
+        from app.core.db.models.subscription_context import CareerSubscriptionContext
 
         assert CareerSubscriptionContext is not None
 
     def test_subscription_has_api_context_relationship(self):
         """Test that Subscription model has api_context relationship."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         subscription = Subscription()
         assert hasattr(subscription, "api_context")
 
     def test_subscription_has_career_context_relationship(self):
         """Test that Subscription model has career_context relationship."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         subscription = Subscription()
         assert hasattr(subscription, "career_context")
 
     def test_subscription_has_product_type_attribute(self):
         """Test that Subscription model has product_type attribute."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         subscription = Subscription()
         assert hasattr(subscription, "product_type")
@@ -286,7 +286,7 @@ class TestSubscriptionServiceContextIntegration:
         Note: Default values are applied by the database on INSERT,
         so we just verify the attribute can be explicitly set.
         """
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         subscription = Subscription(
             plan_id=uuid4(),
@@ -319,7 +319,7 @@ class TestSubscriptionServiceAPIContextCreation:
 
     def test_service_imports_api_context_db(self):
         """Test that service can import api_subscription_context_db."""
-        from app.shared.db.crud import api_subscription_context_db
+        from app.core.db.crud import api_subscription_context_db
 
         assert api_subscription_context_db is not None
         assert hasattr(api_subscription_context_db, "create")
@@ -330,14 +330,14 @@ class TestSubscriptionDBMethods:
 
     def test_subscription_db_has_get_by_workspace(self):
         """Test that SubscriptionDB has get_by_workspace method."""
-        from app.shared.db.crud import subscription_db
+        from app.core.db.crud import subscription_db
 
         assert hasattr(subscription_db, "get_by_workspace")
         assert callable(subscription_db.get_by_workspace)
 
     def test_subscription_db_has_get_by_user(self):
         """Test that SubscriptionDB has get_by_user method."""
-        from app.shared.db.crud import subscription_db
+        from app.core.db.crud import subscription_db
 
         assert hasattr(subscription_db, "get_by_user")
         assert callable(subscription_db.get_by_user)
@@ -345,7 +345,7 @@ class TestSubscriptionDBMethods:
     @pytest.mark.asyncio
     async def test_get_by_workspace_signature(self):
         """Test get_by_workspace method signature."""
-        from app.shared.db.crud import subscription_db
+        from app.core.db.crud import subscription_db
 
         import inspect
 
@@ -359,7 +359,7 @@ class TestSubscriptionDBMethods:
     @pytest.mark.asyncio
     async def test_get_by_user_signature(self):
         """Test get_by_user method signature."""
-        from app.shared.db.crud import subscription_db
+        from app.core.db.crud import subscription_db
 
         import inspect
 
@@ -912,11 +912,14 @@ class TestHandleCheckoutCompletedAmount:
             mock_ctx_db.get_by_workspace = AsyncMock(return_value=None)
             mock_ctx_db.create = AsyncMock()
             mock_user_db.get_by_id = AsyncMock(return_value=None)
-            mock_plan_db.get_by_id = AsyncMock(return_value=None)
+            plan_id = uuid4()
+            plan = MagicMock()
+            plan.id = plan_id
+            plan.stripe_price_id = "price_123"
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
 
             mock_session = AsyncMock()
             workspace_id = uuid4()
-            plan_id = uuid4()
 
             await service.handle_checkout_completed(
                 session=mock_session,
@@ -975,11 +978,14 @@ class TestHandleCheckoutCompletedAmount:
             mock_ctx_db.get_by_workspace = AsyncMock(return_value=None)
             mock_ctx_db.create = AsyncMock()
             mock_user_db.get_by_id = AsyncMock(return_value=None)
-            mock_plan_db.get_by_id = AsyncMock(return_value=None)
+            plan_id = uuid4()
+            plan = MagicMock()
+            plan.id = plan_id
+            plan.stripe_price_id = "price_123"
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
 
             mock_session = AsyncMock()
             workspace_id = uuid4()
-            plan_id = uuid4()
 
             await service.handle_checkout_completed(
                 session=mock_session,

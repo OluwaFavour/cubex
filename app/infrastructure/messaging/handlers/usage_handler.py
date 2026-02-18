@@ -12,11 +12,11 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.shared.config import usage_logger
-from app.shared.db import AsyncSessionLocal
+from app.core.config import usage_logger
+from app.core.db import AsyncSessionLocal
 from app.apps.cubex_api.schemas.workspace import UsageCommitRequest
 from app.apps.cubex_api.services.quota import quota_service
-from app.shared.services.email_manager import EmailManagerService
+from app.core.services.email_manager import EmailManagerService
 
 
 async def handle_usage_commit(event: dict[str, Any]) -> None:

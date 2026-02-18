@@ -23,10 +23,10 @@ import wtforms
 from app.apps.cubex_api.db.crud.quota import plan_pricing_rule_db
 from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule
 from app.apps.cubex_api.db.models.workspace import UsageLog, Workspace, WorkspaceMember
-from app.shared.db.models.plan import Plan
-from app.shared.db.models.subscription import Subscription
-from app.shared.db.models.user import User
-from app.shared.enums import (
+from app.core.db.models.plan import Plan
+from app.core.db.models.subscription import Subscription
+from app.core.db.models.user import User
+from app.core.enums import (
     AccessStatus,
     FailureType,
     MemberRole,

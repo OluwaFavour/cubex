@@ -29,7 +29,7 @@ from app.apps.cubex_api.schemas.workspace import (
     UsageValidateResponse,
 )
 from app.apps.cubex_api.services.quota import quota_service
-from app.core.dependencies import get_async_session
+from app.core.dependencies.db import get_async_session
 
 
 router = APIRouter(prefix="/internal", tags=["Internal API"])

@@ -13,23 +13,23 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.config import stripe_logger
-from app.shared.db.crud import (
+from app.core.config import stripe_logger
+from app.core.db.crud import (
     career_subscription_context_db,
     plan_db,
     subscription_db,
     user_db,
 )
-from app.shared.db.models import Plan, User
-from app.shared.db.models import Subscription as SubscriptionModel
-from app.shared.enums import ProductType, SubscriptionStatus
-from app.shared.exceptions.types import (
+from app.core.db.models import Plan, User
+from app.core.db.models import Subscription as SubscriptionModel
+from app.core.enums import ProductType, SubscriptionStatus
+from app.core.exceptions.types import (
     BadRequestException,
     NotFoundException,
 )
-from app.shared.services.payment.stripe.main import Stripe
+from app.core.services.payment.stripe.main import Stripe
 from app.infrastructure.messaging.publisher import publish_event
-from app.shared.services.payment.stripe.types import (
+from app.core.services.payment.stripe.types import (
     CheckoutSession,
     Invoice,
     LineItem,

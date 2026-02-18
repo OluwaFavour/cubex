@@ -15,8 +15,8 @@ from uuid import UUID
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.config import app_logger
-from app.shared.services.redis_service import RedisService
+from app.core.config import app_logger
+from app.core.services.redis_service import RedisService
 
 if TYPE_CHECKING:
     from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule

@@ -5,12 +5,12 @@ Run tests:
     pytest app/tests/shared/exceptions/test_types.py -v
 
 Run with coverage:
-    pytest app/tests/shared/exceptions/test_types.py --cov=app.shared.exceptions.types --cov-report=term-missing -v
+    pytest app/tests/shared/exceptions/test_types.py --cov=app.core.exceptions.types --cov-report=term-missing -v
 """
 
 from fastapi import status
 
-from app.shared.exceptions.types import AppException, DatabaseException
+from app.core.exceptions.types import AppException, DatabaseException
 
 
 class TestAppException:

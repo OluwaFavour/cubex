@@ -11,9 +11,9 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 # Import from shared models which handles the import order correctly
-from app.shared.db.models import Workspace  # noqa: F401
-from app.shared.enums import PlanType, ProductType, SubscriptionStatus
-from app.shared.db.models.plan import Plan, FeatureSchema
+from app.core.db.models import Workspace  # noqa: F401
+from app.core.enums import PlanType, ProductType, SubscriptionStatus
+from app.core.db.models.plan import Plan, FeatureSchema
 
 
 class TestFeatureSchema:
@@ -208,7 +208,7 @@ class TestSubscriptionModel:
 
     def test_subscription_attributes(self):
         """Test Subscription model has expected attributes."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         plan_id = uuid4()
 
@@ -230,7 +230,7 @@ class TestSubscriptionModel:
 
     def test_subscription_status_enum(self):
         """Test Subscription model uses correct status enum."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         subscription = Subscription(
             plan_id=uuid4(),
@@ -246,7 +246,7 @@ class TestSubscriptionModel:
         Note: Default values are applied by the database on INSERT,
         so we just verify the attribute exists and can be explicitly set.
         """
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         subscription = Subscription(
             plan_id=uuid4(),
@@ -258,7 +258,7 @@ class TestSubscriptionModel:
 
     def test_subscription_product_type_career(self):
         """Test Subscription model can be set to CAREER product type."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         subscription = Subscription(
             plan_id=uuid4(),
@@ -270,7 +270,7 @@ class TestSubscriptionModel:
 
     def test_subscription_context_relationships(self):
         """Test Subscription model has context relationships."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         subscription = Subscription()
 
@@ -279,7 +279,7 @@ class TestSubscriptionModel:
 
     def test_subscription_is_active_property(self):
         """Test Subscription is_active property."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         # Active subscription
         active_sub = Subscription(
@@ -304,7 +304,7 @@ class TestSubscriptionModel:
 
     def test_subscription_is_canceled_property(self):
         """Test Subscription is_canceled property."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         # Canceled subscription
         canceled_sub = Subscription(
@@ -322,7 +322,7 @@ class TestSubscriptionModel:
 
     def test_subscription_is_past_due_property(self):
         """Test Subscription is_past_due property."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         # Past due subscription
         past_due_sub = Subscription(
@@ -347,7 +347,7 @@ class TestSubscriptionModel:
 
     def test_subscription_requires_action_property(self):
         """Test Subscription requires_action property."""
-        from app.shared.db.models.subscription import Subscription
+        from app.core.db.models.subscription import Subscription
 
         # Incomplete subscription
         incomplete_sub = Subscription(
@@ -376,7 +376,7 @@ class TestStripeEventLogModel:
 
     def test_stripe_event_log_attributes(self):
         """Test StripeEventLog model has expected attributes."""
-        from app.shared.db.models.subscription import StripeEventLog
+        from app.core.db.models.subscription import StripeEventLog
 
         event = StripeEventLog(
             event_id="evt_test123",

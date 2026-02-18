@@ -8,7 +8,7 @@ Run all tests:
     pytest tests/shared/db/models/test_subscription_context.py -v
 
 Run with coverage:
-    pytest tests/shared/db/models/test_subscription_context.py --cov=app.shared.db.models.subscription_context --cov-report=term-missing -v
+    pytest tests/shared/db/models/test_subscription_context.py --cov=app.core.db.models.subscription_context --cov-report=term-missing -v
 """
 
 from uuid import uuid4
@@ -18,7 +18,7 @@ import pytest
 # Import workspace models first to avoid mapper configuration issues
 from app.apps.cubex_api.db.models.workspace import Workspace  # noqa: F401
 
-from app.shared.db.models.subscription_context import (
+from app.core.db.models.subscription_context import (
     APISubscriptionContext,
     CareerSubscriptionContext,
 )
@@ -33,7 +33,7 @@ class TestAPISubscriptionContextModelImport:
 
     def test_import_from_models_module(self):
         """Test that APISubscriptionContext can be imported from models module."""
-        from app.shared.db.models import APISubscriptionContext as ImportedModel
+        from app.core.db.models import APISubscriptionContext as ImportedModel
 
         assert ImportedModel is not None
         assert ImportedModel is APISubscriptionContext
@@ -52,7 +52,7 @@ class TestCareerSubscriptionContextModelImport:
 
     def test_import_from_models_module(self):
         """Test that CareerSubscriptionContext can be imported from models module."""
-        from app.shared.db.models import CareerSubscriptionContext as ImportedModel
+        from app.core.db.models import CareerSubscriptionContext as ImportedModel
 
         assert ImportedModel is not None
         assert ImportedModel is CareerSubscriptionContext
@@ -243,13 +243,13 @@ class TestSubscriptionContextInheritance:
 
     def test_api_context_inherits_base_model(self):
         """Test that APISubscriptionContext inherits from BaseModel."""
-        from app.shared.db.models.base import BaseModel
+        from app.core.db.models.base import BaseModel
 
         assert issubclass(APISubscriptionContext, BaseModel)
 
     def test_career_context_inherits_base_model(self):
         """Test that CareerSubscriptionContext inherits from BaseModel."""
-        from app.shared.db.models.base import BaseModel
+        from app.core.db.models.base import BaseModel
 
         assert issubclass(CareerSubscriptionContext, BaseModel)
 
@@ -279,18 +279,18 @@ class TestSubscriptionContextAllExport:
 
     def test_all_exports_defined(self):
         """Test that __all__ is defined in subscription_context module."""
-        from app.shared.db.models import subscription_context
+        from app.core.db.models import subscription_context
 
         assert hasattr(subscription_context, "__all__")
 
     def test_all_exports_contains_api_context(self):
         """Test that __all__ contains APISubscriptionContext."""
-        from app.shared.db.models import subscription_context
+        from app.core.db.models import subscription_context
 
         assert "APISubscriptionContext" in subscription_context.__all__
 
     def test_all_exports_contains_career_context(self):
         """Test that __all__ contains CareerSubscriptionContext."""
-        from app.shared.db.models import subscription_context
+        from app.core.db.models import subscription_context
 
         assert "CareerSubscriptionContext" in subscription_context.__all__

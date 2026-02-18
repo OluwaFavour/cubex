@@ -21,7 +21,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.shared.enums import (
+from app.core.enums import (
     MemberRole,
     MemberStatus,
     WorkspaceStatus,

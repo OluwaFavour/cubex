@@ -15,10 +15,10 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apps.cubex_api.services.quota_cache import QuotaCacheService
-from app.core.dependencies import get_async_session
-from app.shared.config import request_logger
-from app.shared.dependencies.auth import CurrentActiveUser
-from app.shared.exceptions.types import (
+from app.core.dependencies.db import get_async_session
+from app.core.config import request_logger
+from app.core.dependencies.auth import CurrentActiveUser
+from app.core.exceptions.types import (
     BadRequestException,
     ConflictException,
     ForbiddenException,
@@ -65,8 +65,8 @@ from app.apps.cubex_api.services import (
     FreeWorkspaceNoInvitesException,
     APIKeyNotFoundException,
 )
-from app.shared.enums import MemberRole, MemberStatus
-from app.shared.services.oauth.base import OAuthStateManager
+from app.core.enums import MemberRole, MemberStatus
+from app.core.services.oauth.base import OAuthStateManager
 from app.apps.cubex_api.db.models import (
     Workspace,
     WorkspaceMember,

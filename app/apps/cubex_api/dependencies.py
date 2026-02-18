@@ -40,12 +40,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apps.cubex_api.db.crud import workspace_member_db, workspace_db
 from app.apps.cubex_api.db.models import Workspace, WorkspaceMember
-from app.core.dependencies import get_async_session
-from app.shared.config import request_logger, settings
-from app.shared.db.models import User
-from app.shared.dependencies.auth import get_current_active_user
-from app.shared.enums import WorkspaceStatus
-from app.shared.exceptions.types import (
+from app.core.dependencies.db import get_async_session
+from app.core.config import request_logger, settings
+from app.core.db.models import User
+from app.core.dependencies.auth import get_current_active_user
+from app.core.enums import WorkspaceStatus
+from app.core.exceptions.types import (
     AuthenticationException,
     ForbiddenException,
     NotFoundException,

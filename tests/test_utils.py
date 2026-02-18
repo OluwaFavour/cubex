@@ -1,5 +1,5 @@
 """
-Unit tests for utility functions in app.shared.utils module.
+Unit tests for utility functions in app.core.utils module.
 
 This module provides comprehensive test coverage for:
 - Password hashing and verification (bcrypt)
@@ -20,7 +20,7 @@ import tempfile
 import pytest
 from fastapi import FastAPI
 
-from app.shared.utils import (
+from app.core.utils import (
     hash_password,
     verify_password,
     create_jwt_token,
@@ -375,7 +375,7 @@ class TestDecodeJwtToken:
         token = create_jwt_token(sample_jwt_data)
 
         # Temporarily change the secret key for decoding
-        with patch("app.shared.utils.settings") as mock_settings:
+        with patch("app.core.utils.settings") as mock_settings:
             mock_settings.JWT_SECRET_KEY = "different_secret_key"
             mock_settings.JWT_ALGORITHM = "HS256"
 
@@ -784,7 +784,7 @@ class TestHashPasswordEdgeCases:
 
     def test_hash_password_bcrypt_exception(self):
         """Test exception handling when bcrypt fails unexpectedly."""
-        with patch("app.shared.utils.bcrypt.hashpw") as mock_hashpw:
+        with patch("app.core.utils.bcrypt.hashpw") as mock_hashpw:
             mock_hashpw.side_effect = RuntimeError("Simulated bcrypt failure")
 
             with pytest.raises(RuntimeError):
@@ -796,7 +796,7 @@ class TestVerifyPasswordEdgeCases:
 
     def test_verify_password_unexpected_exception(self):
         """Test handling of unexpected exceptions during verification."""
-        with patch("app.shared.utils.bcrypt.checkpw") as mock_checkpw:
+        with patch("app.core.utils.bcrypt.checkpw") as mock_checkpw:
             mock_checkpw.side_effect = RuntimeError("Simulated unexpected error")
 
             # Should return False instead of crashing
@@ -825,7 +825,7 @@ class TestDecodeJwtTokenEdgeCases:
 
     def test_decode_jwt_token_unexpected_exception(self):
         """Test handling of unexpected exceptions during decoding."""
-        with patch("app.shared.utils.jwt.decode") as mock_decode:
+        with patch("app.core.utils.jwt.decode") as mock_decode:
             mock_decode.side_effect = RuntimeError("Simulated unexpected error")
 
             # Should return None instead of crashing
@@ -886,7 +886,7 @@ class TestHmacHashOtp:
 
     def test_hmac_hash_otp_success(self):
         """Test successful HMAC hashing of OTP."""
-        from app.shared.utils import hmac_hash_otp
+        from app.core.utils import hmac_hash_otp
 
         otp = "123456"
         secret = "test_secret_key"
@@ -898,7 +898,7 @@ class TestHmacHashOtp:
 
     def test_hmac_hash_otp_deterministic(self):
         """Test that same OTP and secret produce same hash."""
-        from app.shared.utils import hmac_hash_otp
+        from app.core.utils import hmac_hash_otp
 
         otp = "123456"
         secret = "test_secret_key"
@@ -910,7 +910,7 @@ class TestHmacHashOtp:
 
     def test_hmac_hash_otp_different_otp(self):
         """Test that different OTPs produce different hashes."""
-        from app.shared.utils import hmac_hash_otp
+        from app.core.utils import hmac_hash_otp
 
         secret = "test_secret_key"
         hash1 = hmac_hash_otp("123456", secret)
@@ -920,7 +920,7 @@ class TestHmacHashOtp:
 
     def test_hmac_hash_otp_different_secret(self):
         """Test that different secrets produce different hashes."""
-        from app.shared.utils import hmac_hash_otp
+        from app.core.utils import hmac_hash_otp
 
         otp = "123456"
         hash1 = hmac_hash_otp(otp, "secret1")
@@ -930,35 +930,35 @@ class TestHmacHashOtp:
 
     def test_hmac_hash_otp_none_otp(self):
         """Test that hashing None OTP raises ValueError."""
-        from app.shared.utils import hmac_hash_otp
+        from app.core.utils import hmac_hash_otp
 
         with pytest.raises(ValueError, match="OTP cannot be None or empty"):
             hmac_hash_otp(None, "secret")
 
     def test_hmac_hash_otp_empty_otp(self):
         """Test that hashing empty OTP raises ValueError."""
-        from app.shared.utils import hmac_hash_otp
+        from app.core.utils import hmac_hash_otp
 
         with pytest.raises(ValueError, match="OTP cannot be None or empty"):
             hmac_hash_otp("", "secret")
 
     def test_hmac_hash_otp_none_secret(self):
         """Test that hashing with None secret raises ValueError."""
-        from app.shared.utils import hmac_hash_otp
+        from app.core.utils import hmac_hash_otp
 
         with pytest.raises(ValueError, match="Secret cannot be None or empty"):
             hmac_hash_otp("123456", None)
 
     def test_hmac_hash_otp_empty_secret(self):
         """Test that hashing with empty secret raises ValueError."""
-        from app.shared.utils import hmac_hash_otp
+        from app.core.utils import hmac_hash_otp
 
         with pytest.raises(ValueError, match="Secret cannot be None or empty"):
             hmac_hash_otp("123456", "")
 
     def test_hmac_hash_otp_hex_format(self):
         """Test that result is valid hexadecimal string."""
-        from app.shared.utils import hmac_hash_otp
+        from app.core.utils import hmac_hash_otp
 
         result = hmac_hash_otp("123456", "secret")
 
@@ -971,7 +971,7 @@ class TestHmacVerifyOtp:
 
     def test_hmac_verify_otp_success(self):
         """Test successful HMAC verification of OTP."""
-        from app.shared.utils import hmac_hash_otp, hmac_verify_otp
+        from app.core.utils import hmac_hash_otp, hmac_verify_otp
 
         otp = "123456"
         secret = "test_secret_key"
@@ -982,7 +982,7 @@ class TestHmacVerifyOtp:
 
     def test_hmac_verify_otp_wrong_otp(self):
         """Test verification with wrong OTP."""
-        from app.shared.utils import hmac_hash_otp, hmac_verify_otp
+        from app.core.utils import hmac_hash_otp, hmac_verify_otp
 
         secret = "test_secret_key"
         hashed = hmac_hash_otp("123456", secret)
@@ -992,7 +992,7 @@ class TestHmacVerifyOtp:
 
     def test_hmac_verify_otp_wrong_secret(self):
         """Test verification with wrong secret."""
-        from app.shared.utils import hmac_hash_otp, hmac_verify_otp
+        from app.core.utils import hmac_hash_otp, hmac_verify_otp
 
         otp = "123456"
         hashed = hmac_hash_otp(otp, "original_secret")
@@ -1002,7 +1002,7 @@ class TestHmacVerifyOtp:
 
     def test_hmac_verify_otp_tampered_hash(self):
         """Test verification with tampered hash."""
-        from app.shared.utils import hmac_hash_otp, hmac_verify_otp
+        from app.core.utils import hmac_hash_otp, hmac_verify_otp
 
         otp = "123456"
         secret = "test_secret_key"
@@ -1016,49 +1016,49 @@ class TestHmacVerifyOtp:
 
     def test_hmac_verify_otp_none_otp(self):
         """Test verification with None OTP returns False."""
-        from app.shared.utils import hmac_verify_otp
+        from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp(None, "somehash", "secret")
         assert result is False
 
     def test_hmac_verify_otp_empty_otp(self):
         """Test verification with empty OTP returns False."""
-        from app.shared.utils import hmac_verify_otp
+        from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp("", "somehash", "secret")
         assert result is False
 
     def test_hmac_verify_otp_none_hashed(self):
         """Test verification with None hash returns False."""
-        from app.shared.utils import hmac_verify_otp
+        from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp("123456", None, "secret")
         assert result is False
 
     def test_hmac_verify_otp_empty_hashed(self):
         """Test verification with empty hash returns False."""
-        from app.shared.utils import hmac_verify_otp
+        from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp("123456", "", "secret")
         assert result is False
 
     def test_hmac_verify_otp_none_secret(self):
         """Test verification with None secret returns False."""
-        from app.shared.utils import hmac_verify_otp
+        from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp("123456", "somehash", None)
         assert result is False
 
     def test_hmac_verify_otp_empty_secret(self):
         """Test verification with empty secret returns False."""
-        from app.shared.utils import hmac_verify_otp
+        from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp("123456", "somehash", "")
         assert result is False
 
     def test_hmac_verify_otp_invalid_hash_format(self):
         """Test verification with invalid hash format returns False."""
-        from app.shared.utils import hmac_verify_otp
+        from app.core.utils import hmac_verify_otp
 
         # Non-hex characters in hash
         result = hmac_verify_otp("123456", "not_a_valid_hex_hash!", "secret")
@@ -1066,7 +1066,7 @@ class TestHmacVerifyOtp:
 
     def test_hmac_verify_otp_constant_time(self):
         """Test that verification uses constant-time comparison."""
-        from app.shared.utils import hmac_hash_otp, hmac_verify_otp
+        from app.core.utils import hmac_hash_otp, hmac_verify_otp
         import time
 
         otp = "123456"
@@ -1100,7 +1100,7 @@ class TestCreateRequestFingerprint:
 
     def test_deterministic_output(self):
         """Test that same inputs always produce the same hash."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
         method = "POST"
@@ -1122,7 +1122,7 @@ class TestCreateRequestFingerprint:
 
     def test_different_endpoints_different_hashes(self):
         """Test that different endpoints produce different hashes."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         payload_hash = "b" * 64
         method = "POST"
@@ -1139,7 +1139,7 @@ class TestCreateRequestFingerprint:
 
     def test_different_methods_different_hashes(self):
         """Test that different methods produce different hashes."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/resource"
         payload_hash = "c" * 64
@@ -1156,7 +1156,7 @@ class TestCreateRequestFingerprint:
 
     def test_different_payload_hashes_different_results(self):
         """Test that different payload hashes produce different fingerprints."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
         method = "POST"
@@ -1169,7 +1169,7 @@ class TestCreateRequestFingerprint:
 
     def test_different_usage_estimates_different_hashes(self):
         """Test that different usage estimates produce different hashes."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
         method = "POST"
@@ -1192,7 +1192,7 @@ class TestCreateRequestFingerprint:
 
     def test_output_is_64_char_hex(self):
         """Test that output is a 64-character hexadecimal string (SHA-256)."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         result = create_request_fingerprint(
             "/api/v1/test",
@@ -1206,7 +1206,7 @@ class TestCreateRequestFingerprint:
 
     def test_method_normalization_to_uppercase(self):
         """Test that method is normalized to uppercase."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/resource"
         payload_hash = "f" * 64
@@ -1224,7 +1224,7 @@ class TestCreateRequestFingerprint:
 
     def test_endpoint_normalization_to_lowercase(self):
         """Test that endpoint is normalized to lowercase."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         method = "POST"
         payload_hash = "a1" * 32
@@ -1242,7 +1242,7 @@ class TestCreateRequestFingerprint:
 
     def test_with_none_usage_estimate(self):
         """Test fingerprint generation with None usage_estimate."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         result = create_request_fingerprint("/api/v1/test", "GET", "b2" * 32, None)
 
@@ -1251,7 +1251,7 @@ class TestCreateRequestFingerprint:
 
     def test_none_usage_vs_empty_dict_different(self):
         """Test that None usage_estimate differs from empty dict."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/test"
         method = "POST"
@@ -1266,7 +1266,7 @@ class TestCreateRequestFingerprint:
 
     def test_endpoint_whitespace_is_stripped(self):
         """Test that whitespace in endpoint is stripped."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         method = "POST"
         payload_hash = "d4" * 32
@@ -1284,7 +1284,7 @@ class TestCreateRequestFingerprint:
 
     def test_empty_strings_produce_valid_hash(self):
         """Test that empty strings still produce a valid hash."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         result = create_request_fingerprint("", "", "", None)
 
@@ -1293,7 +1293,7 @@ class TestCreateRequestFingerprint:
 
     def test_special_characters_in_endpoint(self):
         """Test endpoints with special characters."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint_with_params = "/api/v1/analyze?key=value&foo=bar"
         method = "POST"
@@ -1309,7 +1309,7 @@ class TestCreateRequestFingerprint:
 
     def test_unicode_in_endpoint(self):
         """Test endpoints with unicode characters."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze/日本語"
         method = "POST"
@@ -1325,7 +1325,7 @@ class TestCreateRequestFingerprint:
 
     def test_different_models_different_hashes(self):
         """Test that different model names produce different hashes."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
         method = "POST"
@@ -1348,7 +1348,7 @@ class TestCreateRequestFingerprint:
 
     def test_different_max_output_tokens_different_hashes(self):
         """Test that different max_output_tokens produce different hashes."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
         method = "POST"
@@ -1371,7 +1371,7 @@ class TestCreateRequestFingerprint:
 
     def test_partial_usage_estimate_with_missing_keys(self):
         """Test usage estimate with only some keys provided."""
-        from app.shared.utils import create_request_fingerprint
+        from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
         method = "POST"

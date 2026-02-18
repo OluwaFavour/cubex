@@ -18,29 +18,29 @@ from app.apps.cubex_api.db.crud import (
     workspace_member_db,
 )
 from app.apps.cubex_api.db.models import Workspace
-from app.shared.config import stripe_logger
-from app.shared.db.crud import (
+from app.core.config import stripe_logger
+from app.core.db.crud import (
     api_subscription_context_db,
     plan_db,
     subscription_db,
     user_db,
 )
-from app.shared.db.models import Plan, User
-from app.shared.db.models import Subscription as SubscriptionModel
-from app.shared.enums import (
+from app.core.db.models import Plan, User
+from app.core.db.models import Subscription as SubscriptionModel
+from app.core.enums import (
     MemberStatus,
     ProductType,
     SubscriptionStatus,
     WorkspaceStatus,
 )
-from app.shared.exceptions.types import (
+from app.core.exceptions.types import (
     BadRequestException,
     ForbiddenException,
     NotFoundException,
 )
-from app.shared.services.payment.stripe.main import Stripe
+from app.core.services.payment.stripe.main import Stripe
 from app.infrastructure.messaging.publisher import publish_event
-from app.shared.services.payment.stripe.types import (
+from app.core.services.payment.stripe.types import (
     CheckoutSession,
     Invoice,
     LineItem,
@@ -477,9 +477,6 @@ class SubscriptionService:
             Updated subscription or None if not found.
         """
         # Validate parameters
-        if not session or not isinstance(session, AsyncSession):
-            stripe_logger.error("Invalid database session provided.")
-            raise ValueError("Invalid database session.")
         if not stripe_subscription_id or not isinstance(stripe_subscription_id, str):
             stripe_logger.error("Invalid Stripe subscription ID provided.")
             raise ValueError("Invalid Stripe subscription ID.")

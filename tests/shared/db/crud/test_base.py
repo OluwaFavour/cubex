@@ -8,7 +8,7 @@ Run all tests:
     pytest tests/shared/db/crud/test_base.py -v
 
 Run with coverage:
-    pytest tests/shared/db/crud/test_base.py --cov=app.shared.db.crud.base --cov-report=term-missing -v
+    pytest tests/shared/db/crud/test_base.py --cov=app.core.db.crud.base --cov-report=term-missing -v
 """
 
 from datetime import datetime, timezone
@@ -17,9 +17,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.shared.db.crud import plan_db
-from app.shared.enums import PlanType, ProductType
-from app.shared.exceptions.types import DatabaseException
+from app.core.db.crud import plan_db
+from app.core.enums import PlanType, ProductType
+from app.core.exceptions.types import DatabaseException
 
 
 class TestBaseDBUpsert:

@@ -11,7 +11,7 @@ Run with coverage:
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session
+from app.core.dependencies.db import get_async_session
 
 
 class TestGetAsyncSession:

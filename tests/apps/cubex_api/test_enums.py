@@ -4,7 +4,7 @@ Test suite for Workspace models and enums.
 This module tests workspace-related enums and Pydantic validators.
 """
 
-from app.shared.enums import (
+from app.core.enums import (
     APIPlanName,
     CareerPlanName,
     PlanType,

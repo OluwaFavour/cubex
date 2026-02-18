@@ -7,9 +7,9 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session
-from app.shared.config import settings, app_logger
-from app.shared.exceptions.handlers import (
+from app.core.dependencies.db import get_async_session
+from app.core.config import settings, app_logger
+from app.core.exceptions.handlers import (
     authentication_exception_handler,
     bad_request_exception_handler,
     conflict_exception_handler,
@@ -31,7 +31,7 @@ from app.shared.exceptions.handlers import (
     too_many_attempts_exception_handler,
     value_error_exception_handler,
 )
-from app.shared.exceptions.types import (
+from app.core.exceptions.types import (
     AppException,
     AuthenticationException,
     BadRequestException,
@@ -53,10 +53,10 @@ from app.shared.exceptions.types import (
 )
 from app.infrastructure.messaging import start_consumers
 from app.infrastructure.scheduler import scheduler, initialize_scheduler
-from app.shared.services import BrevoService, CloudinaryService, Renderer, RedisService
-from app.shared.services.auth import AuthService
-from app.shared.services.oauth import GoogleOAuthService, GitHubOAuthService
-from app.shared.routers import auth_router, webhook_router
+from app.core.services import BrevoService, CloudinaryService, Renderer, RedisService
+from app.core.services.auth import AuthService
+from app.core.services.oauth import GoogleOAuthService, GitHubOAuthService
+from app.core.routers import auth_router, webhook_router
 from app.apps.cubex_api.routers import (
     internal_router,
     support_router,
@@ -67,8 +67,8 @@ from app.apps.cubex_career.routers import (
     subscription_router as career_subscription_router,
 )
 from app.apps.cubex_api.services import QuotaCacheService
-from app.shared.db import AsyncSessionLocal
-from app.shared.utils import generate_openapi_json, write_to_file_async
+from app.core.db import AsyncSessionLocal
+from app.core.utils import generate_openapi_json, write_to_file_async
 from app.admin import init_admin
 
 

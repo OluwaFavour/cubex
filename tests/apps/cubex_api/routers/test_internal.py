@@ -20,8 +20,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.config import settings
-from app.shared.enums import AccessStatus
+from app.core.config import settings
+from app.core.enums import AccessStatus
 
 
 def _generate_payload_hash(data: str = "") -> str:

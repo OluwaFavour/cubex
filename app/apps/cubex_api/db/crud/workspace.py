@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.shared.db.crud.base import BaseDB
+from app.core.db.crud.base import BaseDB
 from app.apps.cubex_api.db.models.workspace import (
     APIKey,
     UsageLog,
@@ -24,15 +24,15 @@ from app.apps.cubex_api.db.models.workspace import (
     WorkspaceMember,
     WorkspaceInvitation,
 )
-from app.shared.db.models.subscription_context import APISubscriptionContext
-from app.shared.enums import (
+from app.core.db.models.subscription_context import APISubscriptionContext
+from app.core.enums import (
     InvitationStatus,
     MemberRole,
     MemberStatus,
     UsageLogStatus,
     WorkspaceStatus,
 )
-from app.shared.exceptions.types import DatabaseException
+from app.core.exceptions.types import DatabaseException
 
 
 def slugify(text: str) -> str:

@@ -38,7 +38,7 @@ class TestStripeWebhookEndpoint:
         payload = {"type": "checkout.session.completed", "id": "evt_123"}
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             side_effect=Exception("Invalid signature"),
         ):
             response = await client.post(
@@ -59,7 +59,7 @@ class TestStripeWebhookEndpoint:
         payload = {"type": "checkout.session.completed"}
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value={"type": "checkout.session.completed", "id": None},
         ):
             response = await client.post(
@@ -80,7 +80,7 @@ class TestStripeWebhookEndpoint:
         payload = {"id": "evt_123"}
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value={"id": "evt_123", "type": None},
         ):
             response = await client.post(
@@ -99,7 +99,7 @@ class TestStripeWebhookEndpoint:
     async def test_webhook_unhandled_event_type(self, client: AsyncClient):
         """Should return ignored status for unhandled event types."""
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value={
                 "id": "evt_123",
                 "type": "unhandled.event.type",
@@ -138,10 +138,10 @@ class TestStripeWebhookEndpoint:
         }
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.shared.routers.webhook.publish_event",
+            "app.core.routers.webhook.publish_event",
             new_callable=AsyncMock,
         ) as mock_publish:
             response = await client.post(
@@ -182,10 +182,10 @@ class TestStripeWebhookEndpoint:
         }
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.shared.routers.webhook.publish_event",
+            "app.core.routers.webhook.publish_event",
             new_callable=AsyncMock,
         ) as mock_publish:
             response = await client.post(
@@ -221,10 +221,10 @@ class TestStripeWebhookEndpoint:
         }
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.shared.routers.webhook.publish_event",
+            "app.core.routers.webhook.publish_event",
             new_callable=AsyncMock,
         ) as mock_publish:
             response = await client.post(
@@ -260,10 +260,10 @@ class TestStripeWebhookEndpoint:
         }
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.shared.routers.webhook.publish_event",
+            "app.core.routers.webhook.publish_event",
             new_callable=AsyncMock,
         ) as mock_publish:
             response = await client.post(
@@ -299,10 +299,10 @@ class TestStripeWebhookEndpoint:
         }
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.shared.routers.webhook.publish_event",
+            "app.core.routers.webhook.publish_event",
             new_callable=AsyncMock,
         ) as mock_publish:
             response = await client.post(
@@ -339,10 +339,10 @@ class TestStripeWebhookEndpoint:
         }
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.shared.routers.webhook.publish_event",
+            "app.core.routers.webhook.publish_event",
             new_callable=AsyncMock,
         ) as mock_publish:
             response = await client.post(
@@ -381,10 +381,10 @@ class TestStripeWebhookEndpoint:
         }
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.shared.routers.webhook.publish_event",
+            "app.core.routers.webhook.publish_event",
             side_effect=Exception("Queue connection failed"),
         ):
             response = await client.post(
@@ -411,7 +411,7 @@ class TestEventQueueMapping:
 
     def test_checkout_session_completed_mapping(self):
         """Test checkout.session.completed maps to correct queue."""
-        from app.shared.routers.webhook import EVENT_QUEUE_MAPPING
+        from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
             EVENT_QUEUE_MAPPING["checkout.session.completed"]
@@ -420,7 +420,7 @@ class TestEventQueueMapping:
 
     def test_subscription_created_mapping(self):
         """Test customer.subscription.created maps to correct queue."""
-        from app.shared.routers.webhook import EVENT_QUEUE_MAPPING
+        from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
             EVENT_QUEUE_MAPPING["customer.subscription.created"]
@@ -429,7 +429,7 @@ class TestEventQueueMapping:
 
     def test_subscription_updated_mapping(self):
         """Test customer.subscription.updated maps to correct queue."""
-        from app.shared.routers.webhook import EVENT_QUEUE_MAPPING
+        from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
             EVENT_QUEUE_MAPPING["customer.subscription.updated"]
@@ -438,7 +438,7 @@ class TestEventQueueMapping:
 
     def test_subscription_deleted_mapping(self):
         """Test customer.subscription.deleted maps to correct queue."""
-        from app.shared.routers.webhook import EVENT_QUEUE_MAPPING
+        from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
             EVENT_QUEUE_MAPPING["customer.subscription.deleted"]
@@ -447,13 +447,13 @@ class TestEventQueueMapping:
 
     def test_invoice_paid_mapping(self):
         """Test invoice.paid maps to correct queue."""
-        from app.shared.routers.webhook import EVENT_QUEUE_MAPPING
+        from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert EVENT_QUEUE_MAPPING["invoice.paid"] == "stripe_subscription_updated"
 
     def test_invoice_payment_failed_mapping(self):
         """Test invoice.payment_failed maps to correct queue."""
-        from app.shared.routers.webhook import EVENT_QUEUE_MAPPING
+        from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert EVENT_QUEUE_MAPPING["invoice.payment_failed"] == "stripe_payment_failed"
 
@@ -468,7 +468,7 @@ class TestBuildQueueMessage:
 
     def test_build_checkout_session_completed_message(self):
         """Test building message for checkout.session.completed."""
-        from app.shared.routers.webhook import _build_queue_message
+        from app.core.routers.webhook import _build_queue_message
 
         obj = {
             "subscription": "sub_123",
@@ -491,7 +491,7 @@ class TestBuildQueueMessage:
 
     def test_build_checkout_session_completed_default_seat_count(self):
         """Test default seat count of 1 when not provided."""
-        from app.shared.routers.webhook import _build_queue_message
+        from app.core.routers.webhook import _build_queue_message
 
         obj = {
             "subscription": "sub_123",
@@ -505,7 +505,7 @@ class TestBuildQueueMessage:
 
     def test_build_subscription_created_message(self):
         """Test building message for customer.subscription.created."""
-        from app.shared.routers.webhook import _build_queue_message
+        from app.core.routers.webhook import _build_queue_message
 
         obj = {"id": "sub_new_123"}
 
@@ -516,7 +516,7 @@ class TestBuildQueueMessage:
 
     def test_build_subscription_updated_message(self):
         """Test building message for customer.subscription.updated."""
-        from app.shared.routers.webhook import _build_queue_message
+        from app.core.routers.webhook import _build_queue_message
 
         obj = {"id": "sub_updated_123"}
 
@@ -527,7 +527,7 @@ class TestBuildQueueMessage:
 
     def test_build_subscription_deleted_message(self):
         """Test building message for customer.subscription.deleted."""
-        from app.shared.routers.webhook import _build_queue_message
+        from app.core.routers.webhook import _build_queue_message
 
         obj = {"id": "sub_deleted_123"}
 
@@ -540,7 +540,7 @@ class TestBuildQueueMessage:
 
     def test_build_invoice_paid_message(self):
         """Test building message for invoice.paid."""
-        from app.shared.routers.webhook import _build_queue_message
+        from app.core.routers.webhook import _build_queue_message
 
         obj = {"subscription": "sub_invoice_123"}
 
@@ -551,7 +551,7 @@ class TestBuildQueueMessage:
 
     def test_build_invoice_payment_failed_message(self):
         """Test building message for invoice.payment_failed."""
-        from app.shared.routers.webhook import _build_queue_message
+        from app.core.routers.webhook import _build_queue_message
 
         obj = {
             "subscription": "sub_failed_123",
@@ -576,19 +576,19 @@ class TestRouterConfiguration:
     def test_router_is_api_router(self):
         """Test that router is an APIRouter instance."""
         from fastapi import APIRouter
-        from app.shared.routers.webhook import router
+        from app.core.routers.webhook import router
 
         assert isinstance(router, APIRouter)
 
     def test_router_prefix(self):
         """Test that router has correct prefix."""
-        from app.shared.routers.webhook import router
+        from app.core.routers.webhook import router
 
         assert router.prefix == "/webhooks"
 
     def test_router_has_stripe_endpoint(self):
         """Test that router has /stripe endpoint."""
-        from app.shared.routers.webhook import router
+        from app.core.routers.webhook import router
 
         paths = [route.path for route in router.routes]
         # Path includes prefix /webhooks
@@ -605,13 +605,13 @@ class TestModuleExports:
 
     def test_router_is_exported(self):
         """Test that router is exported from module."""
-        from app.shared.routers.webhook import router
+        from app.core.routers.webhook import router
 
         assert router is not None
 
     def test_event_queue_mapping_exported(self):
         """Test that EVENT_QUEUE_MAPPING is accessible."""
-        from app.shared.routers.webhook import EVENT_QUEUE_MAPPING
+        from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert isinstance(EVENT_QUEUE_MAPPING, dict)
         assert len(EVENT_QUEUE_MAPPING) > 0

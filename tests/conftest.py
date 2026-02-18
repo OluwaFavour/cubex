@@ -30,7 +30,7 @@ from sqlalchemy import select
 
 def create_test_access_token(user) -> str:
     """Create a test access token for a user."""
-    from app.shared.utils import create_jwt_token
+    from app.core.utils import create_jwt_token
 
     return create_jwt_token(
         data={
@@ -92,7 +92,7 @@ def setup_test_database(event_loop_policy):
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    from app.shared.config import settings
+    from app.core.config import settings
 
     if not settings.TEST_DATABASE_URL:
         pytest.skip("TEST_DATABASE_URL not configured")
@@ -202,7 +202,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     - Routers to use their normal begin() calls (converted to savepoints)
     - Complete rollback after each test
     """
-    from app.shared.config import settings
+    from app.core.config import settings
 
     if not settings.TEST_DATABASE_URL:
         pytest.skip("TEST_DATABASE_URL not configured")
@@ -270,7 +270,7 @@ async def client(app, db_session: AsyncSession) -> AsyncGenerator[AsyncClient, N
     session as the test fixtures. This allows tests to set up data
     that the app can see within the same transaction.
     """
-    from app.core.dependencies import get_async_session
+    from app.core.dependencies.db import get_async_session
 
     # Override to yield the test session (no transaction management here)
     async def override_get_session():
@@ -315,16 +315,16 @@ def mock_stripe():
         )
 
     with patch(
-        "app.shared.services.payment.stripe.main.Stripe.cancel_subscription",
+        "app.core.services.payment.stripe.main.Stripe.cancel_subscription",
         side_effect=mock_cancel_subscription,
     ), patch(
-        "app.shared.services.payment.stripe.main.Stripe.create_checkout_session",
+        "app.core.services.payment.stripe.main.Stripe.create_checkout_session",
         new_callable=AsyncMock,
     ), patch(
-        "app.shared.services.payment.stripe.main.Stripe.create_customer_portal_session",
+        "app.core.services.payment.stripe.main.Stripe.create_customer_portal_session",
         new_callable=AsyncMock,
     ), patch(
-        "app.shared.services.payment.stripe.main.Stripe._request",
+        "app.core.services.payment.stripe.main.Stripe._request",
         new_callable=AsyncMock,
     ):
         yield
@@ -350,7 +350,7 @@ def mock_email_service():
         "app.infrastructure.messaging.publisher.publish_event",
         side_effect=mock_publish_event,
     ), patch(
-        "app.shared.services.auth.publish_event",
+        "app.core.services.auth.publish_event",
         side_effect=mock_publish_event,
     ), patch(
         "app.apps.cubex_api.services.workspace.publish_event",
@@ -362,7 +362,7 @@ def mock_email_service():
         "app.apps.cubex_career.services.subscription.publish_event",
         side_effect=mock_publish_event,
     ), patch(
-        "app.shared.routers.webhook.publish_event",
+        "app.core.routers.webhook.publish_event",
         side_effect=mock_publish_event,
     ), patch(
         "app.infrastructure.messaging.handlers.stripe.publish_event",
@@ -379,7 +379,7 @@ def mock_email_service():
 @pytest.fixture
 async def test_user(db_session: AsyncSession):
     """Create a test user in the database."""
-    from app.shared.db.models import User
+    from app.core.db.models import User
 
     user = User(
         id=uuid4(),
@@ -397,7 +397,7 @@ async def test_user(db_session: AsyncSession):
 @pytest.fixture
 async def test_user_unverified(db_session: AsyncSession):
     """Create an unverified test user."""
-    from app.shared.db.models import User
+    from app.core.db.models import User
 
     user = User(
         id=uuid4(),
@@ -417,7 +417,7 @@ async def auth_headers(test_user) -> dict[str, str]:
     """Generate authentication headers for test user."""
     from datetime import timedelta
 
-    from app.shared.utils import create_jwt_token
+    from app.core.utils import create_jwt_token
 
     access_token = create_jwt_token(
         data={
@@ -450,8 +450,8 @@ async def free_api_plan(db_session: AsyncSession):
     """Get the free API plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import PlanType, ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import PlanType, ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -470,8 +470,8 @@ async def basic_api_plan(db_session: AsyncSession):
     """Get the basic API plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -562,8 +562,8 @@ async def professional_api_plan(db_session: AsyncSession):
     """Get the professional API plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -582,8 +582,8 @@ async def free_career_plan(db_session: AsyncSession):
     """Get the free Career plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import PlanType, ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import PlanType, ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -602,8 +602,8 @@ async def plus_career_plan(db_session: AsyncSession):
     """Get the Plus Career plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -622,8 +622,8 @@ async def pro_career_plan(db_session: AsyncSession):
     """Get the Pro Career plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -645,8 +645,8 @@ async def pro_career_plan(db_session: AsyncSession):
 @pytest.fixture
 async def test_workspace(db_session: AsyncSession, test_user):
     """Create a test workspace owned by test_user."""
-    from app.shared.db.models import Workspace, WorkspaceMember
-    from app.shared.enums import MemberRole, MemberStatus, WorkspaceStatus
+    from app.core.db.models import Workspace, WorkspaceMember
+    from app.core.enums import MemberRole, MemberStatus, WorkspaceStatus
 
     workspace = Workspace(
         id=uuid4(),
@@ -676,13 +676,13 @@ async def test_workspace(db_session: AsyncSession, test_user):
 @pytest.fixture
 async def personal_workspace(db_session: AsyncSession, test_user, free_api_plan):
     """Create a personal workspace for test_user with a free subscription."""
-    from app.shared.db.models import (
+    from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
         Workspace,
         WorkspaceMember,
     )
-    from app.shared.enums import (
+    from app.core.enums import (
         MemberRole,
         MemberStatus,
         SubscriptionStatus,
@@ -737,8 +737,8 @@ async def personal_workspace(db_session: AsyncSession, test_user, free_api_plan)
 @pytest.fixture
 async def test_workspace_member(db_session: AsyncSession, test_workspace):
     """Create another user who is a member of test_workspace."""
-    from app.shared.db.models import User, WorkspaceMember
-    from app.shared.enums import MemberRole, MemberStatus
+    from app.core.db.models import User, WorkspaceMember
+    from app.core.enums import MemberRole, MemberStatus
 
     user = User(
         id=uuid4(),
@@ -768,8 +768,8 @@ async def test_workspace_member(db_session: AsyncSession, test_workspace):
 @pytest.fixture
 async def test_workspace_admin(db_session: AsyncSession, test_workspace):
     """Create another user who is an admin of test_workspace."""
-    from app.shared.db.models import User, WorkspaceMember
-    from app.shared.enums import MemberRole, MemberStatus
+    from app.core.db.models import User, WorkspaceMember
+    from app.core.enums import MemberRole, MemberStatus
 
     user = User(
         id=uuid4(),
@@ -804,8 +804,8 @@ async def test_workspace_admin(db_session: AsyncSession, test_workspace):
 @pytest.fixture
 async def test_subscription(db_session: AsyncSession, test_workspace, basic_api_plan):
     """Create a test subscription for the workspace."""
-    from app.shared.db.models import APISubscriptionContext, Subscription
-    from app.shared.enums import SubscriptionStatus
+    from app.core.db.models import APISubscriptionContext, Subscription
+    from app.core.enums import SubscriptionStatus
 
     subscription = Subscription(
         id=uuid4(),
@@ -834,8 +834,8 @@ async def test_subscription(db_session: AsyncSession, test_workspace, basic_api_
 @pytest.fixture
 async def career_subscription(db_session: AsyncSession, test_user, free_career_plan):
     """Create a career subscription for test user."""
-    from app.shared.db.models import CareerSubscriptionContext, Subscription
-    from app.shared.enums import ProductType, SubscriptionStatus
+    from app.core.db.models import CareerSubscriptionContext, Subscription
+    from app.core.enums import ProductType, SubscriptionStatus
 
     subscription = Subscription(
         id=uuid4(),
@@ -865,8 +865,8 @@ async def paid_career_subscription(
     db_session: AsyncSession, test_user, plus_career_plan
 ):
     """Create a paid career subscription for test user."""
-    from app.shared.db.models import CareerSubscriptionContext, Subscription
-    from app.shared.enums import ProductType, SubscriptionStatus
+    from app.core.db.models import CareerSubscriptionContext, Subscription
+    from app.core.enums import ProductType, SubscriptionStatus
 
     subscription = Subscription(
         id=uuid4(),
@@ -906,10 +906,10 @@ async def test_invitation(db_session: AsyncSession, test_workspace, test_user):
     """
     import secrets
 
-    from app.shared.config import settings
-    from app.shared.db.models import WorkspaceInvitation
-    from app.shared.enums import InvitationStatus, MemberRole
-    from app.shared.utils import hmac_hash_otp
+    from app.core.config import settings
+    from app.core.db.models import WorkspaceInvitation
+    from app.core.enums import InvitationStatus, MemberRole
+    from app.core.utils import hmac_hash_otp
 
     # Generate raw token and its hash (same as WorkspaceService._generate_secure_token)
     raw_token = secrets.token_urlsafe(32)
@@ -940,10 +940,10 @@ async def expired_invitation(db_session: AsyncSession, test_workspace, test_user
     """
     import secrets
 
-    from app.shared.config import settings
-    from app.shared.db.models import WorkspaceInvitation
-    from app.shared.enums import InvitationStatus, MemberRole
-    from app.shared.utils import hmac_hash_otp
+    from app.core.config import settings
+    from app.core.db.models import WorkspaceInvitation
+    from app.core.enums import InvitationStatus, MemberRole
+    from app.core.utils import hmac_hash_otp
 
     # Generate raw token and its hash
     raw_token = secrets.token_urlsafe(32)
@@ -1047,7 +1047,7 @@ async def setup_redis_service(redis_url):
     1. Initializes RedisService to use the testcontainer Redis
     2. After each test, flushes the database to ensure test isolation
     """
-    from app.shared.services.redis_service import RedisService
+    from app.core.services.redis_service import RedisService
 
     # Initialize with testcontainer URL
     await RedisService.init(redis_url)
@@ -1193,13 +1193,13 @@ async def other_workspace(db_session: AsyncSession, test_user, basic_api_plan):
     This workspace is owned by the same user but is separate from test_workspace.
     Includes its own subscription for quota tracking.
     """
-    from app.shared.db.models import (
+    from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
         Workspace,
         WorkspaceMember,
     )
-    from app.shared.enums import (
+    from app.core.enums import (
         MemberRole,
         MemberStatus,
         SubscriptionStatus,
@@ -1265,13 +1265,13 @@ async def workspace_quota_exhausted(
     Returns:
         Tuple of (workspace, subscription, credits_allocation)
     """
-    from app.shared.db.models import (
+    from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
         Workspace,
         WorkspaceMember,
     )
-    from app.shared.enums import (
+    from app.core.enums import (
         MemberRole,
         MemberStatus,
         SubscriptionStatus,

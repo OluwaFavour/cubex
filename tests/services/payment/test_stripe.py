@@ -8,7 +8,8 @@ the _flatten_to_payload helper function.
 import pytest
 from typing import Any
 
-from app.shared.services.payment.stripe.main import Stripe
+from app.core.exceptions.types import StripeAPIException
+from app.core.services.payment.stripe.main import Stripe
 
 
 class TestFlattenToPayload:
@@ -316,7 +317,7 @@ class TestUpdateSubscriptionWithSeatPriceId:
 
             # Patch model_validate to skip validation for the update response
             with patch(
-                "app.shared.services.payment.stripe.main.Subscription.model_validate"
+                "app.core.services.payment.stripe.main.Subscription.model_validate"
             ) as mock_validate:
                 mock_validate.return_value = mock_subscription_items
 
@@ -339,10 +340,8 @@ class TestUpdateSubscriptionWithSeatPriceId:
                 assert payload.get("items[0][quantity]") == 10
 
     @pytest.mark.asyncio
-    async def test_update_subscription_falls_back_to_first_item(
-        self, mock_subscription_items
-    ):
-        """Test that update_subscription falls back to first item if seat_price_id not found."""
+    async def test_update_subscription_fails(self, mock_subscription_items):
+        """Test that update_subscription fails if seat_price_id not found."""
         from unittest.mock import patch, AsyncMock
 
         with patch.object(
@@ -354,24 +353,22 @@ class TestUpdateSubscriptionWithSeatPriceId:
             mock_request.return_value = {"id": "sub_test123", "object": "subscription"}
 
             with patch(
-                "app.shared.services.payment.stripe.main.Subscription.model_validate"
+                "app.core.services.payment.stripe.main.Subscription.model_validate"
             ) as mock_validate:
                 mock_validate.return_value = mock_subscription_items
 
-                await Stripe.update_subscription(
-                    "sub_test123",
-                    quantity=10,
-                    seat_price_id="price_nonexistent",  # Won't be found
+                with pytest.raises(StripeAPIException) as stripe_error:
+                    await Stripe.update_subscription(
+                        "sub_test123",
+                        quantity=10,
+                        seat_price_id="price_nonexistent",  # Won't be found
+                    )
+
+                # Should fail
+                assert (
+                    "Seat subscription item not found for seat_price_id='price_nonexistent'"
+                    in str(stripe_error.value)
                 )
-
-                # Verify _request was called for the update
-                mock_request.assert_called_once()
-                call_args = mock_request.call_args
-                payload = call_args.kwargs.get("data", {})
-
-                # Should fall back to first item (si_base_item)
-                assert payload.get("items[0][id]") == "si_base_item"
-                assert payload.get("items[0][quantity]") == 10
 
     @pytest.mark.asyncio
     async def test_update_subscription_without_seat_price_id_uses_first_item(
@@ -389,7 +386,7 @@ class TestUpdateSubscriptionWithSeatPriceId:
             mock_request.return_value = {"id": "sub_test123", "object": "subscription"}
 
             with patch(
-                "app.shared.services.payment.stripe.main.Subscription.model_validate"
+                "app.core.services.payment.stripe.main.Subscription.model_validate"
             ) as mock_validate:
                 mock_validate.return_value = mock_subscription_items
 

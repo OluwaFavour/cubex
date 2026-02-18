@@ -13,18 +13,18 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.config import stripe_logger
-from app.shared.db import AsyncSessionLocal
-from app.shared.db.crud import (
+from app.core.config import stripe_logger
+from app.core.db import AsyncSessionLocal
+from app.core.db.crud import (
     subscription_db,
     plan_db,
     user_db,
     api_subscription_context_db,
     career_subscription_context_db,
 )
-from app.shared.db.models import Subscription
-from app.shared.enums import ProductType
-from app.shared.services import RedisService
+from app.core.db.models import Subscription
+from app.core.enums import ProductType
+from app.core.services import RedisService
 from app.apps.cubex_api.services import subscription_service as api_subscription_service
 from app.apps.cubex_api.db.crud import workspace_db
 from app.apps.cubex_career.services import (

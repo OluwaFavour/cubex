@@ -27,12 +27,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.apps.cubex_api.db.crud import api_key_db, usage_log_db, workspace_db
 from app.apps.cubex_api.db.models import APIKey
 from app.apps.cubex_api.services.quota_cache import QuotaCacheService
-from app.shared.config import settings, workspace_logger
-from app.shared.services.redis_service import RedisService
-from app.shared.db.crud import api_subscription_context_db
-from app.shared.enums import AccessStatus
-from app.shared.exceptions.types import NotFoundException
-from app.shared.utils import create_request_fingerprint, hmac_hash_otp
+from app.core.config import settings, workspace_logger
+from app.core.services.redis_service import RedisService
+from app.core.db.crud import api_subscription_context_db
+from app.core.enums import AccessStatus
+from app.core.exceptions.types import NotFoundException
+from app.core.utils import create_request_fingerprint, hmac_hash_otp
 
 
 # ============================================================================

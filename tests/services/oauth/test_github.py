@@ -12,7 +12,7 @@ Run all tests:
     pytest app/tests/services/oauth/test_github.py -v
 
 Run with coverage:
-    pytest app/tests/services/oauth/test_github.py --cov=app.shared.services.oauth.github --cov-report=term-missing -v
+    pytest app/tests/services/oauth/test_github.py --cov=app.core.services.oauth.github --cov-report=term-missing -v
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -21,7 +21,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import pytest
 
-from app.shared.exceptions.types import OAuthException
+from app.core.exceptions.types import OAuthException
 
 
 class TestGitHubOAuthServiceInit:
@@ -30,21 +30,21 @@ class TestGitHubOAuthServiceInit:
     @pytest.fixture(autouse=True)
     async def cleanup(self):
         """Cleanup fixture to close client after each test."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         yield
         await GitHubOAuthService.aclose()
 
     def test_provider_name(self):
         """Test that provider_name is 'github'."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         assert GitHubOAuthService.provider_name == "github"
 
     @pytest.mark.asyncio
     async def test_init_creates_client(self):
         """Test that init creates HTTP client."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         await GitHubOAuthService.init()
 
@@ -54,7 +54,7 @@ class TestGitHubOAuthServiceInit:
     @pytest.mark.asyncio
     async def test_init_with_custom_credentials(self):
         """Test that init accepts custom credentials."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         await GitHubOAuthService.init(
             client_id="custom_github_id",
@@ -67,7 +67,7 @@ class TestGitHubOAuthServiceInit:
     @pytest.mark.asyncio
     async def test_aclose_closes_client(self):
         """Test that aclose closes the HTTP client."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         await GitHubOAuthService.init()
         assert GitHubOAuthService._client is not None
@@ -79,7 +79,7 @@ class TestGitHubOAuthServiceInit:
     @pytest.mark.asyncio
     async def test_aclose_when_client_is_none(self):
         """Test that aclose handles None client gracefully."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         GitHubOAuthService._client = None
 
@@ -94,7 +94,7 @@ class TestGitHubAuthorizationUrl:
 
     def test_get_authorization_url_structure(self):
         """Test that authorization URL has correct structure."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         url = GitHubOAuthService.get_authorization_url(
             redirect_uri="https://app.com/callback",
@@ -108,7 +108,7 @@ class TestGitHubAuthorizationUrl:
 
     def test_get_authorization_url_contains_client_id(self):
         """Test that authorization URL contains client_id."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         url = GitHubOAuthService.get_authorization_url(
             redirect_uri="https://app.com/callback",
@@ -120,7 +120,7 @@ class TestGitHubAuthorizationUrl:
 
     def test_get_authorization_url_contains_redirect_uri(self):
         """Test that authorization URL contains redirect_uri."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         redirect_uri = "https://app.com/callback"
         url = GitHubOAuthService.get_authorization_url(
@@ -133,7 +133,7 @@ class TestGitHubAuthorizationUrl:
 
     def test_get_authorization_url_contains_state(self):
         """Test that authorization URL contains state parameter."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         state = "unique_state_token"
         url = GitHubOAuthService.get_authorization_url(
@@ -146,7 +146,7 @@ class TestGitHubAuthorizationUrl:
 
     def test_get_authorization_url_has_correct_scopes(self):
         """Test that authorization URL requests correct scopes."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         url = GitHubOAuthService.get_authorization_url(
             redirect_uri="https://app.com/callback",
@@ -166,7 +166,7 @@ class TestGitHubTokenExchange:
     @pytest.fixture(autouse=True)
     async def setup_client(self):
         """Setup HTTP client for each test."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         await GitHubOAuthService.init()
         yield
@@ -175,7 +175,7 @@ class TestGitHubTokenExchange:
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_success(self):
         """Test successful token exchange."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -202,7 +202,7 @@ class TestGitHubTokenExchange:
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_posts_to_correct_url(self):
         """Test that token exchange posts to correct GitHub endpoint."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -227,7 +227,7 @@ class TestGitHubTokenExchange:
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_sends_correct_headers(self):
         """Test that token exchange sends Accept: application/json header."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -252,7 +252,7 @@ class TestGitHubTokenExchange:
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_failure(self):
         """Test token exchange failure handling."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -277,7 +277,7 @@ class TestGitHubTokenExchange:
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_http_error(self):
         """Test token exchange HTTP error handling."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         mock_response = MagicMock()
         mock_response.status_code = 500
@@ -297,7 +297,7 @@ class TestGitHubTokenExchange:
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_network_error(self):
         """Test token exchange network error handling."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         with patch.object(
             GitHubOAuthService._client, "post", new_callable=AsyncMock
@@ -317,7 +317,7 @@ class TestGitHubUserInfo:
     @pytest.fixture(autouse=True)
     async def setup_client(self):
         """Setup HTTP client for each test."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         await GitHubOAuthService.init()
         yield
@@ -326,7 +326,7 @@ class TestGitHubUserInfo:
     @pytest.mark.asyncio
     async def test_get_user_info_success(self):
         """Test successful user info retrieval."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         user_response = MagicMock()
         user_response.status_code = 200
@@ -350,9 +350,7 @@ class TestGitHubUserInfo:
         ) as mock_get:
             mock_get.side_effect = [user_response, emails_response]
 
-            user_info = await GitHubOAuthService.get_user_info(
-                access_token="gho_token"
-            )
+            user_info = await GitHubOAuthService.get_user_info(access_token="gho_token")
 
             assert user_info.provider == "github"
             assert user_info.provider_user_id == "12345678"
@@ -364,7 +362,7 @@ class TestGitHubUserInfo:
     @pytest.mark.asyncio
     async def test_get_user_info_uses_primary_email(self):
         """Test that primary email is used when available."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         user_response = MagicMock()
         user_response.status_code = 200
@@ -386,9 +384,7 @@ class TestGitHubUserInfo:
         ) as mock_get:
             mock_get.side_effect = [user_response, emails_response]
 
-            user_info = await GitHubOAuthService.get_user_info(
-                access_token="token"
-            )
+            user_info = await GitHubOAuthService.get_user_info(access_token="token")
 
             assert user_info.email == "primary@example.com"
             assert user_info.email_verified is True
@@ -396,7 +392,7 @@ class TestGitHubUserInfo:
     @pytest.mark.asyncio
     async def test_get_user_info_fallback_to_verified_email(self):
         """Test fallback to first verified email when no primary."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         user_response = MagicMock()
         user_response.status_code = 200
@@ -418,9 +414,7 @@ class TestGitHubUserInfo:
         ) as mock_get:
             mock_get.side_effect = [user_response, emails_response]
 
-            user_info = await GitHubOAuthService.get_user_info(
-                access_token="token"
-            )
+            user_info = await GitHubOAuthService.get_user_info(access_token="token")
 
             assert user_info.email == "verified@example.com"
             assert user_info.email_verified is True
@@ -428,7 +422,7 @@ class TestGitHubUserInfo:
     @pytest.mark.asyncio
     async def test_get_user_info_calls_correct_endpoints(self):
         """Test that correct GitHub API endpoints are called."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         user_response = MagicMock()
         user_response.status_code = 200
@@ -452,7 +446,7 @@ class TestGitHubUserInfo:
     @pytest.mark.asyncio
     async def test_get_user_info_sends_authorization_header(self):
         """Test that authorization header is sent correctly."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         user_response = MagicMock()
         user_response.status_code = 200
@@ -477,7 +471,7 @@ class TestGitHubUserInfo:
     @pytest.mark.asyncio
     async def test_get_user_info_failure(self):
         """Test user info retrieval failure handling."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         mock_response = MagicMock()
         mock_response.status_code = 401
@@ -496,7 +490,7 @@ class TestGitHubUserInfo:
     @pytest.mark.asyncio
     async def test_get_user_info_stores_raw_data(self):
         """Test that raw response data is stored."""
-        from app.shared.services.oauth.github import GitHubOAuthService
+        from app.core.services.oauth.github import GitHubOAuthService
 
         raw_data = {
             "id": 123,
@@ -528,7 +522,7 @@ class TestGitHubModuleExports:
 
     def test_all_exports(self):
         """Test that __all__ contains expected exports."""
-        from app.shared.services.oauth import github
+        from app.core.services.oauth import github
 
         assert hasattr(github, "__all__")
         assert "GitHubOAuthService" in github.__all__

@@ -12,7 +12,7 @@ Run all tests:
     pytest app/tests/services/test_cloudinary.py -v
 
 Run with coverage:
-    pytest app/tests/services/test_cloudinary.py --cov=app.shared.services.cloudinary --cov-report=term-missing -v
+    pytest app/tests/services/test_cloudinary.py --cov=app.core.services.cloudinary --cov-report=term-missing -v
 """
 
 from io import BytesIO
@@ -21,11 +21,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import UploadFile, status
 
-from app.shared.services.cloudinary import (
+from app.core.services.cloudinary import (
     CloudinaryService,
     CloudinaryUploadCredentials,
 )
-from app.shared.exceptions.types import AppException
+from app.core.exceptions.types import AppException
 
 
 class TestCloudinaryServiceInit:
@@ -33,7 +33,7 @@ class TestCloudinaryServiceInit:
 
     def test_init_configures_cloudinary(self):
         """Test that init properly configures cloudinary with credentials."""
-        with patch("app.shared.services.cloudinary.cloudinary.config") as mock_config:
+        with patch("app.core.services.cloudinary.cloudinary.config") as mock_config:
             CloudinaryService.init(
                 cloud_name="test-cloud",
                 api_key="test-key-123",
@@ -48,7 +48,7 @@ class TestCloudinaryServiceInit:
 
     def test_init_with_all_parameters(self):
         """Test init accepts all required parameters."""
-        with patch("app.shared.services.cloudinary.cloudinary.config") as mock_config:
+        with patch("app.core.services.cloudinary.cloudinary.config") as mock_config:
             CloudinaryService.init(
                 cloud_name="my-cloud", api_key="my-api-key", api_secret="my-api-secret"
             )
@@ -76,8 +76,8 @@ class TestCloudinaryServiceUploadFile:
             "resource_type": "image",
         }
 
-        with patch("app.shared.services.cloudinary.cloudinary.uploader.upload"), patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+        with patch("app.core.services.cloudinary.cloudinary.uploader.upload"), patch(
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = mock_upload_result
 
@@ -114,9 +114,9 @@ class TestCloudinaryServiceUploadFile:
             return mock_upload_result
 
         with patch(
-            "app.shared.services.cloudinary.cloudinary.uploader.upload"
+            "app.core.services.cloudinary.cloudinary.uploader.upload"
         ) as mock_upload, patch(
-            "app.shared.services.cloudinary.run_sync", side_effect=mock_run_sync
+            "app.core.services.cloudinary.run_sync", side_effect=mock_run_sync
         ):
             mock_upload.return_value = mock_upload_result
 
@@ -143,8 +143,8 @@ class TestCloudinaryServiceUploadFile:
             "resource_type": "image",
         }
 
-        with patch("app.shared.services.cloudinary.cloudinary.uploader.upload"), patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+        with patch("app.core.services.cloudinary.cloudinary.uploader.upload"), patch(
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = mock_upload_result
 
@@ -170,7 +170,7 @@ class TestCloudinaryServiceUploadFile:
         }
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = mock_upload_result
 
@@ -187,7 +187,7 @@ class TestCloudinaryServiceUploadFile:
         mock_file.file = BytesIO(b"test content")
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.side_effect = Exception("Upload failed: Network error")
 
@@ -211,7 +211,7 @@ class TestCloudinaryServiceUploadFile:
         }
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = mock_upload_result
 
@@ -235,9 +235,9 @@ class TestCloudinaryServiceDeleteFile:
             return func(*args)
 
         with patch(
-            "app.shared.services.cloudinary.cloudinary.uploader.destroy"
+            "app.core.services.cloudinary.cloudinary.uploader.destroy"
         ) as mock_destroy, patch(
-            "app.shared.services.cloudinary.run_sync", side_effect=mock_run_sync
+            "app.core.services.cloudinary.run_sync", side_effect=mock_run_sync
         ):
             mock_destroy.return_value = None
 
@@ -249,7 +249,7 @@ class TestCloudinaryServiceDeleteFile:
     async def test_delete_file_with_path(self):
         """Test deletion of file with path in public_id."""
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = None
 
@@ -262,7 +262,7 @@ class TestCloudinaryServiceDeleteFile:
     async def test_delete_file_raises_exception_on_failure(self):
         """Test that deletion failure raises AppException."""
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.side_effect = Exception("Deletion failed: Resource not found")
 
@@ -277,9 +277,9 @@ class TestCloudinaryServiceDeleteFile:
     async def test_delete_file_logs_operation(self):
         """Test that delete_file logs the operation."""
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync, patch(
-            "app.shared.services.cloudinary.cloudinary_logger"
+            "app.core.services.cloudinary.cloudinary_logger"
         ) as mock_logger:
             mock_run_sync.return_value = None
 
@@ -305,9 +305,9 @@ class TestCloudinaryServiceDeleteFiles:
             return func(*args)
 
         with patch(
-            "app.shared.services.cloudinary.cloudinary.api.delete_resources"
+            "app.core.services.cloudinary.cloudinary.api.delete_resources"
         ) as mock_delete, patch(
-            "app.shared.services.cloudinary.run_sync", side_effect=mock_run_sync
+            "app.core.services.cloudinary.run_sync", side_effect=mock_run_sync
         ):
             mock_delete.return_value = None
 
@@ -319,7 +319,7 @@ class TestCloudinaryServiceDeleteFiles:
     async def test_delete_files_empty_list(self):
         """Test batch deletion with empty list."""
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = None
 
@@ -332,7 +332,7 @@ class TestCloudinaryServiceDeleteFiles:
     async def test_delete_files_single_file(self):
         """Test batch deletion with single file."""
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = None
 
@@ -347,7 +347,7 @@ class TestCloudinaryServiceDeleteFiles:
         public_ids = ["folder1/image1", "folder2/subfolder/image2", "root_image"]
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = None
 
@@ -362,7 +362,7 @@ class TestCloudinaryServiceDeleteFiles:
         public_ids = ["id1", "id2"]
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.side_effect = Exception("API error: Rate limit exceeded")
 
@@ -379,9 +379,9 @@ class TestCloudinaryServiceDeleteFiles:
         public_ids = ["id1", "id2"]
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync, patch(
-            "app.shared.services.cloudinary.cloudinary_logger"
+            "app.core.services.cloudinary.cloudinary_logger"
         ) as mock_logger:
             mock_run_sync.return_value = None
 
@@ -400,7 +400,7 @@ class TestCloudinaryServiceDeleteFiles:
         large_batch = [f"image_{i}" for i in range(100)]
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.return_value = None
 
@@ -422,7 +422,7 @@ class TestCloudinaryServiceErrorHandling:
         original_error = ValueError("Invalid file format")
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.side_effect = original_error
 
@@ -438,7 +438,7 @@ class TestCloudinaryServiceErrorHandling:
         original_error = ConnectionError("Network failure")
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.side_effect = original_error
 
@@ -453,7 +453,7 @@ class TestCloudinaryServiceErrorHandling:
         original_error = TimeoutError("Request timeout")
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.side_effect = original_error
 
@@ -469,7 +469,7 @@ class TestCloudinaryServiceErrorHandling:
         mock_file.file = BytesIO(b"test")
 
         with patch(
-            "app.shared.services.cloudinary.run_sync", new_callable=AsyncMock
+            "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
             mock_run_sync.side_effect = Exception("Specific upload error")
 
@@ -500,8 +500,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_success(self):
         """Test successful generation of upload credentials."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "generated_signature"
 
@@ -521,8 +521,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_with_folder(self):
         """Test generation of upload credentials with folder parameter."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "signature_with_folder"
 
@@ -539,8 +539,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_with_resource_type(self):
         """Test generation of upload credentials with different resource types."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "signature"
 
@@ -568,8 +568,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_with_upload_preset(self):
         """Test generation of upload credentials with upload preset."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "signature_with_preset"
 
@@ -586,8 +586,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_with_eager(self):
         """Test generation of upload credentials with eager transformations."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "signature_with_eager"
 
@@ -604,8 +604,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_with_kwargs(self):
         """Test generation of upload credentials with additional kwargs."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "signature_with_kwargs"
 
@@ -627,8 +627,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_with_all_parameters(self):
         """Test generation of upload credentials with all parameters."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "full_signature"
 
@@ -700,7 +700,7 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_raises_exception_on_signature_failure(self):
         """Test that generate_upload_credentials raises AppException when signature generation fails."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign:
             mock_sign.side_effect = Exception("Signature generation failed")
 
@@ -714,11 +714,11 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_logs_success(self):
         """Test that generate_upload_credentials logs successful credential generation."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch(
-            "app.shared.services.cloudinary.time.time"
+            "app.core.services.cloudinary.time.time"
         ) as mock_time, patch(
-            "app.shared.services.cloudinary.cloudinary_logger"
+            "app.core.services.cloudinary.cloudinary_logger"
         ) as mock_logger:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "signature"
@@ -733,9 +733,9 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_logs_error_on_failure(self):
         """Test that generate_upload_credentials logs errors on failure."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch(
-            "app.shared.services.cloudinary.cloudinary_logger"
+            "app.core.services.cloudinary.cloudinary_logger"
         ) as mock_logger:
             mock_sign.side_effect = Exception("Test error")
 
@@ -750,8 +750,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_signature_uses_api_secret(self):
         """Test that signature generation uses the correct API secret."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "signature"
 
@@ -764,8 +764,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_timestamp_in_params(self):
         """Test that timestamp is included in params to sign."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 9876543210
             mock_sign.return_value = "signature"
 
@@ -780,8 +780,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_none_kwargs_excluded(self):
         """Test that None kwargs are excluded from the result."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "signature"
 
@@ -798,8 +798,8 @@ class TestCloudinaryServiceGenerateUploadCredentials:
     def test_generate_upload_credentials_returns_pydantic_model(self):
         """Test that the return type is CloudinaryUploadCredentials Pydantic model."""
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
-        ) as mock_sign, patch("app.shared.services.cloudinary.time.time") as mock_time:
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
+        ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
             mock_time.return_value = 1234567890
             mock_sign.return_value = "signature"
 
@@ -818,7 +818,7 @@ class TestCloudinaryServiceGenerateUploadCredentials:
         original_error = ValueError("Original error")
 
         with patch(
-            "app.shared.services.cloudinary.cloudinary.utils.api_sign_request"
+            "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign:
             mock_sign.side_effect = original_error
 

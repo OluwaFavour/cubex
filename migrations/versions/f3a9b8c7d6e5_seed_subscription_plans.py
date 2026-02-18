@@ -14,7 +14,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
-from app.shared.config import settings
+from app.core.config import settings
 
 
 # revision identifiers, used by Alembic.

@@ -81,7 +81,7 @@ class TestGetConnection:
     async def test_get_connection_uses_settings_url(self):
         """Test that get_connection uses RABBITMQ_URL from settings."""
         from app.infrastructure.messaging import connection as conn_module
-        from app.shared.config import settings
+        from app.core.config import settings
 
         conn_module._connection = None
 

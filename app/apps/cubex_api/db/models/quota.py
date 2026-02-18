@@ -14,10 +14,10 @@ from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, UniqueConstr
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
-from app.shared.db.models.base import BaseModel
+from app.core.db.models.base import BaseModel
 
 if TYPE_CHECKING:
-    from app.shared.db.models.plan import Plan
+    from app.core.db.models.plan import Plan
 
 
 class EndpointCostConfig(BaseModel):

@@ -13,7 +13,7 @@ Run all tests:
     pytest app/tests/services/test_brevo.py -v
 
 Run with coverage:
-    pytest app/tests/services/test_brevo.py --cov=app.shared.services.brevo --cov-report=term-missing -v
+    pytest app/tests/services/test_brevo.py --cov=app.core.services.brevo --cov-report=term-missing -v
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -22,14 +22,14 @@ import httpx
 import pytest
 from fastapi import status as http_status
 
-from app.shared.services.brevo import (
+from app.core.services.brevo import (
     BrevoService,
     Contact,
     ListContact,
     ListMessageVersion,
     MessageVersion,
 )
-from app.shared.exceptions.types import AppException
+from app.core.exceptions.types import AppException
 
 
 class TestBrevoServiceInit:

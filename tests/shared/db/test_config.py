@@ -5,7 +5,7 @@ Run tests:
     pytest app/tests/shared/db/test_config.py -v
 
 Run with coverage:
-    pytest app/tests/shared/db/test_config.py --cov=app.shared.db.config --cov-report=term-missing -v
+    pytest app/tests/shared/db/test_config.py --cov=app.core.db.config --cov-report=term-missing -v
 """
 
 from unittest.mock import AsyncMock, patch
@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncConnection
 
-from app.shared.db.config import (
+from app.core.db.config import (
     async_engine,
     AsyncSessionLocal,
     Base,
@@ -52,7 +52,7 @@ class TestInitDb:
         mock_begin.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_begin.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("app.shared.db.config.async_engine") as mock_engine:
+        with patch("app.core.db.config.async_engine") as mock_engine:
             mock_engine.begin.return_value = mock_begin
 
             await init_db()
@@ -83,7 +83,7 @@ class TestInitDb:
         mock_context.__aenter__ = mock_begin
         mock_context.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("app.shared.db.config.async_engine") as mock_engine:
+        with patch("app.core.db.config.async_engine") as mock_engine:
             mock_engine.begin.return_value = mock_context
 
             await init_db()
@@ -99,7 +99,7 @@ class TestDisposeDb:
     @pytest.mark.asyncio
     async def test_dispose_db_calls_engine_dispose(self):
         """Test that dispose_db calls engine.dispose()."""
-        with patch("app.shared.db.config.async_engine") as mock_engine:
+        with patch("app.core.db.config.async_engine") as mock_engine:
             mock_engine.dispose = AsyncMock()
 
             await dispose_db()
@@ -110,7 +110,7 @@ class TestDisposeDb:
     @pytest.mark.asyncio
     async def test_dispose_db_is_awaitable(self):
         """Test that dispose_db is properly async."""
-        with patch("app.shared.db.config.async_engine") as mock_engine:
+        with patch("app.core.db.config.async_engine") as mock_engine:
             mock_engine.dispose = AsyncMock()
 
             # Should not raise any errors

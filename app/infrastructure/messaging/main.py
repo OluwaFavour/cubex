@@ -21,9 +21,9 @@ import aio_pika
 from app.infrastructure.messaging.connection import get_connection
 from app.infrastructure.messaging.consumer import process_message
 from app.infrastructure.messaging.queues import get_queue_configs
-from app.shared.config import rabbitmq_logger, settings
-from app.shared.db import init_db, dispose_db
-from app.shared.services import BrevoService, RedisService, Renderer
+from app.core.config import rabbitmq_logger, settings
+from app.core.db import init_db, dispose_db
+from app.core.services import BrevoService, RedisService, Renderer
 
 
 async def start_consumers(keep_alive: bool) -> aio_pika.RobustConnection | None:

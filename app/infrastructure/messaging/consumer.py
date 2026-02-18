@@ -3,8 +3,8 @@ from typing import Callable, Any
 
 import aio_pika
 
-from app.shared.config import rabbitmq_logger
-from app.shared.services.email_manager import EmailManagerService
+from app.core.config import rabbitmq_logger
+from app.core.services.email_manager import EmailManagerService
 
 
 async def process_message(

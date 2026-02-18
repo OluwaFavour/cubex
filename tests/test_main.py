@@ -560,7 +560,7 @@ class TestHealthCheckEndpoint:
             yield mock_db_session
 
         from app.main import app as test_app
-        from app.core.dependencies import get_async_session
+        from app.core.dependencies.db import get_async_session
 
         test_app.dependency_overrides[get_async_session] = get_session_override
 
@@ -620,7 +620,7 @@ class TestHealthCheckEndpoint:
                 yield session
 
         from app.main import app as test_app
-        from app.core.dependencies import get_async_session
+        from app.core.dependencies.db import get_async_session
 
         test_app.dependency_overrides[get_async_session] = override_get_session
 
@@ -675,7 +675,7 @@ class TestHealthCheckEndpoint:
 
         # Override the dependency
         from app.main import app as test_app
-        from app.core.dependencies import get_async_session
+        from app.core.dependencies.db import get_async_session
 
         test_app.dependency_overrides[get_async_session] = failing_session
 
@@ -731,7 +731,7 @@ class TestHealthCheckEndpoint:
 
         # Override the dependency
         from app.main import app as test_app
-        from app.core.dependencies import get_async_session
+        from app.core.dependencies.db import get_async_session
 
         test_app.dependency_overrides[get_async_session] = invalid_result_session
 
@@ -790,7 +790,7 @@ class TestHealthCheckEndpoint:
                 yield session
 
         from app.main import app as test_app
-        from app.core.dependencies import get_async_session
+        from app.core.dependencies.db import get_async_session
 
         test_app.dependency_overrides[get_async_session] = override_get_session
 

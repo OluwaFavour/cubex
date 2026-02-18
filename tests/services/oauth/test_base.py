@@ -11,9 +11,8 @@ Run all tests:
     pytest app/tests/services/oauth/test_base.py -v
 
 Run with coverage:
-    pytest app/tests/services/oauth/test_base.py --cov=app.shared.services.oauth.base --cov-report=term-missing -v
+    pytest app/tests/services/oauth/test_base.py --cov=app.core.services.oauth.base --cov-report=term-missing -v
 """
-
 
 import pytest
 
@@ -23,14 +22,14 @@ class TestBaseOAuthProviderAbstract:
 
     def test_base_provider_is_abstract(self):
         """Test that BaseOAuthProvider cannot be instantiated directly."""
-        from app.shared.services.oauth.base import BaseOAuthProvider
+        from app.core.services.oauth.base import BaseOAuthProvider
 
         with pytest.raises(TypeError):
             BaseOAuthProvider()
 
     def test_base_provider_requires_get_authorization_url(self):
         """Test that subclasses must implement get_authorization_url."""
-        from app.shared.services.oauth.base import BaseOAuthProvider
+        from app.core.services.oauth.base import BaseOAuthProvider
 
         class IncompleteProvider(BaseOAuthProvider):
             provider_name = "incomplete"
@@ -46,7 +45,7 @@ class TestBaseOAuthProviderAbstract:
 
     def test_base_provider_requires_exchange_code_for_tokens(self):
         """Test that subclasses must implement exchange_code_for_tokens."""
-        from app.shared.services.oauth.base import BaseOAuthProvider
+        from app.core.services.oauth.base import BaseOAuthProvider
 
         class IncompleteProvider(BaseOAuthProvider):
             provider_name = "incomplete"
@@ -62,7 +61,7 @@ class TestBaseOAuthProviderAbstract:
 
     def test_base_provider_requires_get_user_info(self):
         """Test that subclasses must implement get_user_info."""
-        from app.shared.services.oauth.base import BaseOAuthProvider
+        from app.core.services.oauth.base import BaseOAuthProvider
 
         class IncompleteProvider(BaseOAuthProvider):
             provider_name = "incomplete"
@@ -82,14 +81,14 @@ class TestGenerateState:
 
     def test_generate_state_returns_string(self):
         """Test that generate_state returns a string."""
-        from app.shared.services.oauth.base import generate_state
+        from app.core.services.oauth.base import generate_state
 
         state = generate_state()
         assert isinstance(state, str)
 
     def test_generate_state_default_length(self):
         """Test that generate_state uses default length of 32 bytes (64 hex chars)."""
-        from app.shared.services.oauth.base import generate_state
+        from app.core.services.oauth.base import generate_state
 
         state = generate_state()
         # 32 bytes = 64 hex characters
@@ -97,7 +96,7 @@ class TestGenerateState:
 
     def test_generate_state_custom_length(self):
         """Test that generate_state respects custom length."""
-        from app.shared.services.oauth.base import generate_state
+        from app.core.services.oauth.base import generate_state
 
         state = generate_state(length=16)
         # 16 bytes = 32 hex characters
@@ -105,7 +104,7 @@ class TestGenerateState:
 
     def test_generate_state_is_unique(self):
         """Test that generate_state produces unique values."""
-        from app.shared.services.oauth.base import generate_state
+        from app.core.services.oauth.base import generate_state
 
         states = [generate_state() for _ in range(100)]
         assert len(set(states)) == 100
@@ -116,7 +115,7 @@ class TestOAuthUserInfo:
 
     def test_oauth_user_info_creation(self):
         """Test creating OAuthUserInfo with all fields."""
-        from app.shared.services.oauth.base import OAuthUserInfo
+        from app.core.services.oauth.base import OAuthUserInfo
 
         user_info = OAuthUserInfo(
             provider="google",
@@ -142,7 +141,7 @@ class TestOAuthUserInfo:
 
     def test_oauth_user_info_minimal(self):
         """Test creating OAuthUserInfo with minimal fields."""
-        from app.shared.services.oauth.base import OAuthUserInfo
+        from app.core.services.oauth.base import OAuthUserInfo
 
         user_info = OAuthUserInfo(
             provider="github",
@@ -162,7 +161,7 @@ class TestOAuthUserInfo:
 
     def test_oauth_user_info_to_dict(self):
         """Test converting OAuthUserInfo to dictionary."""
-        from app.shared.services.oauth.base import OAuthUserInfo
+        from app.core.services.oauth.base import OAuthUserInfo
 
         user_info = OAuthUserInfo(
             provider="google",
@@ -185,7 +184,7 @@ class TestOAuthTokens:
 
     def test_oauth_tokens_creation(self):
         """Test creating OAuthTokens with all fields."""
-        from app.shared.services.oauth.base import OAuthTokens
+        from app.core.services.oauth.base import OAuthTokens
 
         tokens = OAuthTokens(
             access_token="access_123",
@@ -205,7 +204,7 @@ class TestOAuthTokens:
 
     def test_oauth_tokens_minimal(self):
         """Test creating OAuthTokens with minimal fields."""
-        from app.shared.services.oauth.base import OAuthTokens
+        from app.core.services.oauth.base import OAuthTokens
 
         tokens = OAuthTokens(
             access_token="access_123",
@@ -226,7 +225,7 @@ class TestConcreteProvider:
     @pytest.fixture
     def concrete_provider(self):
         """Create a concrete implementation for testing."""
-        from app.shared.services.oauth.base import (
+        from app.core.services.oauth.base import (
             BaseOAuthProvider,
             OAuthTokens,
             OAuthUserInfo,
@@ -236,7 +235,9 @@ class TestConcreteProvider:
             provider_name = "test"
 
             def get_authorization_url(self, redirect_uri: str, state: str) -> str:
-                return f"https://test.com/auth?redirect_uri={redirect_uri}&state={state}"
+                return (
+                    f"https://test.com/auth?redirect_uri={redirect_uri}&state={state}"
+                )
 
             async def exchange_code_for_tokens(
                 self, code: str, redirect_uri: str
@@ -298,7 +299,7 @@ class TestModuleExports:
 
     def test_all_exports(self):
         """Test that __all__ contains expected exports."""
-        from app.shared.services.oauth import base
+        from app.core.services.oauth import base
 
         assert hasattr(base, "__all__")
         assert "BaseOAuthProvider" in base.__all__

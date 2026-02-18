@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
-from app.shared.enums import SalesRequestStatus
+from app.core.enums import SalesRequestStatus
 
 
 class ContactSalesRequest(BaseModel):

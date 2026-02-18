@@ -15,9 +15,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session
-from app.shared.config import request_logger
-from app.shared.dependencies.auth import CurrentActiveUser
+from app.core.dependencies.db import get_async_session
+from app.core.config import request_logger
+from app.core.dependencies.auth import CurrentActiveUser
 from app.apps.cubex_api.db.crud import workspace_member_db
 from app.apps.cubex_api.schemas import (
     PlanResponse,
@@ -42,8 +42,8 @@ from app.apps.cubex_api.services import (
     SubscriptionNotFoundException,
     QuotaCacheService,
 )
-from app.shared.db.models import Plan, Subscription
-from app.shared.db.crud import api_subscription_context_db
+from app.core.db.models import Plan, Subscription
+from app.core.db.crud import api_subscription_context_db
 
 
 router = APIRouter(prefix="/subscriptions")

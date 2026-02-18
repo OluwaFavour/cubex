@@ -21,8 +21,8 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from app.shared.config import scheduler_logger, settings
-from app.shared.services import BrevoService, RedisService, Renderer
+from app.core.config import scheduler_logger, settings
+from app.core.services import BrevoService, RedisService, Renderer
 
 
 logging.basicConfig(level=logging.INFO)

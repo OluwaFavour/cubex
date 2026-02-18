@@ -23,7 +23,7 @@ class TestRateLimitResult:
 
     def test_rate_limit_result_allowed(self):
         """Test RateLimitResult when request is allowed."""
-        from app.shared.services.rate_limit import RateLimitResult
+        from app.core.services.rate_limit import RateLimitResult
 
         result = RateLimitResult(
             allowed=True,
@@ -39,7 +39,7 @@ class TestRateLimitResult:
 
     def test_rate_limit_result_denied(self):
         """Test RateLimitResult when request is denied."""
-        from app.shared.services.rate_limit import RateLimitResult
+        from app.core.services.rate_limit import RateLimitResult
 
         result = RateLimitResult(
             allowed=False,
@@ -65,7 +65,7 @@ class TestMemoryBackend:
     @pytest.mark.asyncio
     async def test_memory_backend_first_request(self):
         """Test first request creates new entry."""
-        from app.shared.services.rate_limit import MemoryBackend
+        from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
         result = await backend.check("test_key", limit=10, window=60)
@@ -77,7 +77,7 @@ class TestMemoryBackend:
     @pytest.mark.asyncio
     async def test_memory_backend_increment(self):
         """Test incrementing request count."""
-        from app.shared.services.rate_limit import MemoryBackend
+        from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
 
@@ -92,7 +92,7 @@ class TestMemoryBackend:
     @pytest.mark.asyncio
     async def test_memory_backend_limit_exceeded(self):
         """Test rate limit exceeded."""
-        from app.shared.services.rate_limit import MemoryBackend
+        from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
 
@@ -110,7 +110,7 @@ class TestMemoryBackend:
     @pytest.mark.asyncio
     async def test_memory_backend_window_reset(self):
         """Test window reset after expiry."""
-        from app.shared.services.rate_limit import MemoryBackend
+        from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
 
@@ -129,7 +129,7 @@ class TestMemoryBackend:
     @pytest.mark.asyncio
     async def test_memory_backend_reset(self):
         """Test resetting a key."""
-        from app.shared.services.rate_limit import MemoryBackend
+        from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
 
@@ -148,7 +148,7 @@ class TestMemoryBackend:
     @pytest.mark.asyncio
     async def test_memory_backend_get_remaining(self):
         """Test getting remaining requests."""
-        from app.shared.services.rate_limit import MemoryBackend
+        from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
 
@@ -163,7 +163,7 @@ class TestMemoryBackend:
     @pytest.mark.asyncio
     async def test_memory_backend_get_remaining_no_key(self):
         """Test getting remaining when key doesn't exist."""
-        from app.shared.services.rate_limit import MemoryBackend
+        from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
         remaining = await backend.get_remaining("non_existing", limit=10, window=60)
@@ -173,7 +173,7 @@ class TestMemoryBackend:
     @pytest.mark.asyncio
     async def test_memory_backend_cleanup_expired(self):
         """Test that expired entries are cleaned up."""
-        from app.shared.services.rate_limit import MemoryBackend
+        from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
 
@@ -201,9 +201,9 @@ class TestRedisBackend:
     @pytest.mark.asyncio
     async def test_redis_backend_first_request(self):
         """Test first request creates new entry."""
-        from app.shared.services.rate_limit import RedisBackend
+        from app.core.services.rate_limit import RedisBackend
 
-        with patch("app.shared.services.rate_limit.RedisService") as mock_redis:
+        with patch("app.core.services.rate_limit.RedisService") as mock_redis:
             mock_redis.incr = AsyncMock(return_value=1)
             mock_redis.expire = AsyncMock(return_value=True)
             mock_redis.ttl = AsyncMock(return_value=60)
@@ -219,9 +219,9 @@ class TestRedisBackend:
     @pytest.mark.asyncio
     async def test_redis_backend_limit_exceeded(self):
         """Test rate limit exceeded."""
-        from app.shared.services.rate_limit import RedisBackend
+        from app.core.services.rate_limit import RedisBackend
 
-        with patch("app.shared.services.rate_limit.RedisService") as mock_redis:
+        with patch("app.core.services.rate_limit.RedisService") as mock_redis:
             mock_redis.incr = AsyncMock(return_value=11)
             mock_redis.ttl = AsyncMock(return_value=30)
 
@@ -235,9 +235,9 @@ class TestRedisBackend:
     @pytest.mark.asyncio
     async def test_redis_backend_reset(self):
         """Test resetting a key."""
-        from app.shared.services.rate_limit import RedisBackend
+        from app.core.services.rate_limit import RedisBackend
 
-        with patch("app.shared.services.rate_limit.RedisService") as mock_redis:
+        with patch("app.core.services.rate_limit.RedisService") as mock_redis:
             mock_redis.delete = AsyncMock(return_value=True)
 
             backend = RedisBackend()
@@ -248,9 +248,9 @@ class TestRedisBackend:
     @pytest.mark.asyncio
     async def test_redis_backend_get_remaining(self):
         """Test getting remaining requests."""
-        from app.shared.services.rate_limit import RedisBackend
+        from app.core.services.rate_limit import RedisBackend
 
-        with patch("app.shared.services.rate_limit.RedisService") as mock_redis:
+        with patch("app.core.services.rate_limit.RedisService") as mock_redis:
             mock_redis.get = AsyncMock(return_value="5")
 
             backend = RedisBackend()
@@ -261,9 +261,9 @@ class TestRedisBackend:
     @pytest.mark.asyncio
     async def test_redis_backend_get_remaining_no_key(self):
         """Test getting remaining when key doesn't exist."""
-        from app.shared.services.rate_limit import RedisBackend
+        from app.core.services.rate_limit import RedisBackend
 
-        with patch("app.shared.services.rate_limit.RedisService") as mock_redis:
+        with patch("app.core.services.rate_limit.RedisService") as mock_redis:
             mock_redis.get = AsyncMock(return_value=None)
 
             backend = RedisBackend()
@@ -283,7 +283,7 @@ class TestRateLimiter:
     @pytest.mark.asyncio
     async def test_rate_limiter_memory_backend(self):
         """Test RateLimiter with memory backend."""
-        from app.shared.services.rate_limit import RateLimiter
+        from app.core.services.rate_limit import RateLimiter
 
         limiter = RateLimiter(backend="memory")
         result = await limiter.check("test_key", limit=10, window=60)
@@ -293,9 +293,9 @@ class TestRateLimiter:
     @pytest.mark.asyncio
     async def test_rate_limiter_redis_backend(self):
         """Test RateLimiter with redis backend."""
-        from app.shared.services.rate_limit import RateLimiter
+        from app.core.services.rate_limit import RateLimiter
 
-        with patch("app.shared.services.rate_limit.RedisService") as mock_redis:
+        with patch("app.core.services.rate_limit.RedisService") as mock_redis:
             mock_redis.incr = AsyncMock(return_value=1)
             mock_redis.expire = AsyncMock(return_value=True)
             mock_redis.ttl = AsyncMock(return_value=60)
@@ -308,9 +308,9 @@ class TestRateLimiter:
     @pytest.mark.asyncio
     async def test_rate_limiter_default_backend_from_settings(self):
         """Test RateLimiter uses settings for default backend."""
-        from app.shared.services.rate_limit import RateLimiter
+        from app.core.services.rate_limit import RateLimiter
 
-        with patch("app.shared.services.rate_limit.settings") as mock_settings:
+        with patch("app.core.services.rate_limit.settings") as mock_settings:
             mock_settings.RATE_LIMIT_BACKEND = "memory"
 
             limiter = RateLimiter()
@@ -339,9 +339,9 @@ class TestRateLimitDependencies:
     @pytest.mark.asyncio
     async def test_rate_limit_by_ip(self, mock_request):
         """Test rate_limit_by_ip dependency."""
-        from app.shared.services.rate_limit import rate_limit_by_ip
+        from app.core.services.rate_limit import rate_limit_by_ip
 
-        with patch("app.shared.services.rate_limit.RateLimiter") as mock_limiter_class:
+        with patch("app.core.services.rate_limit.RateLimiter") as mock_limiter_class:
             mock_limiter = MagicMock()
             mock_limiter.check = AsyncMock(
                 return_value=MagicMock(allowed=True, remaining=9, limit=10)
@@ -359,10 +359,10 @@ class TestRateLimitDependencies:
     @pytest.mark.asyncio
     async def test_rate_limit_by_ip_exceeded(self, mock_request):
         """Test rate_limit_by_ip when limit exceeded."""
-        from app.shared.services.rate_limit import rate_limit_by_ip
-        from app.shared.exceptions.types import RateLimitExceededException
+        from app.core.services.rate_limit import rate_limit_by_ip
+        from app.core.exceptions.types import RateLimitExceededException
 
-        with patch("app.shared.services.rate_limit.RateLimiter") as mock_limiter_class:
+        with patch("app.core.services.rate_limit.RateLimiter") as mock_limiter_class:
             mock_limiter = MagicMock()
             mock_limiter.check = AsyncMock(
                 return_value=MagicMock(
@@ -381,9 +381,9 @@ class TestRateLimitDependencies:
     @pytest.mark.asyncio
     async def test_rate_limit_by_endpoint(self, mock_request):
         """Test rate_limit_by_endpoint dependency."""
-        from app.shared.services.rate_limit import rate_limit_by_endpoint
+        from app.core.services.rate_limit import rate_limit_by_endpoint
 
-        with patch("app.shared.services.rate_limit.RateLimiter") as mock_limiter_class:
+        with patch("app.core.services.rate_limit.RateLimiter") as mock_limiter_class:
             mock_limiter = MagicMock()
             mock_limiter.check = AsyncMock(
                 return_value=MagicMock(allowed=True, remaining=9, limit=10)
@@ -400,12 +400,12 @@ class TestRateLimitDependencies:
     @pytest.mark.asyncio
     async def test_rate_limit_by_user(self):
         """Test rate_limit_by_user dependency."""
-        from app.shared.services.rate_limit import rate_limit_by_user
+        from app.core.services.rate_limit import rate_limit_by_user
 
         mock_request = MagicMock(spec=Request)
         mock_request.url.path = "/api/test"
 
-        with patch("app.shared.services.rate_limit.RateLimiter") as mock_limiter_class:
+        with patch("app.core.services.rate_limit.RateLimiter") as mock_limiter_class:
             mock_limiter = MagicMock()
             mock_limiter.check = AsyncMock(
                 return_value=MagicMock(allowed=True, remaining=9, limit=10)
@@ -422,8 +422,8 @@ class TestRateLimitDependencies:
     @pytest.mark.asyncio
     async def test_rate_limit_by_user_no_user(self):
         """Test rate_limit_by_user when no user_id provided."""
-        from app.shared.services.rate_limit import rate_limit_by_user
-        from app.shared.exceptions.types import AuthenticationException
+        from app.core.services.rate_limit import rate_limit_by_user
+        from app.core.exceptions.types import AuthenticationException
 
         mock_request = MagicMock(spec=Request)
 
@@ -443,21 +443,21 @@ class TestKeyFormat:
 
     def test_key_format_ip(self):
         """Test IP-based key format."""
-        from app.shared.services.rate_limit import format_rate_limit_key
+        from app.core.services.rate_limit import format_rate_limit_key
 
         key = format_rate_limit_key("ip", "192.168.1.1", "/api/test")
         assert key == "rate_limit:ip:192.168.1.1:/api/test"
 
     def test_key_format_user(self):
         """Test user-based key format."""
-        from app.shared.services.rate_limit import format_rate_limit_key
+        from app.core.services.rate_limit import format_rate_limit_key
 
         key = format_rate_limit_key("user", "user-123", "/api/test")
         assert key == "rate_limit:user:user-123:/api/test"
 
     def test_key_format_endpoint(self):
         """Test endpoint-based key format."""
-        from app.shared.services.rate_limit import format_rate_limit_key
+        from app.core.services.rate_limit import format_rate_limit_key
 
         key = format_rate_limit_key("endpoint", "/api/test", "/api/test")
         assert key == "rate_limit:endpoint:/api/test:/api/test"
@@ -474,13 +474,16 @@ class TestStackingRateLimiters:
     @pytest.mark.asyncio
     async def test_stacking_ip_and_endpoint(self):
         """Test stacking IP and endpoint rate limiters."""
-        from app.shared.services.rate_limit import rate_limit_by_ip, rate_limit_by_endpoint
+        from app.core.services.rate_limit import (
+            rate_limit_by_ip,
+            rate_limit_by_endpoint,
+        )
 
         mock_request = MagicMock(spec=Request)
         mock_request.client.host = "192.168.1.1"
         mock_request.url.path = "/api/test"
 
-        with patch("app.shared.services.rate_limit.RateLimiter") as mock_limiter_class:
+        with patch("app.core.services.rate_limit.RateLimiter") as mock_limiter_class:
             mock_limiter = MagicMock()
             mock_limiter.check = AsyncMock(
                 return_value=MagicMock(allowed=True, remaining=9, limit=10)

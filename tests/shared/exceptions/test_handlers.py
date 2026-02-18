@@ -5,7 +5,7 @@ Run tests:
     pytest app/tests/shared/exceptions/test_handlers.py -v
 
 Run with coverage:
-    pytest app/tests/shared/exceptions/test_handlers.py --cov=app.shared.exceptions.handlers --cov-report=term-missing -v
+    pytest app/tests/shared/exceptions/test_handlers.py --cov=app.core.exceptions.handlers --cov-report=term-missing -v
 """
 
 from unittest.mock import MagicMock, patch
@@ -13,12 +13,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import status
 
-from app.shared.exceptions.handlers import (
+from app.core.exceptions.handlers import (
     general_exception_handler,
     database_exception_handler,
     exception_schema,
 )
-from app.shared.exceptions.types import AppException, DatabaseException
+from app.core.exceptions.types import AppException, DatabaseException
 
 
 class TestGeneralExceptionHandler:
@@ -30,7 +30,7 @@ class TestGeneralExceptionHandler:
         mock_request = MagicMock()
         exc = AppException("Test error", status_code=status.HTTP_400_BAD_REQUEST)
 
-        with patch("app.shared.exceptions.handlers.request_logger") as mock_logger:
+        with patch("app.core.exceptions.handlers.request_logger") as mock_logger:
             response = await general_exception_handler(mock_request, exc)
 
             # Verify logger was called
@@ -48,7 +48,7 @@ class TestGeneralExceptionHandler:
         mock_request = MagicMock()
         exc = AppException("Internal error")
 
-        with patch("app.shared.exceptions.handlers.request_logger"):
+        with patch("app.core.exceptions.handlers.request_logger"):
             response = await general_exception_handler(mock_request, exc)
 
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -64,7 +64,7 @@ class TestDatabaseExceptionHandler:
         mock_request = MagicMock()
         exc = DatabaseException("Connection lost")
 
-        with patch("app.shared.exceptions.handlers.request_logger") as mock_logger:
+        with patch("app.core.exceptions.handlers.request_logger") as mock_logger:
             response = await database_exception_handler(mock_request, exc)
 
             # Verify logger was called
@@ -82,7 +82,7 @@ class TestDatabaseExceptionHandler:
         mock_request = MagicMock()
         exc = DatabaseException()
 
-        with patch("app.shared.exceptions.handlers.request_logger"):
+        with patch("app.core.exceptions.handlers.request_logger"):
             response = await database_exception_handler(mock_request, exc)
 
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

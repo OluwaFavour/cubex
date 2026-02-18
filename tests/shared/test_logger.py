@@ -5,7 +5,7 @@ Run tests:
     pytest app/tests/shared/test_logger.py -v
 
 Run with coverage:
-    pytest app/tests/shared/test_logger.py --cov=app.shared.logger --cov-report=term-missing -v
+    pytest app/tests/shared/test_logger.py --cov=app.core.logger --cov-report=term-missing -v
 """
 
 import logging
@@ -15,13 +15,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.shared.logger import setup_logger, init_sentry
+from app.core.logger import setup_logger, init_sentry
 
 
 @pytest.fixture(autouse=True)
 def reset_sentry_state():
     """Reset Sentry initialization state before each test."""
-    import app.shared.logger as logger_module
+    import app.core.logger as logger_module
 
     logger_module._sentry_initialized = False
     yield
@@ -82,7 +82,7 @@ class TestInitSentry:
 
     def test_init_sentry_already_initialized(self):
         """Test that Sentry initialization is skipped if already initialized."""
-        import app.shared.logger as logger_module
+        import app.core.logger as logger_module
 
         logger_module._sentry_initialized = True
 
@@ -117,7 +117,7 @@ class TestInitSentry:
 
     def test_init_sentry_sets_global_flag(self):
         """Test that successful initialization sets global flag."""
-        import app.shared.logger as logger_module
+        import app.core.logger as logger_module
 
         mock_sentry = MagicMock()
         mock_logging_integration = MagicMock()
@@ -162,7 +162,7 @@ class TestSetupLogger:
     def test_setup_logger_creates_log_directory(self, temp_log_dir):
         """Test that logger creates 'logs' directory if it doesn't exist."""
         # Mock os.makedirs to verify it's called
-        with patch("app.shared.logger.os.makedirs") as mock_makedirs:
+        with patch("app.core.logger.os.makedirs") as mock_makedirs:
             log_file = os.path.join(temp_log_dir, "test.log")
             setup_logger(name="test_logger", log_file=log_file)
 
@@ -230,7 +230,7 @@ class TestSetupLogger:
 
     def test_setup_logger_with_sentry_tag_initialized(self, temp_log_dir):
         """Test sentry_tag when Sentry is initialized."""
-        import app.shared.logger as logger_module
+        import app.core.logger as logger_module
 
         logger_module._sentry_initialized = True
 
@@ -250,7 +250,7 @@ class TestSetupLogger:
 
     def test_setup_logger_sentry_tag_import_error(self, temp_log_dir):
         """Test graceful handling when Sentry SDK not available with tag."""
-        import app.shared.logger as logger_module
+        import app.core.logger as logger_module
 
         logger_module._sentry_initialized = True
 

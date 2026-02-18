@@ -4,9 +4,9 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.infrastructure.scheduler.main import scheduler
-from app.shared.config import scheduler_logger, settings
-from app.shared.db import AsyncSessionLocal
-from app.shared.db.crud import user_db
+from app.core.config import scheduler_logger, settings
+from app.core.db import AsyncSessionLocal
+from app.core.db.crud import user_db
 from app.apps.cubex_api.db.crud import usage_log_db
 
 

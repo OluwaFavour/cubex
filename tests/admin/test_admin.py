@@ -67,7 +67,7 @@ class TestAdminAuthBackend:
     def auth_backend(self):
         """Create a fresh AdminAuth instance for testing."""
         from app.admin.auth import AdminAuth
-        from app.shared.config import settings
+        from app.core.config import settings
 
         return AdminAuth(secret_key=settings.SESSION_SECRET_KEY)
 
@@ -82,7 +82,7 @@ class TestAdminAuthBackend:
     async def test_login_success(self, auth_backend, mock_request):
         """Test successful login with correct credentials."""
         from app.admin.auth import AdminAuth
-        from app.shared.config import settings
+        from app.core.config import settings
 
         # Mock form data with correct credentials
         mock_request.form = AsyncMock(
@@ -104,7 +104,7 @@ class TestAdminAuthBackend:
     @pytest.mark.asyncio
     async def test_login_failure_wrong_username(self, auth_backend, mock_request):
         """Test login failure with wrong username."""
-        from app.shared.config import settings
+        from app.core.config import settings
 
         mock_request.form = AsyncMock(
             return_value={
@@ -121,7 +121,7 @@ class TestAdminAuthBackend:
     @pytest.mark.asyncio
     async def test_login_failure_wrong_password(self, auth_backend, mock_request):
         """Test login failure with wrong password."""
-        from app.shared.config import settings
+        from app.core.config import settings
 
         mock_request.form = AsyncMock(
             return_value={
@@ -171,7 +171,7 @@ class TestAdminAuthBackend:
     async def test_authenticate_with_valid_token(self, auth_backend, mock_request):
         """Test authentication succeeds with valid HMAC token in session."""
         from app.admin.auth import AdminAuth
-        from app.shared.config import settings
+        from app.core.config import settings
 
         # Generate a valid HMAC token
         token = AdminAuth._create_token(settings.SESSION_SECRET_KEY)
@@ -225,7 +225,7 @@ class TestAdminAuthBackend:
 
         from starlette.responses import RedirectResponse
 
-        from app.shared.config import settings
+        from app.core.config import settings
 
         # Create an expired token (timestamp from 2 days ago)
         expired_timestamp = int(time.time()) - 172800  # 48 hours ago
@@ -398,14 +398,14 @@ class TestAdminSettingsConfiguration:
 
     def test_admin_settings_exist(self):
         """Test that admin settings are defined in config."""
-        from app.shared.config import settings
+        from app.core.config import settings
 
         assert hasattr(settings, "ADMIN_USERNAME")
         assert hasattr(settings, "ADMIN_PASSWORD")
 
     def test_admin_settings_have_defaults(self):
         """Test that admin settings have default values."""
-        from app.shared.config import settings
+        from app.core.config import settings
 
         # These should have defaults (for development)
         assert settings.ADMIN_USERNAME is not None

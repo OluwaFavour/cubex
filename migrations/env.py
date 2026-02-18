@@ -6,11 +6,11 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from app.shared.db import Base
+from app.core.db import Base
 
-from app.shared.db.models import *
+from app.core.db.models import *
 from app.apps.cubex_api.db.models import *
-from app.shared.config import settings
+from app.core.config import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

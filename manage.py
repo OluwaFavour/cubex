@@ -14,7 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine
 import typer
 
-from app.shared.config import settings
+from app.core.config import settings
 
 app = typer.Typer()
 
@@ -350,9 +350,9 @@ async def sync_plans_task(dry_run: bool = False) -> None:
     """
     from decimal import Decimal
 
-    from app.shared.db import AsyncSessionLocal
-    from app.shared.db.crud import plan_db
-    from app.shared.enums import PlanType, ProductType
+    from app.core.db import AsyncSessionLocal
+    from app.core.db.crud import plan_db
+    from app.core.enums import PlanType, ProductType
 
     # Load plans from JSON file
     plans_file = Path(__file__).parent / "app" / "shared" / "data" / "plans.json"

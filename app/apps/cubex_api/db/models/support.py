@@ -10,8 +10,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.shared.db.models.base import BaseModel
-from app.shared.enums import SalesRequestStatus
+from app.core.db.models.base import BaseModel
+from app.core.enums import SalesRequestStatus
 
 
 class SalesRequest(BaseModel):

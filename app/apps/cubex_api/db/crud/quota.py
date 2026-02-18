@@ -14,8 +14,8 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule
-from app.shared.db.crud.base import BaseDB
-from app.shared.exceptions.types import DatabaseException
+from app.core.db.crud.base import BaseDB
+from app.core.exceptions.types import DatabaseException
 
 
 class EndpointCostConfigDB(BaseDB[EndpointCostConfig]):

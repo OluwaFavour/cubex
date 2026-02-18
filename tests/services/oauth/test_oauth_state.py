@@ -20,7 +20,7 @@ class TestOAuthStateData:
 
     def test_oauth_state_data_defaults(self):
         """Test OAuthStateData has correct defaults."""
-        from app.shared.services.oauth import OAuthStateData
+        from app.core.services.oauth import OAuthStateData
 
         data = OAuthStateData()
         assert data.callback_url is None
@@ -30,7 +30,7 @@ class TestOAuthStateData:
 
     def test_oauth_state_data_with_values(self):
         """Test OAuthStateData with custom values."""
-        from app.shared.services.oauth import OAuthStateData
+        from app.core.services.oauth import OAuthStateData
 
         data = OAuthStateData(
             callback_url="https://example.com/callback",
@@ -47,7 +47,7 @@ class TestOAuthStateManagerEncode:
 
     def test_encode_state_returns_string(self):
         """Test encode_state returns a non-empty string."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         state = OAuthStateManager.encode_state()
         assert isinstance(state, str)
@@ -55,7 +55,7 @@ class TestOAuthStateManagerEncode:
 
     def test_encode_state_with_callback_url(self):
         """Test encode_state includes callback_url."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         state = OAuthStateManager.encode_state(
             callback_url="https://myapp.com/callback",
@@ -70,7 +70,7 @@ class TestOAuthStateManagerEncode:
 
     def test_encode_state_with_remember_me(self):
         """Test encode_state includes remember_me flag."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         state = OAuthStateManager.encode_state(remember_me=True)
         decoded = OAuthStateManager.decode_state(state)
@@ -79,7 +79,7 @@ class TestOAuthStateManagerEncode:
 
     def test_encode_state_unique_nonces(self):
         """Test encode_state generates unique nonces."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         state1 = OAuthStateManager.encode_state()
         state2 = OAuthStateManager.encode_state()
@@ -93,7 +93,7 @@ class TestOAuthStateManagerDecode:
 
     def test_decode_state_success(self):
         """Test decode_state successfully decodes valid state."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         state = OAuthStateManager.encode_state(
             callback_url="https://example.com/cb",
@@ -108,7 +108,7 @@ class TestOAuthStateManagerDecode:
 
     def test_decode_state_invalid_signature(self):
         """Test decode_state returns None for tampered state."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         # Tamper with the state
         state = OAuthStateManager.encode_state()
@@ -119,22 +119,22 @@ class TestOAuthStateManagerDecode:
 
     def test_decode_state_garbage_input(self):
         """Test decode_state returns None for garbage input."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         decoded = OAuthStateManager.decode_state("not_a_valid_state")
         assert decoded is None
 
     def test_decode_state_empty_string(self):
         """Test decode_state returns None for empty string."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         decoded = OAuthStateManager.decode_state("")
         assert decoded is None
 
     def test_decode_state_expired(self):
         """Test decode_state returns None for expired state."""
-        from app.shared.services.oauth import OAuthStateManager
-        from app.shared.services.oauth.base import _state_serializer
+        from app.core.services.oauth import OAuthStateManager
+        from app.core.services.oauth.base import _state_serializer
 
         # Create a state with the serializer directly, then mock max_age
         state = OAuthStateManager.encode_state()
@@ -156,26 +156,26 @@ class TestOAuthStateManagerValidateCallback:
 
     def test_validate_callback_url_empty(self):
         """Test validate_callback_url rejects empty URL."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         assert OAuthStateManager.validate_callback_url("") is False
         assert OAuthStateManager.validate_callback_url(None) is False
 
     def test_validate_callback_url_no_scheme(self):
         """Test validate_callback_url rejects URL without scheme."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         assert OAuthStateManager.validate_callback_url("example.com/callback") is False
 
     def test_validate_callback_url_allowed_origin(self):
         """Test validate_callback_url accepts URL in CORS origins."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         with patch(
-            "app.shared.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
             ["https://myapp.com"],
         ), patch(
-            "app.shared.services.oauth.base.settings.ENVIRONMENT",
+            "app.core.services.oauth.base.settings.ENVIRONMENT",
             "development",
         ):
             result = OAuthStateManager.validate_callback_url(
@@ -185,13 +185,13 @@ class TestOAuthStateManagerValidateCallback:
 
     def test_validate_callback_url_not_in_origins(self):
         """Test validate_callback_url rejects URL not in CORS origins."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         with patch(
-            "app.shared.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
             ["https://myapp.com"],
         ), patch(
-            "app.shared.services.oauth.base.settings.ENVIRONMENT",
+            "app.core.services.oauth.base.settings.ENVIRONMENT",
             "development",
         ):
             result = OAuthStateManager.validate_callback_url(
@@ -201,13 +201,13 @@ class TestOAuthStateManagerValidateCallback:
 
     def test_validate_callback_url_wildcard_origin(self):
         """Test validate_callback_url accepts any URL with wildcard origin."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         with patch(
-            "app.shared.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
             ["*"],
         ), patch(
-            "app.shared.services.oauth.base.settings.ENVIRONMENT",
+            "app.core.services.oauth.base.settings.ENVIRONMENT",
             "development",
         ):
             result = OAuthStateManager.validate_callback_url(
@@ -217,13 +217,13 @@ class TestOAuthStateManagerValidateCallback:
 
     def test_validate_callback_url_production_requires_https(self):
         """Test validate_callback_url requires HTTPS in production."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         with patch(
-            "app.shared.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
             ["http://myapp.com", "https://myapp.com"],
         ), patch(
-            "app.shared.services.oauth.base.settings.ENVIRONMENT",
+            "app.core.services.oauth.base.settings.ENVIRONMENT",
             "production",
         ):
             # HTTP should fail in production
@@ -240,13 +240,13 @@ class TestOAuthStateManagerValidateCallback:
 
     def test_validate_callback_url_development_allows_http(self):
         """Test validate_callback_url allows HTTP in development."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         with patch(
-            "app.shared.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
             ["http://localhost:3000"],
         ), patch(
-            "app.shared.services.oauth.base.settings.ENVIRONMENT",
+            "app.core.services.oauth.base.settings.ENVIRONMENT",
             "development",
         ):
             result = OAuthStateManager.validate_callback_url(
@@ -256,13 +256,13 @@ class TestOAuthStateManagerValidateCallback:
 
     def test_validate_callback_url_trailing_slash_handling(self):
         """Test validate_callback_url handles trailing slashes correctly."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         with patch(
-            "app.shared.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
             ["https://myapp.com/"],
         ), patch(
-            "app.shared.services.oauth.base.settings.ENVIRONMENT",
+            "app.core.services.oauth.base.settings.ENVIRONMENT",
             "development",
         ):
             # Should match despite different trailing slash
@@ -277,7 +277,7 @@ class TestOAuthStateManagerIntegration:
 
     def test_full_encode_decode_cycle(self):
         """Test complete encode/decode cycle preserves data."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
 
         original_callback = "https://frontend.app/oauth/callback"
         original_remember_me = True
@@ -295,7 +295,7 @@ class TestOAuthStateManagerIntegration:
 
     def test_state_is_url_safe(self):
         """Test encoded state is URL-safe."""
-        from app.shared.services.oauth import OAuthStateManager
+        from app.core.services.oauth import OAuthStateManager
         import re
 
         state = OAuthStateManager.encode_state(
@@ -313,14 +313,14 @@ class TestModuleExports:
 
     def test_exports_from_oauth_package(self):
         """Test OAuthStateManager is exported from oauth package."""
-        from app.shared.services.oauth import OAuthStateManager, OAuthStateData
+        from app.core.services.oauth import OAuthStateManager, OAuthStateData
 
         assert OAuthStateManager is not None
         assert OAuthStateData is not None
 
     def test_all_includes_state_manager(self):
         """Test __all__ includes OAuthStateManager."""
-        from app.shared.services import oauth
+        from app.core.services import oauth
 
         assert "OAuthStateManager" in oauth.__all__
         assert "OAuthStateData" in oauth.__all__

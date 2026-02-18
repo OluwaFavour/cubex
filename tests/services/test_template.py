@@ -11,7 +11,7 @@ Run all tests:
     pytest app/tests/services/test_template.py -v
 
 Run with coverage:
-    pytest app/tests/services/test_template.py --cov=app.shared.services.template --cov-report=term-missing -v
+    pytest app/tests/services/test_template.py --cov=app.core.services.template --cov-report=term-missing -v
 """
 
 from unittest.mock import MagicMock, patch, AsyncMock
@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 import pytest
 from jinja2 import TemplateNotFound
 
-from app.shared.services.template import Renderer
+from app.core.services.template import Renderer
 
 
 class TestRendererInitialization:
@@ -27,7 +27,7 @@ class TestRendererInitialization:
 
     def test_initialize_sets_environment(self):
         """Test that initialize creates Jinja2 environment."""
-        with patch("app.shared.services.template.Environment") as mock_env_class:
+        with patch("app.core.services.template.Environment") as mock_env_class:
             mock_env_instance = MagicMock()
             mock_env_class.return_value = mock_env_instance
 
@@ -38,14 +38,14 @@ class TestRendererInitialization:
 
     def test_initialize_with_file_system_loader(self):
         """Test that initialize configures FileSystemLoader."""
-        with patch("app.shared.services.template.FileSystemLoader") as mock_loader:
+        with patch("app.core.services.template.FileSystemLoader") as mock_loader:
             Renderer.initialize(template_dir="/path/to/templates")
 
             mock_loader.assert_called_once_with("/path/to/templates")
 
     def test_initialize_enables_autoescape(self):
         """Test that initialize enables autoescape for security."""
-        with patch("app.shared.services.template.Environment") as mock_env_class:
+        with patch("app.core.services.template.Environment") as mock_env_class:
             Renderer.initialize(template_dir="/templates")
 
             call_kwargs = mock_env_class.call_args[1]
@@ -53,7 +53,7 @@ class TestRendererInitialization:
 
     def test_initialize_enables_async(self):
         """Test that initialize enables async rendering."""
-        with patch("app.shared.services.template.Environment") as mock_env_class:
+        with patch("app.core.services.template.Environment") as mock_env_class:
             Renderer.initialize(template_dir="/templates")
 
             call_kwargs = mock_env_class.call_args[1]
@@ -69,7 +69,7 @@ class TestRendererInitialization:
         ]
 
         for template_dir in test_paths:
-            with patch("app.shared.services.template.FileSystemLoader") as mock_loader:
+            with patch("app.core.services.template.FileSystemLoader") as mock_loader:
                 Renderer.initialize(template_dir=template_dir)
                 mock_loader.assert_called_once_with(template_dir)
 
