@@ -101,6 +101,13 @@ class Plan(BaseModel):
         nullable=True,
     )
 
+    # Tier settings
+    rank: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Plan rank for ordering (0 = lowest tier, higher = more expensive)",
+    )
+
     # Stripe fields (optional for free plans)
     stripe_price_id: Mapped[str | None] = mapped_column(
         String(128),
@@ -181,6 +188,7 @@ class Plan(BaseModel):
     )
 
     __table_args__ = (
+        CheckConstraint("rank >= 0", name="ck_plans_rank_non_negative"),
         CheckConstraint("price >= 0", name="ck_plans_price_non_negative"),
         CheckConstraint("seat_price >= 0", name="ck_plans_seat_price_non_negative"),
         CheckConstraint("min_seats >= 1", name="ck_plans_min_seats_positive"),
@@ -207,6 +215,8 @@ class Plan(BaseModel):
         ),
         # Unique per product_type (allows "Free" for both API and Career)
         UniqueConstraint("name", "product_type", name="uq_plans_name_product_type"),
+        # Unique rank per product_type to ensure consistent ordering
+        UniqueConstraint("rank", "product_type", name="uq_plans_rank_product_type"),
     )
 
     def __str__(self) -> str:

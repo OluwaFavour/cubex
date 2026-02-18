@@ -28,6 +28,7 @@ class SubscriptionDB(BaseDB[Subscription]):
 
     def __init__(self):
         super().__init__(Subscription)
+        self.plan_loader = joinedload(Subscription.plan)
 
     async def get_by_workspace(
         self,

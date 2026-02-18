@@ -7,12 +7,14 @@ This module provides endpoints for:
 - Invitation management
 """
 
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.apps.cubex_api.services.quota_cache import QuotaCacheService
 from app.core.dependencies import get_async_session
 from app.shared.config import request_logger
 from app.shared.dependencies.auth import CurrentActiveUser
@@ -66,6 +68,7 @@ from app.apps.cubex_api.services import (
 from app.shared.enums import MemberRole, MemberStatus
 from app.shared.services.oauth.base import OAuthStateManager
 from app.apps.cubex_api.db.models import (
+    Workspace,
     WorkspaceMember,
     WorkspaceInvitation,
 )
@@ -79,8 +82,35 @@ router = APIRouter(prefix="/workspaces")
 # ============================================================================
 
 
-def _build_workspace_response(workspace, enabled_count: int = 0) -> WorkspaceResponse:
+async def _build_workspace_response(
+    session: AsyncSession, workspace: Workspace
+) -> WorkspaceResponse:
     """Build WorkspaceResponse from Workspace model."""
+    # Get seat count
+    seat_count = (
+        workspace.api_subscription_context.subscription.seat_count
+        if workspace.api_subscription_context
+        else 0
+    )
+    enabled_count = len(
+        [m for m in workspace.members if m.status == MemberStatus.ENABLED]
+    )
+    available_seats = seat_count - enabled_count
+
+    # Get credits
+    credits_used = (
+        workspace.api_subscription_context.credits_used
+        if workspace.api_subscription_context
+        else Decimal("0.00")
+    )
+    credits_limit = await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+        session,
+        (
+            workspace.api_subscription_context.subscription.plan_id
+            if workspace.api_subscription_context
+            else None
+        ),
+    )
     return WorkspaceResponse(
         id=workspace.id,
         display_name=workspace.display_name,
@@ -90,9 +120,12 @@ def _build_workspace_response(workspace, enabled_count: int = 0) -> WorkspaceRes
         description=workspace.description,
         created_at=workspace.created_at,
         owner_id=workspace.owner_id,
-        enabled_member_count=enabled_count
-        or len([m for m in workspace.members if m.status == MemberStatus.ENABLED]),
+        enabled_member_count=enabled_count,
         total_member_count=len(workspace.members) if workspace.members else 0,
+        seat_count=seat_count,
+        available_seats=available_seats,
+        credits_used=credits_used,
+        credits_limit=credits_limit,
     )
 
 
@@ -106,6 +139,7 @@ def _build_member_response(member: WorkspaceMember) -> WorkspaceMemberResponse:
         joined_at=member.joined_at,
         user_email=member.user.email if member.user else None,
         user_name=member.user.full_name if member.user else None,
+        user_avatar_url=member.user.avatar_url if member.user else None,
     )
 
 
@@ -183,9 +217,10 @@ async def list_workspaces(
         request_logger.info(
             f"GET /workspaces - user={current_user.id} returned {len(workspaces)} workspaces"
         )
-        return WorkspaceListResponse(
-            workspaces=[_build_workspace_response(w) for w in workspaces]
-        )
+        workspaces_response = [
+            await _build_workspace_response(session, w) for w in workspaces
+        ]
+        return WorkspaceListResponse(workspaces=workspaces_response)
 
 
 @router.post(
@@ -313,6 +348,9 @@ Retrieve detailed information about a specific workspace including members and s
 | `members` | array | List of workspace members |
 | `seat_count` | integer | Total seats in subscription |
 | `available_seats` | integer | Seats available for new members |
+| `credits_used` | decimal | API credits used in current billing period |
+| `credits_limit` | decimal | Total API credits allocated by subscription |
+| `credits_remaining` | decimal | Remaining API credits (limit - used) |
 
 ### Error Responses
 
@@ -352,14 +390,28 @@ async def get_workspace(
             raise NotFoundException("Workspace not found or access denied.")
 
         workspace = await workspace_service.get_workspace(session, workspace_id)
-        members = await workspace_member_db.get_workspace_members(session, workspace_id)
+        members = workspace.members if workspace.members else []
 
         # Get subscription info
-        subscription = await subscription_service.get_subscription(
-            session, workspace_id
+        subscription = (
+            workspace.api_subscription_context.subscription
+            if workspace.api_subscription_context
+            else None
         )
         seat_count = subscription.seat_count if subscription else 0
         enabled_count = len([m for m in members if m.status == MemberStatus.ENABLED])
+
+        # Get credits
+        credits_used = (
+            subscription.api_context.credits_used
+            if subscription and subscription.api_context
+            else Decimal("0.00")
+        )
+        credits_limit = (
+            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+                session, subscription.plan_id if subscription else None
+            )
+        )
 
         return WorkspaceDetailResponse(
             id=workspace.id,
@@ -375,6 +427,8 @@ async def get_workspace(
             members=[_build_member_response(m) for m in members],
             seat_count=seat_count,
             available_seats=seat_count - enabled_count,
+            credits_used=credits_used,
+            credits_limit=credits_limit,
         )
 
 
@@ -455,7 +509,8 @@ async def update_workspace(
                 description=data.description,
                 commit_self=False,
             )
-            return _build_workspace_response(workspace)
+            workspace_response = await _build_workspace_response(session, workspace)
+            return workspace_response
     except PermissionDeniedException as e:
         raise ForbiddenException(str(e.message)) from e
     except WorkspaceNotFoundException as e:
@@ -505,6 +560,7 @@ Array of member objects:
 | `joined_at` | datetime | When member joined |
 | `user_email` | string | Member's email |
 | `user_name` | string | Member's full name |
+| `user_avatar_url` | string | URL to member's avatar image |
 
 ### Error Responses
 
@@ -1022,7 +1078,8 @@ async def transfer_ownership(
                 new_owner_id=new_owner_id,
                 commit_self=False,
             )
-            return _build_workspace_response(workspace)
+            workspace_response = await _build_workspace_response(session, workspace)
+            return workspace_response
     except PermissionDeniedException as e:
         raise ForbiddenException(str(e.message)) from e
     except MemberNotFoundException as e:
@@ -1139,6 +1196,7 @@ an invitation URL to accept.
 |-------|------|----------|-------------|
 | `email` | string | ✅ | Email address to invite |
 | `role` | string | ❌ | Role to assign: `admin` or `member` (default) |
+| `callback_url` | string | ✅ | Frontend URL to redirect after accepting (must be in allowed origins) |
 
 ### Response
 
@@ -1152,6 +1210,7 @@ an invitation URL to accept.
 1. Admin sends invitation with this endpoint
 2. System generates invitation token (valid 7 days)
 3. Send `invitation_url` to the invitee
+   - The `invitation_url` is the provided `callback_url` with the token as a query parameter
 4. Invitee logs in and calls `/invitations/accept`
 5. Invitee becomes a workspace member
 
@@ -1494,11 +1553,12 @@ async def activate_personal_workspace(
                 commit_self=False,
             )
         )
+        workspace_response = await _build_workspace_response(session, workspace)
 
     request_logger.info(
         f"POST /workspaces/activate - workspace={workspace.id} for user={current_user.id}"
     )
-    return _build_workspace_response(workspace)
+    return workspace_response
 
 
 # ============================================================================

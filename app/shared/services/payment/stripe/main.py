@@ -38,6 +38,7 @@ from app.shared.services.payment.stripe.types import (
     RecurringWithoutCount,
     Subscription,
     SubscriptionData,
+    SubscriptionItem,
     Tier,
 )
 
@@ -1368,132 +1369,111 @@ class Stripe:
         ] = "create_prorations",
         proration_date: int | None = None,
     ) -> Subscription:
-        """Update a Stripe subscription.
 
-        Modifies an existing subscription with new properties like metadata,
-        payment method, trial period, cancellation settings, price/plan, or quantity.
+        if new_seat_price_id is not None and seat_price_id is None:
+            raise ValueError(
+                "seat_price_id must be provided when new_seat_price_id is provided."
+            )
 
-        Parameters
-        ----------
-        subscription_id : str
-            The Stripe subscription identifier to update.
-        idempotency_key : str, optional
-            Idempotency key to ensure the operation is performed only once by Stripe.
-        new_price_id : str, optional
-            New price ID to change the subscription plan/price.
-            This will update the subscription items to use the new price.
-        quantity : int, optional
-            New quantity (seat count) for the subscription item.
-            Updates the quantity on the seat item if seat_price_id is provided,
-            otherwise updates the first subscription item.
-        seat_price_id : str, optional
-            Price ID of the seat item to update quantity for.
-            Use this for subscriptions with base + seat pricing (dual line items).
-            If provided, quantity updates will target the item matching this price ID.
-        new_seat_price_id : str, optional
-            New price ID for the seat item during plan upgrades.
-            Use this when upgrading plans to change the seat pricing along with the base plan.
-            The seat item is identified by seat_price_id and updated to new_seat_price_id.
-        metadata : dict[str, str], optional
-            Custom key-value pairs to attach to the subscription.
-        default_payment_method : str, optional
-            ID of the payment method to set as default.
-        trial_end : int | Literal["now"], optional
-            Unix timestamp for when the trial should end, or "now" to end immediately.
-        cancel_at_period_end : bool, optional
-            Whether to cancel at the end of the current period.
-        proration_behavior : Literal["create_prorations", "none", "always_invoice"], optional
-            How to handle proration when changes affect billing.
-            Default is "create_prorations".
-        proration_date : int, optional
-            Unix timestamp for backdating the proration calculation.
-            If not provided, uses current time.
+        if quantity is not None and quantity <= 0:
+            raise ValueError("quantity must be a positive integer.")
 
-        Returns
-        -------
-        Subscription
-            The updated Subscription object.
+        payload: dict[str, Any] = {
+            "proration_behavior": proration_behavior,
+        }
 
-        Raises
-        ------
-        StripeAPIException
-            If the Stripe API request fails.
-        Any exception raised by the underlying _request coroutine.
-        """
-        # If changing price or quantity, need to update subscription items
-        if (
+        if proration_date is not None:
+            payload["proration_date"] = proration_date
+
+        # --- build subscription item updates if needed ---
+        needs_item_update = (
             new_price_id is not None
             or quantity is not None
             or new_seat_price_id is not None
-        ):
-            # First, get the current subscription to find the subscription item ID
+        )
+
+        if needs_item_update:
             subscription = await cls.get_subscription(subscription_id)
+            items_data = subscription.items.data
 
-            items = subscription.items
-            items_data = items.data
+            if not items_data:
+                raise StripeAPIException("Subscription has no subscription items.")
 
-            payload: dict[str, Any] = {
-                "proration_behavior": proration_behavior,
-            }
+            def find_item_by_price(price_id: str) -> SubscriptionItem | None:
+                return next(
+                    (item for item in items_data if item.price.id == price_id), None
+                )
 
-            item_index = 0
+            def find_base_item() -> SubscriptionItem:
+                if seat_price_id is None:
+                    return items_data[0]
 
-            # Handle base plan price change (first item or item not matching seat_price_id)
+                return next(
+                    (item for item in items_data if item.price.id != seat_price_id),
+                    items_data[0],
+                )
+
+            stripe_items: list[dict[str, Any]] = []
+
+            # Base plan update
             if new_price_id is not None:
-                # Find the base plan item (not the seat item)
-                base_item = None
-                for item in items_data:
-                    if seat_price_id is None or item.price.id != seat_price_id:
-                        base_item = item
-                        break
-                if base_item is None:
-                    base_item = items_data[0]
+                base_item = find_base_item()
+                stripe_items.append(
+                    {
+                        "id": base_item.id,
+                        "price": new_price_id,
+                    }
+                )
 
-                payload[f"items[{item_index}][id]"] = base_item.id
-                payload[f"items[{item_index}][price]"] = new_price_id
-                item_index += 1
-
-            # Handle seat item updates (quantity change or price change)
-            if (
-                seat_price_id is not None and quantity is not None
-            ) or new_seat_price_id is not None:
-                # Find the seat item by current seat_price_id
-                seat_item = None
-                for item in items_data:
-                    if seat_price_id is not None and item.price.id == seat_price_id:
-                        seat_item = item
-                        break
-
-                if seat_item is not None:
-                    payload[f"items[{item_index}][id]"] = seat_item.id
-                    if new_seat_price_id is not None:
-                        payload[f"items[{item_index}][price]"] = new_seat_price_id
-                    if quantity is not None:
-                        payload[f"items[{item_index}][quantity]"] = quantity
-                    item_index += 1
-                elif quantity is not None and new_price_id is None:
-                    # Fallback: if no seat item found and only updating quantity, use first item
-                    payload[f"items[{item_index}][id]"] = items_data[0].id
-                    payload[f"items[{item_index}][quantity]"] = quantity
-                    item_index += 1
-
-            # Handle quantity-only updates (no seat_price_id provided)
-            elif (
-                quantity is not None and seat_price_id is None and new_price_id is None
+            # Seat item update
+            if seat_price_id is not None and (
+                quantity is not None or new_seat_price_id is not None
             ):
-                # Update quantity on first item when no specific seat item is targeted
-                payload[f"items[{item_index}][id]"] = items_data[0].id
-                payload[f"items[{item_index}][quantity]"] = quantity
-                item_index += 1
+                seat_item = find_item_by_price(seat_price_id)
 
-            if proration_date is not None:
-                payload["proration_date"] = proration_date
-        else:
-            # Regular update without price/quantity change
-            payload: dict[str, Any] = {
-                "proration_behavior": proration_behavior,
-            }
+                if seat_item is None:
+                    raise StripeAPIException(
+                        f"Seat subscription item not found for seat_price_id='{seat_price_id}'."
+                    )
 
+                seat_update: dict[str, Any] = {"id": seat_item.id}
+
+                if new_seat_price_id is not None:
+                    seat_update["price"] = new_seat_price_id
+
+                if quantity is not None:
+                    seat_update["quantity"] = quantity
+
+                stripe_items.append(seat_update)
+
+            # Quantity-only update (single-item subscription)
+            if seat_price_id is None and quantity is not None:
+                if stripe_items:
+                    # If base plan already being updated, attach quantity to that same item
+                    stripe_items[0]["quantity"] = quantity
+                else:
+                    # Otherwise update the first item directly
+                    stripe_items.append(
+                        {
+                            "id": items_data[0].id,
+                            "quantity": quantity,
+                        }
+                    )
+
+            if not stripe_items:
+                raise ValueError("No subscription item updates could be constructed.")
+
+            # Flatten into Stripe payload format
+            for idx, item in enumerate(stripe_items):
+                payload[f"items[{idx}][id]"] = item["id"]
+
+                if "price" in item:
+                    payload[f"items[{idx}][price]"] = item["price"]
+
+                if "quantity" in item:
+                    payload[f"items[{idx}][quantity]"] = item["quantity"]
+
+        # --- non-item subscription fields ---
         if metadata is not None:
             payload["metadata"] = metadata
         if default_payment_method is not None:
@@ -1504,9 +1484,11 @@ class Stripe:
             payload["cancel_at_period_end"] = cancel_at_period_end
 
         endpoint = f"/v1/subscriptions/{subscription_id}"
-        headers = {}
-        if idempotency_key:
+
+        headers: dict[str, str] = {}
+        if idempotency_key is not None:
             headers["Idempotency-Key"] = idempotency_key
+
         body = await cls._request("POST", endpoint, data=payload, headers=headers)
         return Subscription.model_validate(body)
 
@@ -1585,14 +1567,18 @@ class Stripe:
     async def preview_invoice(
         cls,
         subscription_id: str,
-        new_price_id: str,
         *,
+        new_price_id: str | None = None,
+        quantity: int | None = None,
+        seat_price_id: str | None = None,
+        new_seat_price_id: str | None = None,
         proration_behavior: Literal[
             "create_prorations", "none", "always_invoice"
         ] = "create_prorations",
         proration_date: int | None = None,
     ) -> Invoice:
-        """Preview the prorated invoice for a subscription plan change.
+        """
+        Preview the prorated invoice for a subscription plan and/or seat change.
 
         Simulates changing a subscription's price without actually making the change,
         allowing you to see what the customer would be charged or credited.
@@ -1600,45 +1586,147 @@ class Stripe:
         Parameters
         ----------
         subscription_id : str
-            The Stripe subscription identifier.
-        new_price_id : str
-            The new price ID to preview.
-        proration_behavior : Literal["create_prorations", "none", "always_invoice"], optional
-            How to handle proration. Default is "create_prorations".
-        proration_date : int, optional
-            Unix timestamp for backdating the proration calculation.
+            Stripe subscription ID.
+        new_price_id : str | None
+            New base plan price ID.
+        quantity : int | None
+            New seat quantity.
+        seat_price_id : str | None
+            Current seat price ID used to locate the seat subscription item.
+        new_seat_price_id : str | None
+            New seat price ID (used during plan upgrade).
+        proration_behavior : Literal["create_prorations", "none", "always_invoice"]
+            Proration behavior.
+        proration_date : int | None
+            Unix timestamp for proration calculation.
 
         Returns
         -------
         Invoice
-            Upcoming invoice preview with prorated amounts.
+            Stripe invoice preview.
 
         Raises
         ------
+        ValueError
+            If input params are invalid.
         StripeAPIException
-            If the preview request fails.
+            If Stripe request fails.
         """
-        # Get the subscription to find the item ID
+
+        # ---- validation ----
+        if new_price_id is None and quantity is None and new_seat_price_id is None:
+            raise ValueError(
+                "At least one change must be provided: "
+                "new_price_id, quantity, or new_seat_price_id."
+            )
+
+        if new_seat_price_id is not None and seat_price_id is None:
+            raise ValueError(
+                "seat_price_id must be provided when new_seat_price_id is provided."
+            )
+
+        if quantity is not None and quantity <= 0:
+            raise ValueError("quantity must be a positive integer.")
+
+        # ---- fetch subscription ----
         subscription = await cls.get_subscription(subscription_id)
+        items = subscription.items.data
 
-        subscription_item_id = subscription.items.data[0].id
+        if not items:
+            raise StripeAPIException("Subscription has no subscription items.")
 
-        # Preview the upcoming invoice with the new price
-        # Using subscription_details as per official Stripe API docs
+        # ---- helpers ----
+        def find_item_by_price(price_id: str) -> SubscriptionItem | None:
+            return next((item for item in items if item.price.id == price_id), None)
+
+        def find_base_item() -> SubscriptionItem:
+            """
+            Base item is either:
+            - the first item if no seat_price_id is provided
+            - the first item whose price != seat_price_id if seat_price_id is provided
+            """
+            if seat_price_id is None:
+                return items[0]
+
+            return next(
+                (item for item in items if item.price.id != seat_price_id),
+                items[0],
+            )
+
+        # ---- build subscription item update list ----
+        stripe_items: list[dict[str, Any]] = []
+
+        # Base plan update (price change)
+        if new_price_id is not None:
+            base_item = find_base_item()
+
+            stripe_items.append(
+                {
+                    "id": base_item.id,
+                    "price": new_price_id,
+                    "quantity": base_item.quantity,
+                }
+            )
+
+        # Seat update (quantity and/or seat price change)
+        if seat_price_id is not None and (
+            quantity is not None or new_seat_price_id is not None
+        ):
+            seat_item = find_item_by_price(seat_price_id)
+
+            if seat_item is None:
+                raise StripeAPIException(
+                    f"Seat subscription item not found for seat_price_id='{seat_price_id}'."
+                )
+
+            stripe_items.append(
+                {
+                    "id": seat_item.id,
+                    "price": new_seat_price_id or seat_item.price.id,
+                    "quantity": (
+                        quantity if quantity is not None else seat_item.quantity
+                    ),
+                }
+            )
+
+        # Quantity-only update (single-item subscription case)
+        # This is only allowed if seat_price_id is not provided.
+        if seat_price_id is None and quantity is not None:
+            # If base item already added above, just override its quantity.
+            if stripe_items:
+                stripe_items[0]["quantity"] = quantity
+            else:
+                # No base price change was requested, so update the existing item quantity.
+                stripe_items.append(
+                    {
+                        "id": items[0].id,
+                        "price": items[0].price.id,
+                        "quantity": quantity,
+                    }
+                )
+
+        if not stripe_items:
+            raise ValueError("No subscription item updates could be constructed.")
+
+        # ---- payload ----
         payload: dict[str, Any] = {
             "customer": subscription.customer,
             "subscription": subscription_id,
-            "subscription_details[items][0][id]": subscription_item_id,
-            "subscription_details[items][0][price]": new_price_id,
-            "subscription_details[items][0][quantity]": 1,
             "subscription_details[proration_behavior]": proration_behavior,
         }
 
         if proration_date is not None:
-            payload["subscription_details"]["proration_date"] = proration_date
+            payload["subscription_details[proration_date]"] = proration_date
 
+        for idx, item in enumerate(stripe_items):
+            payload[f"subscription_details[items][{idx}][id]"] = item["id"]
+            payload[f"subscription_details[items][{idx}][price]"] = item["price"]
+            payload[f"subscription_details[items][{idx}][quantity]"] = item["quantity"]
+
+        # ---- request ----
         endpoint = "/v1/invoices/create_preview"
         body = await cls._request("POST", endpoint, data=payload)
+
         return Invoice.model_validate(body)
 
     @classmethod

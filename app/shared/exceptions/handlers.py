@@ -392,6 +392,27 @@ async def not_implemented_exception_handler(request: Request, exc: Exception):
     )
 
 
+async def value_error_exception_handler(request: Request, exc: Exception):
+    """
+    Handles value errors by returning a JSON response.
+
+    Args:
+        request: The request object.
+        exc (ValueError): The value error instance.
+
+    Returns:
+        JSONResponse: A response containing the error message and status code 400.
+    """
+    value_exc = cast(ValueError, exc)
+    request_logger.warning(f"ValueError: {exc}")
+    # Note: We return a 500 status code here because ValueErrors typically
+    # indicate a bug in the code that should be fixed, rather than a client error.
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": str(value_exc)},
+    )
+
+
 exception_schema: dict[int | str, dict[str, Any]] = {
     status.HTTP_400_BAD_REQUEST: {
         "description": "Bad Request",
@@ -471,5 +492,6 @@ __all__ = [
     "idempotency_exception_handler",
     "stripe_rate_limit_exception_handler",
     "not_implemented_exception_handler",
+    "value_error_exception_handler",
     "exception_schema",
 ]

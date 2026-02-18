@@ -101,6 +101,7 @@ class WorkspaceMemberResponse(BaseModel):
                 "joined_at": "2024-01-15T10:30:00Z",
                 "user_email": "john@example.com",
                 "user_name": "John Doe",
+                "user_avatar_url": "https://example.com/avatar.jpg",
             }
         },
     )
@@ -112,6 +113,7 @@ class WorkspaceMemberResponse(BaseModel):
     joined_at: datetime
     user_email: str | None = None
     user_name: str | None = None
+    user_avatar_url: str | None = None
 
 
 class WorkspaceResponse(BaseModel):
@@ -132,6 +134,11 @@ class WorkspaceResponse(BaseModel):
                 "enabled_member_count": 5,
                 "total_member_count": 7,
                 "client_id": "ws_550e8400e29b41d4a716446655440000",
+                "seat_count": 10,
+                "available_seats": 3,
+                "credits_used": "150.00",
+                "credits_limit": "1000.00",
+                "credits_remaining": "850.00",
             }
         },
     )
@@ -146,6 +153,16 @@ class WorkspaceResponse(BaseModel):
     owner_id: UUID
     enabled_member_count: int = 0
     total_member_count: int = 0
+    seat_count: int = 0
+    available_seats: int = 0
+    credits_used: Decimal = Decimal("0.00")
+    credits_limit: Decimal = Decimal("0.00")
+
+    @computed_field
+    @property
+    def credits_remaining(self) -> Decimal:
+        """Calculate remaining credits."""
+        return self.credits_limit - self.credits_used
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -181,17 +198,19 @@ class WorkspaceDetailResponse(WorkspaceResponse):
                         "joined_at": "2024-01-15T10:30:00Z",
                         "user_email": "owner@example.com",
                         "user_name": "Owner Name",
+                        "user_avatar_url": "https://example.com/avatar_owner.jpg",
                     }
                 ],
                 "seat_count": 10,
                 "available_seats": 3,
+                "credits_used": "150.00",
+                "credits_limit": "1000.00",
+                "credits_remaining": "850.00",
             }
         },
     )
 
     members: list[WorkspaceMemberResponse] = []
-    seat_count: int = 0
-    available_seats: int = 0
 
 
 class WorkspaceListResponse(BaseModel):
@@ -213,6 +232,11 @@ class WorkspaceListResponse(BaseModel):
                         "enabled_member_count": 5,
                         "total_member_count": 7,
                         "client_id": "ws_550e8400e29b41d4a716446655440000",
+                        "seat_count": 10,
+                        "available_seats": 3,
+                        "credits_used": "150.00",
+                        "credits_limit": "1000.00",
+                        "credits_remaining": "850.00",
                     }
                 ]
             }

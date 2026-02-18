@@ -29,6 +29,7 @@ from app.shared.exceptions.handlers import (
     stripe_card_exception_handler,
     stripe_rate_limit_exception_handler,
     too_many_attempts_exception_handler,
+    value_error_exception_handler,
 )
 from app.shared.exceptions.types import (
     AppException,
@@ -218,6 +219,8 @@ app.add_exception_handler(RateLimitException, stripe_rate_limit_exception_handle
 app.add_exception_handler(StripeAPIException, stripe_api_exception_handler)
 # Not implemented exception handler
 app.add_exception_handler(NotImplementedException, not_implemented_exception_handler)
+# Value error handler
+app.add_exception_handler(ValueError, value_error_exception_handler)
 # Generic fallback
 app.add_exception_handler(AppException, general_exception_handler)
 
