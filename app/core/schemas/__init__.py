@@ -1,7 +1,7 @@
 """
 Shared schemas for API request validation and response serialization.
 
-This module exports all shared Pydantic schemas used across
+This module exports all core Pydantic schemas used across
 multiple application modules.
 """
 

@@ -2,10 +2,10 @@
 Test suite for FastAPI dependencies.
 
 Run tests:
-    pytest app/tests/core/test_dependencies.py -v
+    pytest app/tests/core/test_db.py -v
 
 Run with coverage:
-    pytest app/tests/core/test_dependencies.py --cov=app.core.dependencies --cov-report=term-missing -v
+    pytest app/tests/core/test_db.py --cov=app.core.dependencies --cov-report=term-missing -v
 """
 
 import pytest

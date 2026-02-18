@@ -342,7 +342,7 @@ async def sync_plans_task(dry_run: bool = False) -> None:
     """
     Synchronize subscription plans from plans.json to the database.
 
-    Reads plan definitions from app/shared/data/plans.json and upserts them
+    Reads plan definitions from app/core/data/plans.json and upserts them
     into the database. Plans are matched by (name, product_type) unique constraint.
 
     Args:
@@ -355,7 +355,7 @@ async def sync_plans_task(dry_run: bool = False) -> None:
     from app.core.enums import PlanType, ProductType
 
     # Load plans from JSON file
-    plans_file = Path(__file__).parent / "app" / "shared" / "data" / "plans.json"
+    plans_file = Path(__file__).parent / "app" / "core" / "data" / "plans.json"
     if not plans_file.exists():
         print(f"[red]Error: Plans file not found at {plans_file}[/red]")
         raise typer.Exit(1)
@@ -452,7 +452,7 @@ def syncplans(
     """
     Synchronize subscription plans from plans.json to the database.
 
-    Reads plan definitions from app/shared/data/plans.json and upserts them
+    Reads plan definitions from app/core/data/plans.json and upserts them
     into the database. Plans are matched by (name, product_type) unique constraint.
 
     Examples:

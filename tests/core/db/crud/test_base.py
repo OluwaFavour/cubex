@@ -5,10 +5,10 @@ This module contains unit tests for the BaseDB generic CRUD class.
 Tests cover upsert operations using PostgreSQL's INSERT ... ON CONFLICT.
 
 Run all tests:
-    pytest tests/shared/db/crud/test_base.py -v
+    pytest tests/core/db/crud/test_base.py -v
 
 Run with coverage:
-    pytest tests/shared/db/crud/test_base.py --cov=app.core.db.crud.base --cov-report=term-missing -v
+    pytest tests/core/db/crud/test_base.py --cov=app.core.db.crud.base --cov-report=term-missing -v
 """
 
 from datetime import datetime, timezone

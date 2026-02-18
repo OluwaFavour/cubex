@@ -1,1 +1,1 @@
-"""Test suite for shared services."""
+"""Test suite for core services."""

@@ -1,8 +1,8 @@
 """
-Base OAuth provider abstract class and shared utilities.
+Base OAuth provider abstract class and core utilities.
 
 This module provides the abstract base class for OAuth providers and
-shared data structures for OAuth authentication flows.
+core data structures for OAuth authentication flows.
 
 Example usage:
     from app.core.services.oauth.base import BaseOAuthProvider, OAuthUserInfo

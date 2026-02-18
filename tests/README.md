@@ -41,25 +41,25 @@ pytest
 ### Run specific test file
 
 ```bash
-pytest tests/shared/routers/test_auth.py
+pytest tests/core/routers/test_auth.py
 ```
 
 ### Run specific test class
 
 ```bash
-pytest tests/shared/routers/test_auth.py::TestSignupEndpoint
+pytest tests/core/routers/test_auth.py::TestSignupEndpoint
 ```
 
 ### Run specific test function
 
 ```bash
-pytest tests/shared/routers/test_auth.py::TestSignupEndpoint::test_signup_success
+pytest tests/core/routers/test_auth.py::TestSignupEndpoint::test_signup_success
 ```
 
 ### Run router tests only
 
 ```bash
-pytest tests/shared/routers/ tests/apps/
+pytest tests/core/routers/ tests/apps/
 ```
 
 ### Run with coverage report
@@ -98,15 +98,16 @@ pytest --tb=short
 
 ### Router Tests (Integration)
 
-- `shared/routers/test_auth.py` - Authentication endpoints (46 tests)
-- `shared/routers/test_webhook.py` - Stripe webhook handling (30 tests)
+- `core/routers/test_auth.py` - Authentication endpoints (46 tests)
+- `core/routers/test_webhook.py` - Stripe webhook handling (30 tests)
 - `apps/cubex_api/routers/test_workspace.py` - Workspace management endpoints
 - `apps/cubex_api/routers/test_subscription.py` - API subscription endpoints
 - `apps/cubex_career/routers/test_subscription.py` - Career subscription endpoints
 
 ### Core Tests
 
-- `core/test_dependencies.py` - FastAPI dependencies (3 tests)
+- `core/dependencies/test_db.py` - DB dependencies (3 tests)
+- `core/dependencies/test_auth.py` - Auth dependencies
 
 ### Main Application Tests
 
@@ -128,12 +129,12 @@ pytest --tb=short
 - `infrastructure/messaging/test_main.py` - Consumer startup (10 tests)
 - `infrastructure/scheduler/test_main.py` - Scheduler initialization (4 tests)
 
-### Shared Module Tests
+### Core Module Tests
 
-- `shared/db/test_config.py` - Database configuration (7 tests)
-- `shared/exceptions/test_types.py` - Exception types (8 tests)
-- `shared/exceptions/test_handlers.py` - Exception handlers (5 tests)
-- `shared/test_logger.py` - Logger and Sentry integration (17 tests)
+- `core/db/test_config.py` - Database configuration (7 tests)
+- `core/exceptions/test_types.py` - Exception types (8 tests)
+- `core/exceptions/test_handlers.py` - Exception handlers (5 tests)
+- `core/test_logger.py` - Logger and Sentry integration (17 tests)
 
 ### Configuration
 
@@ -210,7 +211,7 @@ The following fixtures are available in `conftest.py`:
 Create a new test file in the appropriate directory:
 
 ```python
-# tests/shared/routers/test_my_router.py
+# tests/core/routers/test_my_router.py
 
 """
 Integration tests for my router endpoints.

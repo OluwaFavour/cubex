@@ -2,10 +2,10 @@
 Test suite for logger configuration and Sentry integration.
 
 Run tests:
-    pytest app/tests/shared/test_logger.py -v
+    pytest app/tests/core/test_logger.py -v
 
 Run with coverage:
-    pytest app/tests/shared/test_logger.py --cov=app.core.logger --cov-report=term-missing -v
+    pytest app/tests/core/test_logger.py --cov=app.core.logger --cov-report=term-missing -v
 """
 
 import logging

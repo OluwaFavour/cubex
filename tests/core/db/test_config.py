@@ -2,10 +2,10 @@
 Test suite for database configuration and utilities.
 
 Run tests:
-    pytest app/tests/shared/db/test_config.py -v
+    pytest app/tests/core/db/test_config.py -v
 
 Run with coverage:
-    pytest app/tests/shared/db/test_config.py --cov=app.core.db.config --cov-report=term-missing -v
+    pytest app/tests/core/db/test_config.py --cov=app.core.db.config --cov-report=term-missing -v
 """
 
 from unittest.mock import AsyncMock, patch

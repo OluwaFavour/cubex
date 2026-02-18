@@ -2,10 +2,10 @@
 Test suite for custom exception types.
 
 Run tests:
-    pytest app/tests/shared/exceptions/test_types.py -v
+    pytest app/tests/core/exceptions/test_types.py -v
 
 Run with coverage:
-    pytest app/tests/shared/exceptions/test_types.py --cov=app.core.exceptions.types --cov-report=term-missing -v
+    pytest app/tests/core/exceptions/test_types.py --cov=app.core.exceptions.types --cov-report=term-missing -v
 """
 
 from fastapi import status

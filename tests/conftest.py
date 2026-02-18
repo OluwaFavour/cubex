@@ -1,5 +1,5 @@
 """
-Pytest configuration and shared fixtures.
+Pytest configuration and core fixtures.
 
 Provides fixtures for integration tests using real test database with per-test rollback.
 All fixtures are function-scoped for complete test isolation.
@@ -1013,7 +1013,7 @@ def redis_container():
     """Start a Redis container for the test session.
 
     Uses testcontainers to start a real Redis instance.
-    The container is shared across all tests in the session for efficiency.
+    The container is core across all tests in the session for efficiency.
     """
     try:
         from testcontainers.core.container import DockerContainer

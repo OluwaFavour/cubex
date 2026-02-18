@@ -6,10 +6,10 @@ and CareerSubscriptionContextDB CRUD classes. Tests cover all CRUD operations
 including context creation, retrieval by workspace/user, and retrieval by subscription.
 
 Run all tests:
-    pytest tests/shared/db/crud/test_subscription_context.py -v
+    pytest tests/core/db/crud/test_subscription_context.py -v
 
 Run with coverage:
-    pytest tests/shared/db/crud/test_subscription_context.py --cov=app.core.db.crud.subscription_context --cov-report=term-missing -v
+    pytest tests/core/db/crud/test_subscription_context.py --cov=app.core.db.crud.subscription_context --cov-report=term-missing -v
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch

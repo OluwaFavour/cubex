@@ -8,10 +8,10 @@ This module contains comprehensive unit tests for the auth dependencies includin
 - get_optional_user: Optional authentication
 
 Run all tests:
-    pytest tests/shared/dependencies/test_auth.py -v
+    pytest tests/core/dependencies/test_auth.py -v
 
 Run with coverage:
-    pytest tests/shared/dependencies/test_auth.py --cov=app.core.dependencies.auth --cov-report=term-missing -v
+    pytest tests/core/dependencies/test_auth.py --cov=app.core.dependencies.auth --cov-report=term-missing -v
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch

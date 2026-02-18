@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-# Import from shared models which handles the import order correctly
+# Import from core models which handles the import order correctly
 from app.core.db.models import Workspace  # noqa: F401
 from app.core.enums import PlanType, ProductType, SubscriptionStatus
 from app.core.db.models.plan import Plan, FeatureSchema

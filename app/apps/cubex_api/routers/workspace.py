@@ -1438,7 +1438,7 @@ Returns the created member object:
 
 ### Notes
 
-- Token is typically received via email or shared link
+- Token is typically received via email or core link
 - Token expires after 7 days
 - Email must match the invitation email
 - If seats are full, the invitation cannot be accepted

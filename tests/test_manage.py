@@ -129,7 +129,7 @@ class TestPlansJsonStructure:
     def test_plans_json_exists(self):
         """Test that plans.json file exists."""
         plans_file = (
-            Path(__file__).parent.parent / "app" / "shared" / "data" / "plans.json"
+            Path(__file__).parent.parent / "app" / "core" / "data" / "plans.json"
         )
         # This may not exist in test environment, so we just verify the path is correct
         assert "plans.json" in str(plans_file)
@@ -145,7 +145,7 @@ class TestPlansJsonStructure:
         ]
 
         plans_file = (
-            Path(__file__).parent.parent / "app" / "shared" / "data" / "plans.json"
+            Path(__file__).parent.parent / "app" / "core" / "data" / "plans.json"
         )
 
         if plans_file.exists():
@@ -168,7 +168,7 @@ class TestPlansJsonStructure:
         ]
 
         plans_file = (
-            Path(__file__).parent.parent / "app" / "shared" / "data" / "plans.json"
+            Path(__file__).parent.parent / "app" / "core" / "data" / "plans.json"
         )
 
         if plans_file.exists():
@@ -185,7 +185,7 @@ class TestPlansJsonStructure:
     def test_plans_json_api_plans_structure(self):
         """Test that API plans have correct structure."""
         plans_file = (
-            Path(__file__).parent.parent / "app" / "shared" / "data" / "plans.json"
+            Path(__file__).parent.parent / "app" / "core" / "data" / "plans.json"
         )
 
         if plans_file.exists():
@@ -203,7 +203,7 @@ class TestPlansJsonStructure:
     def test_plans_json_career_plans_no_seat_pricing(self):
         """Test that Career plans don't have seat stripe IDs."""
         plans_file = (
-            Path(__file__).parent.parent / "app" / "shared" / "data" / "plans.json"
+            Path(__file__).parent.parent / "app" / "core" / "data" / "plans.json"
         )
 
         if plans_file.exists():

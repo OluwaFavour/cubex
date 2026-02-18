@@ -2,10 +2,10 @@
 Test suite for exception handlers.
 
 Run tests:
-    pytest app/tests/shared/exceptions/test_handlers.py -v
+    pytest app/tests/core/exceptions/test_handlers.py -v
 
 Run with coverage:
-    pytest app/tests/shared/exceptions/test_handlers.py --cov=app.core.exceptions.handlers --cov-report=term-missing -v
+    pytest app/tests/core/exceptions/test_handlers.py --cov=app.core.exceptions.handlers --cov-report=term-missing -v
 """
 
 from unittest.mock import MagicMock, patch

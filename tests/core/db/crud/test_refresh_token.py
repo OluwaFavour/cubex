@@ -10,10 +10,10 @@ Tests cover all CRUD operations including:
 - Active session retrieval
 
 Run all tests:
-    pytest tests/shared/db/crud/test_refresh_token.py -v
+    pytest tests/core/db/crud/test_refresh_token.py -v
 
 Run with coverage:
-    pytest tests/shared/db/crud/test_refresh_token.py --cov=app.core.db.crud.refresh_token --cov-report=term-missing -v
+    pytest tests/core/db/crud/test_refresh_token.py --cov=app.core.db.crud.refresh_token --cov-report=term-missing -v
 """
 
 import hashlib

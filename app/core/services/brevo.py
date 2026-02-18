@@ -350,7 +350,7 @@ class BrevoService:
         Batch and send message versions per Brevo API limits.
 
         Args:
-            payload: Base payload containing sender/subject/content shared across versions.
+            payload: Base payload containing sender/subject/content core across versions.
             messageVersions: ListMessageVersion container with MessageVersion items.
 
         Returns:

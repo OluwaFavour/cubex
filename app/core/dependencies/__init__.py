@@ -1,7 +1,7 @@
 """
 Shared dependencies for FastAPI endpoints.
 
-This module exports all shared FastAPI dependency functions
+This module exports all core FastAPI dependency functions
 used across multiple application modules.
 """
 

@@ -1,7 +1,7 @@
 """
 Shared routers for the application.
 
-This module exports all shared FastAPI routers that can be
+This module exports all core FastAPI routers that can be
 included in the main application or app-specific routers.
 """
 

@@ -1,5 +1,5 @@
 """
-Stripe webhook handler for shared use across cubex apps.
+Stripe webhook handler for core use across cubex apps.
 
 This module provides a single endpoint to handle all Stripe webhook events.
 Implements secure signature verification and publishes events to message queues

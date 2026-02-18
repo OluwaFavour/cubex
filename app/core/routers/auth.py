@@ -109,7 +109,7 @@ _oauth_rate_limit = rate_limit_by_ip(limit=20, window=60)
 
 
 def _get_device_info_from_request(request: Request) -> str | None:
-    """Extract device info from request headers using shared utility."""
+    """Extract device info from request headers using core utility."""
     user_agent = request.headers.get("User-Agent")
     return get_device_info(user_agent)
 

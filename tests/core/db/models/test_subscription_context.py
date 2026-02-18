@@ -5,10 +5,10 @@ This module contains comprehensive tests for the APISubscriptionContext
 and CareerSubscriptionContext SQLAlchemy models.
 
 Run all tests:
-    pytest tests/shared/db/models/test_subscription_context.py -v
+    pytest tests/core/db/models/test_subscription_context.py -v
 
 Run with coverage:
-    pytest tests/shared/db/models/test_subscription_context.py --cov=app.core.db.models.subscription_context --cov-report=term-missing -v
+    pytest tests/core/db/models/test_subscription_context.py --cov=app.core.db.models.subscription_context --cov-report=term-missing -v
 """
 
 from uuid import uuid4
