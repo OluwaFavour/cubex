@@ -236,6 +236,12 @@ usage_logger = setup_logger(
     level=logging.INFO,
     sentry_tag="usage",
 )
+career_logger = setup_logger(
+    name="career_logger",
+    log_file="logs/career.log",
+    level=logging.INFO,
+    sentry_tag="career",
+)
 
 __all__ = [
     "settings",
@@ -256,4 +262,5 @@ __all__ = [
     "workspace_logger",
     "webhook_logger",
     "usage_logger",
+    "career_logger",
 ]

@@ -1,13 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 
-from app.infrastructure.scheduler.main import scheduler
 from app.core.config import scheduler_logger, settings
 from app.core.db import AsyncSessionLocal
 from app.core.db.crud import user_db
 from app.apps.cubex_api.db.crud import usage_log_db
+from app.apps.cubex_career.db.crud import career_usage_log_db
 
 
 async def cleanup_soft_deleted_users(days_threshold: int = 30) -> None:
@@ -51,4 +49,27 @@ async def expire_pending_usage_logs() -> None:
         )
         scheduler_logger.info(
             f"Completed expiration of pending usage logs. Expired {expired_count} record(s)."
+        )
+
+
+async def expire_pending_career_usage_logs() -> None:
+    """
+    Periodic task to expire career usage logs that have been in PENDING status
+    for longer than the configured timeout.
+
+    This ensures that career usage logs from abandoned operations don't remain
+    in PENDING state indefinitely.
+    """
+    timeout_minutes = settings.USAGE_LOG_PENDING_TIMEOUT_MINUTES
+    cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
+
+    async with AsyncSessionLocal.begin() as session:
+        scheduler_logger.info(
+            f"Starting expiration of pending career usage logs older than {timeout_minutes} minutes (cutoff: {cutoff_time})"
+        )
+        expired_count = await career_usage_log_db.expire_pending(
+            session, older_than=cutoff_time, commit_self=False
+        )
+        scheduler_logger.info(
+            f"Completed expiration of pending career usage logs. Expired {expired_count} record(s)."
         )

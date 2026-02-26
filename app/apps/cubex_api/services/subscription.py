@@ -529,7 +529,7 @@ class SubscriptionService:
                 )
                 if context:
                     await api_subscription_context_db.reset_credits_used(
-                        session, context.id, new_period_start
+                        session, context.id
                     )
                     stripe_logger.info(
                         f"Billing period changed for subscription {stripe_subscription_id}: "

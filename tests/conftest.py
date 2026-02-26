@@ -1324,7 +1324,6 @@ async def workspace_quota_exhausted(
         subscription_id=subscription.id,
         workspace_id=workspace.id,
         credits_used=credits_allocation,  # Exactly at the limit
-        billing_period_start=datetime.now(timezone.utc),
     )
     db_session.add(context)
     await db_session.flush()

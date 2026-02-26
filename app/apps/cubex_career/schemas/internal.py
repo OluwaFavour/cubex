@@ -11,7 +11,7 @@ from pydantic import (
     StringConstraints,
 )
 
-from app.core.enums import AccessStatus, FailureType
+from app.core.enums import AccessStatus, FailureType, FeatureKey
 
 # ============================================================================
 # Usage Validation Schemas (Internal API)
@@ -73,6 +73,7 @@ class UsageValidateRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "request_id": "req_9f0c2a7e-acde-4b9a-8b2f-83cc71a3c9a2",
+                "feature_key": "career.career_path",
                 "endpoint": "/v1/extract-cues/resume",
                 "method": "POST",
                 "payload_hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
@@ -89,6 +90,10 @@ class UsageValidateRequest(BaseModel):
     request_id: Annotated[
         str,
         Field(description="Globally unique request ID for idempotency"),
+    ]
+    feature_key: Annotated[
+        FeatureKey,
+        Field(description="The feature key identifying the career feature being used"),
     ]
     endpoint: Annotated[
         str,

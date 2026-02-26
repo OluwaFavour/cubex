@@ -10,6 +10,7 @@ from app.core.db import Base
 
 from app.core.db.models import *
 from app.apps.cubex_api.db.models import *
+from app.apps.cubex_career.db.models import *
 from app.core.config import settings
 
 # this is the Alembic Config object, which provides

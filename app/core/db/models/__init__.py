@@ -19,9 +19,13 @@ from app.core.db.models.subscription_context import (
     CareerSubscriptionContext,
 )
 
+# Import career models to ensure they are registered with SQLAlchemy
+from app.apps.cubex_career.db.models.usage_log import CareerUsageLog
+
 __all__ = [
     "APISubscriptionContext",
     "CareerSubscriptionContext",
+    "CareerUsageLog",
     "FeatureSchema",
     "OAuthAccount",
     "OTPToken",

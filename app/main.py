@@ -65,6 +65,7 @@ from app.apps.cubex_api.routers import (
 )
 from app.apps.cubex_career.routers import (
     subscription_router as career_subscription_router,
+    internal_router as career_internal_router,
 )
 from app.core.db import AsyncSessionLocal
 from app.core.services import QuotaCacheService
@@ -251,6 +252,9 @@ app.include_router(support_router, prefix="/api", tags=["API - Support"])
 app.include_router(internal_router, prefix="/api", tags=["API - Internal API"])
 app.include_router(
     career_subscription_router, prefix="/career", tags=["Career - Subscriptions"]
+)
+app.include_router(
+    career_internal_router, prefix="/career", tags=["Career - Internal API"]
 )
 
 # Mount admin interface

@@ -484,6 +484,24 @@ class CareerSubscriptionService:
         # Get billing period and price from first subscription item
         if stripe_sub.items and stripe_sub.items.data:
             first_item = stripe_sub.items.data[0]
+
+            # Check if billing period changed (renewal) - reset quota
+            old_period_start = subscription.current_period_start
+            new_period_start = first_item.current_period_start
+
+            if old_period_start != new_period_start and new_period_start is not None:
+                context = await career_subscription_context_db.get_by_subscription(
+                    session, subscription.id
+                )
+                if context:
+                    await career_subscription_context_db.reset_credits_used(
+                        session, context.id
+                    )
+                    stripe_logger.info(
+                        f"Billing period changed for career subscription {stripe_subscription_id}: "
+                        f"reset credits_used to 0"
+                    )
+
             updates["current_period_start"] = first_item.current_period_start
             updates["current_period_end"] = first_item.current_period_end
 
@@ -731,7 +749,7 @@ class CareerSubscriptionService:
 
         invoice_preview = await Stripe.preview_invoice(
             subscription.stripe_subscription_id,
-            new_plan.stripe_price_id,
+            new_price_id=new_plan.stripe_price_id,
         )
 
         stripe_logger.info(
