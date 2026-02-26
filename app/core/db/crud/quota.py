@@ -108,7 +108,10 @@ class FeatureCostConfigDB(BaseDB[FeatureCostConfig]):
             return updated
         return await self.create(
             session,
-            {"feature_key": feature_key, "internal_cost_credits": internal_cost_credits},
+            {
+                "feature_key": feature_key,
+                "internal_cost_credits": internal_cost_credits,
+            },
         )
 
 
