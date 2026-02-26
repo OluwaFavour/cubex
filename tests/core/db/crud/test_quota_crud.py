@@ -41,10 +41,10 @@ class TestFeatureCostConfigDBImports:
 class TestFeatureCostConfigDBMethods:
     """Test suite for FeatureCostConfigDB method signatures."""
 
-    def test_has_get_by_endpoint_method(self):
-        """Test that get_by_endpoint method exists."""
-        assert hasattr(feature_cost_config_db, "get_by_endpoint")
-        assert callable(feature_cost_config_db.get_by_endpoint)
+    def test_has_get_by_feature_key(self):
+        """Test that get_by_feature_key method exists."""
+        assert hasattr(feature_cost_config_db, "get_by_feature_key")
+        assert callable(feature_cost_config_db.get_by_feature_key)
 
     def test_has_get_all_active_method(self):
         """Test that get_all_active method exists."""
