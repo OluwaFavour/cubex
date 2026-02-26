@@ -2,6 +2,12 @@ from app.core.services.auth import AuthService
 from app.core.services.brevo import BrevoService
 from app.core.services.cloudinary import CloudinaryService
 from app.core.services.email_manager import EmailManagerService
+from app.core.services.quota_cache import (
+    QuotaCacheService,
+    QuotaCacheBackend,
+    MemoryBackend as QuotaMemoryBackend,
+    RedisBackend as QuotaRedisBackend,
+)
 from app.core.services.rate_limit import (
     MemoryBackend,
     RateLimitBackend,
@@ -51,4 +57,9 @@ __all__ = [
     "OAuthTokens",
     "OAuthUserInfo",
     "generate_state",
+    # Quota cache service
+    "QuotaCacheService",
+    "QuotaCacheBackend",
+    "QuotaMemoryBackend",
+    "QuotaRedisBackend",
 ]

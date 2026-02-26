@@ -27,7 +27,7 @@ class TestAdminModuleImports:
     def test_admin_views_import(self):
         """Test that all admin views can be imported."""
         from app.admin.views import (
-            EndpointCostConfigAdmin,
+            FeatureCostConfigAdmin,
             PlanAdmin,
             PlanPricingRuleAdmin,
             SubscriptionAdmin,
@@ -37,7 +37,7 @@ class TestAdminModuleImports:
         )
 
         assert PlanAdmin is not None
-        assert EndpointCostConfigAdmin is not None
+        assert FeatureCostConfigAdmin is not None
         assert PlanPricingRuleAdmin is not None
         assert UserAdmin is not None
         assert WorkspaceAdmin is not None
@@ -292,14 +292,14 @@ class TestAdminViewConfigurations:
         assert PlanAdmin.can_export is True
 
     def test_endpoint_cost_config_admin_configuration(self):
-        """Test EndpointCostConfigAdmin view configuration."""
-        from app.admin.views import EndpointCostConfigAdmin
+        """Test FeatureCostConfigAdmin view configuration."""
+        from app.admin.views import FeatureCostConfigAdmin
 
-        assert EndpointCostConfigAdmin.name == "Endpoint Cost"
-        assert EndpointCostConfigAdmin.name_plural == "Endpoint Costs"
-        assert EndpointCostConfigAdmin.can_create is True
-        assert EndpointCostConfigAdmin.can_edit is True
-        assert EndpointCostConfigAdmin.can_delete is True
+        assert FeatureCostConfigAdmin.name == "Feature Cost"
+        assert FeatureCostConfigAdmin.name_plural == "Feature Costs"
+        assert FeatureCostConfigAdmin.can_create is True
+        assert FeatureCostConfigAdmin.can_edit is True
+        assert FeatureCostConfigAdmin.can_delete is True
 
     def test_plan_pricing_rule_admin_configuration(self):
         """Test PlanPricingRuleAdmin view configuration."""

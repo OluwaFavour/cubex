@@ -1,14 +1,13 @@
 """
-Quota service for API usage tracking and validation.
+Quota service for Career usage tracking and validation.
 
 This module provides business logic for:
-- Validating API keys and logging usage
+- Validating user quota and logging usage
 - Committing usage logs (idempotent)
-- Future: Quota checking and enforcement
 
 Usage flow:
-1. External API calls /internal/usage/validate with API key and client_id
-2. QuotaService validates key, logs usage, checks quota
+1. External API calls /internal/usage/validate with access_token in header
+2. QuotaService validates user, logs usage, checks quota
 3. Returns granted/denied response with usage_id
 4. External API calls /internal/usage/commit to finalize usage
 """
@@ -26,11 +25,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apps.cubex_api.db.crud import api_key_db, usage_log_db, workspace_db
 from app.apps.cubex_api.db.models import APIKey
-from app.apps.cubex_api.services.quota_cache import APIQuotaCacheService
+from app.core.services.quota_cache import QuotaCacheService
 from app.core.config import settings, workspace_logger
 from app.core.services.redis_service import RedisService
 from app.core.db.crud import api_subscription_context_db
-from app.core.enums import AccessStatus, FeatureKey
+from app.core.enums import AccessStatus
 from app.core.exceptions.types import NotFoundException
 from app.core.utils import create_request_fingerprint, hmac_hash_otp
 
@@ -279,7 +278,7 @@ class QuotaService:
             RateLimitInfo with current rate limit status.
         """
         # Get rate limit for the plan
-        rate_limit = await APIQuotaCacheService.get_plan_rate_limit(plan_id)
+        rate_limit = await QuotaCacheService.get_plan_rate_limit(plan_id)
 
         # Redis key for workspace rate limit
         rate_limit_key = f"rate_limit:{workspace_id}"
@@ -410,7 +409,7 @@ class QuotaService:
         key_hash = self._hash_api_key(api_key)
 
         # Try cache first for hot path optimization
-        cached_info = await APIQuotaCacheService.get_cached_api_key_info(key_hash)
+        cached_info = await QuotaCacheService.get_cached_api_key_info(key_hash)
 
         if cached_info:
             # Cache hit - validate workspace matches
@@ -495,7 +494,7 @@ class QuotaService:
             plan_id = workspace.subscription.plan_id
 
         # Cache API key info for subsequent requests (15s TTL)
-        await APIQuotaCacheService.cache_api_key_info(
+        await QuotaCacheService.cache_api_key_info(
             key_hash=key_hash,
             api_key_id=str(api_key_id),
             workspace_id=str(workspace_id),
@@ -534,7 +533,7 @@ class QuotaService:
         """
         # Get credits limit for the plan (with DB fallback if cache unavailable)
         credits_limit = (
-            await APIQuotaCacheService.get_plan_credits_allocation_with_fallback(
+            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
                 session, plan_id
             )
         )
@@ -708,7 +707,6 @@ class QuotaService:
         api_key: str,
         client_id: str,
         request_id: str,
-        feature_key: FeatureKey,
         endpoint: str,
         method: str,
         payload_hash: str,
@@ -738,7 +736,6 @@ class QuotaService:
             api_key: The full API key from the request.
             client_id: Workspace client ID (ws_<uuid_hex>).
             request_id: Globally unique request ID for idempotency.
-            feature_key: The key of feature being used.
             endpoint: The API endpoint path being called.
             method: HTTP method (GET, POST, etc.).
             payload_hash: SHA-256 hash of the request payload.
@@ -844,8 +841,8 @@ class QuotaService:
             message = "Access granted (test key - no credits charged)."
             response_status_code = status.HTTP_200_OK
         else:
-            credits_reserved = await APIQuotaCacheService.calculate_billable_cost(
-                feature_key, plan_id
+            credits_reserved = await QuotaCacheService.calculate_billable_cost(
+                endpoint, plan_id
             )
             access_status, message, response_status_code = (
                 await self._check_quota_for_live_key(
@@ -862,7 +859,6 @@ class QuotaService:
                 "api_key_id": api_key_id,
                 "workspace_id": workspace_id,
                 "request_id": request_id,
-                "feature_key": feature_key,
                 "fingerprint_hash": fingerprint_hash,
                 "access_status": access_status.value,
                 "endpoint": endpoint,
@@ -1015,10 +1011,5 @@ __all__ = [
     "QuotaService",
     "quota_service",
     "RateLimitInfo",
-    "APIKeyNotFoundException",
-    "APIKeyInvalidException",
     "UsageLogNotFoundException",
-    "API_KEY_PREFIX",
-    "TEST_API_KEY_PREFIX",
-    "CLIENT_ID_PREFIX",
 ]

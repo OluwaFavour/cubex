@@ -992,15 +992,9 @@ class SubscriptionService:
 
         # Cancel in Stripe if exists
         if subscription.stripe_subscription_id:
-            idempotency_key = (
-                f"cancel_subscription:{subscription.stripe_subscription_id}:"
-                f"{cancel_at_period_end}:"
-                f"{subscription.current_period_start.timestamp() if subscription.current_period_start else ''}"
-            )
             await Stripe.cancel_subscription(
                 subscription.stripe_subscription_id,
                 cancel_at_period_end=cancel_at_period_end,
-                idempotency_key=idempotency_key,
             )
 
         # Update our record

@@ -39,7 +39,7 @@ from app.apps.cubex_api.services import (
     AdminPermissionRequiredException,
     OwnerPermissionRequiredException,
     SubscriptionNotFoundException,
-    QuotaCacheService,
+    APIQuotaCacheService,
 )
 from app.core.db.models import Plan, Subscription
 from app.core.db.crud import api_subscription_context_db
@@ -114,7 +114,7 @@ async def _get_credits_info(
     """
     # Get credits allocation from plan pricing rules
     credits_allocation = (
-        await QuotaCacheService.get_plan_credits_allocation_with_fallback(
+        await APIQuotaCacheService.get_plan_credits_allocation_with_fallback(
             session, plan_id
         )
     )
@@ -908,7 +908,7 @@ async def preview_subscription_change(
 
         return UpgradePreviewResponse(
             current_plan=current_plan.name,
-            new_plan=new_plan.name,
+            new_plan=new_plan.name if new_plan else current_plan.name,
             current_seat_count=current_sub.seat_count,
             new_seat_count=data.new_seat_count or current_sub.seat_count,
             proration_amount=invoice_preview.proration_amount,

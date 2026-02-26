@@ -1,97 +1,100 @@
 """
 CRUD operations for Quota models.
 
-This module provides database operations for endpoint cost configurations
+This module provides database operations for feature cost configurations
 and plan pricing rules.
 """
 
 from decimal import Decimal
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule
+from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule
 from app.core.db.crud.base import BaseDB
 from app.core.exceptions.types import DatabaseException
 
+if TYPE_CHECKING:
+    from app.core.enums import FeatureKey
 
-class EndpointCostConfigDB(BaseDB[EndpointCostConfig]):
-    """CRUD operations for EndpointCostConfig model."""
+
+class FeatureCostConfigDB(BaseDB[FeatureCostConfig]):
+    """CRUD operations for FeatureCostConfig model."""
 
     def __init__(self):
-        """Initialize with EndpointCostConfig model."""
-        super().__init__(EndpointCostConfig)
+        """Initialize with FeatureCostConfig model."""
+        super().__init__(FeatureCostConfig)
 
-    async def get_by_endpoint(
+    async def get_by_feature_key(
         self,
         session: AsyncSession,
-        endpoint: str,
-    ) -> EndpointCostConfig | None:
+        feature_key: "FeatureKey",
+    ) -> FeatureCostConfig | None:
         """
-        Get endpoint cost configuration by endpoint path.
+        Get feature cost configuration by feature key.
 
         Args:
             session: Database session.
-            endpoint: The API endpoint path.
+            feature_key: The feature key (e.g., FeatureKey.API_CAREER_PATH).
 
         Returns:
-            EndpointCostConfig or None if not found.
+            FeatureCostConfig or None if not found.
         """
         return await self.get_one_by_filters(
             session,
-            {"endpoint": endpoint, "is_deleted": False},
+            {"feature_key": feature_key, "is_deleted": False},
         )
 
     async def get_all_active(
         self,
         session: AsyncSession,
-    ) -> Sequence[EndpointCostConfig]:
+    ) -> Sequence[FeatureCostConfig]:
         """
-        Get all active endpoint cost configurations.
+        Get all active feature cost configurations.
 
         Args:
             session: Database session.
 
         Returns:
-            List of active endpoint cost configurations.
+            List of active feature cost configurations.
         """
-        stmt = select(EndpointCostConfig).where(
-            EndpointCostConfig.is_deleted == False  # noqa: E712
+        stmt = select(FeatureCostConfig).where(
+            FeatureCostConfig.is_deleted == False  # noqa: E712
         )
         try:
             result = await session.execute(stmt)
             return result.scalars().all()
         except Exception as e:
             raise DatabaseException(
-                f"Error getting endpoint cost configs: {str(e)}"
+                f"Error getting feature cost configs: {str(e)}"
             ) from e
 
     async def create_or_update(
         self,
         session: AsyncSession,
-        endpoint: str,
+        feature_key: "FeatureKey",
         internal_cost_credits: Decimal,
-    ) -> EndpointCostConfig:
+    ) -> FeatureCostConfig:
         """
-        Create or update an endpoint cost configuration.
+        Create or update a feature cost configuration.
 
-        If the endpoint already exists, updates its cost. Otherwise creates new.
+        If the feature key already exists, updates its cost. Otherwise creates new.
 
         Args:
             session: Database session.
-            endpoint: The API endpoint path.
+            feature_key: The feature key (e.g., FeatureKey.API_CAREER_PATH).
             internal_cost_credits: The internal credit cost.
 
         Returns:
-            Created or updated EndpointCostConfig.
+            Created or updated FeatureCostConfig.
 
         Raises:
             DatabaseException: If update fails unexpectedly.
         """
-        existing = await self.get_by_endpoint(session, endpoint)
+        existing = await self.get_by_feature_key(session, feature_key)
         if existing:
             updated = await self.update(
                 session,
@@ -100,12 +103,12 @@ class EndpointCostConfigDB(BaseDB[EndpointCostConfig]):
             )
             if updated is None:
                 raise DatabaseException(
-                    f"Failed to update EndpointCostConfig for endpoint {endpoint}"
+                    f"Failed to update FeatureCostConfig for feature {feature_key}"
                 )
             return updated
         return await self.create(
             session,
-            {"endpoint": endpoint, "internal_cost_credits": internal_cost_credits},
+            {"feature_key": feature_key, "internal_cost_credits": internal_cost_credits},
         )
 
 
@@ -220,13 +223,13 @@ class PlanPricingRuleDB(BaseDB[PlanPricingRule]):
 
 
 # Global instances for dependency injection
-endpoint_cost_config_db = EndpointCostConfigDB()
+feature_cost_config_db = FeatureCostConfigDB()
 plan_pricing_rule_db = PlanPricingRuleDB()
 
 
 __all__ = [
-    "EndpointCostConfigDB",
+    "FeatureCostConfigDB",
     "PlanPricingRuleDB",
-    "endpoint_cost_config_db",
+    "feature_cost_config_db",
     "plan_pricing_rule_db",
 ]

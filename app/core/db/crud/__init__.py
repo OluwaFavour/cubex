@@ -1,6 +1,12 @@
 from app.core.db.crud.base import BaseDB
 from app.core.db.crud.otp import OTPTokenDB
 from app.core.db.crud.plan import PlanDB
+from app.core.db.crud.quota import (
+    FeatureCostConfigDB,
+    PlanPricingRuleDB,
+    feature_cost_config_db,
+    plan_pricing_rule_db,
+)
 from app.core.db.crud.refresh_token import RefreshTokenDB
 from app.core.db.crud.subscription import SubscriptionDB, StripeEventLogDB
 from app.core.db.crud.subscription_context import (
@@ -28,6 +34,9 @@ __all__ = [
     "OAuthAccountDB",
     "OTPTokenDB",
     "PlanDB",
+    # Quota
+    "FeatureCostConfigDB",
+    "PlanPricingRuleDB",
     "RefreshTokenDB",
     "StripeEventLogDB",
     "SubscriptionDB",
@@ -35,6 +44,8 @@ __all__ = [
     # Global instances (for actual usage)
     "api_subscription_context_db",
     "career_subscription_context_db",
+    "feature_cost_config_db",
+    "plan_pricing_rule_db",
     "user_db",
     "oauth_account_db",
     "otp_token_db",

@@ -3,7 +3,7 @@ SQLAdmin model views for Cubex.
 
 Defines admin views for managing application models:
 - PlanAdmin: Full CRUD for subscription plans
-- EndpointCostConfigAdmin: Manage API endpoint pricing
+- FeatureCostConfigAdmin: Manage feature pricing
 - PlanPricingRuleAdmin: Manage plan multipliers and rate limits
 - UserAdmin: Read-only user view
 - WorkspaceAdmin: Read-only workspace view
@@ -20,8 +20,8 @@ from sqlalchemy.sql.expression import Select
 from starlette.requests import Request
 import wtforms
 
-from app.apps.cubex_api.db.crud.quota import plan_pricing_rule_db
-from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule
+from app.core.db.crud.quota import plan_pricing_rule_db
+from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule
 from app.apps.cubex_api.db.models.workspace import UsageLog, Workspace, WorkspaceMember
 from app.core.db.models.plan import Plan
 from app.core.db.models.subscription import Subscription
@@ -221,51 +221,48 @@ class PlanAdmin(ModelView, model=Plan):
 # ============================================================================
 
 
-class EndpointCostConfigAdmin(ModelView, model=EndpointCostConfig):
-    """Admin view for API endpoint pricing configuration."""
+class FeatureCostConfigAdmin(ModelView, model=FeatureCostConfig):
+    """Admin view for feature pricing configuration."""
 
-    name = "Endpoint Cost"
-    name_plural = "Endpoint Costs"
+    name = "Feature Cost"
+    name_plural = "Feature Costs"
     icon = "fa-solid fa-server"
 
     column_list = [
-        EndpointCostConfig.id,
-        EndpointCostConfig.endpoint,
-        EndpointCostConfig.internal_cost_credits,
-        EndpointCostConfig.created_at,
-        EndpointCostConfig.updated_at,
+        FeatureCostConfig.id,
+        FeatureCostConfig.feature_key,
+        FeatureCostConfig.internal_cost_credits,
+        FeatureCostConfig.created_at,
+        FeatureCostConfig.updated_at,
     ]
 
-    column_searchable_list = ["endpoint"]
+    column_searchable_list = ["feature_key"]
     column_sortable_list = [
-        EndpointCostConfig.endpoint,
-        EndpointCostConfig.internal_cost_credits,
-        EndpointCostConfig.created_at,
+        FeatureCostConfig.feature_key,
+        FeatureCostConfig.internal_cost_credits,
+        FeatureCostConfig.created_at,
     ]
-    column_default_sort = [(EndpointCostConfig.endpoint, False)]
+    column_default_sort = [(FeatureCostConfig.feature_key, False)]
 
     form_columns = [
-        EndpointCostConfig.endpoint,
-        EndpointCostConfig.internal_cost_credits,
+        FeatureCostConfig.feature_key,
+        FeatureCostConfig.internal_cost_credits,
     ]
 
     column_labels = {
-        EndpointCostConfig.id: "ID",
-        EndpointCostConfig.endpoint: "Endpoint Path",
-        EndpointCostConfig.internal_cost_credits: "Cost (Credits)",
-        EndpointCostConfig.created_at: "Created",
-        EndpointCostConfig.updated_at: "Updated",
+        FeatureCostConfig.id: "ID",
+        FeatureCostConfig.feature_key: "Feature Key",
+        FeatureCostConfig.internal_cost_credits: "Cost (Credits)",
+        FeatureCostConfig.created_at: "Created",
+        FeatureCostConfig.updated_at: "Updated",
     }
 
     column_formatters = {
-        EndpointCostConfig.internal_cost_credits: lambda m, a: f"{m.internal_cost_credits:.4f}",
+        FeatureCostConfig.internal_cost_credits: lambda m, a: f"{m.internal_cost_credits:.4f}",
     }
 
     form_args = {
-        "endpoint": {
-            "description": "API endpoint path (e.g., /v1/extract-cues/resume). "
-            "Will be normalized to lowercase.",
-        },
+        "feature_key": {"description": "Feature key (e.g., api.resume)."},
         "internal_cost_credits": {
             "description": "Internal credit cost for calling this endpoint. "
             "Default is 1.0 credit per call.",
@@ -796,7 +793,7 @@ class UsageLogAdmin(ModelView, model=UsageLog):
 # Export all admin views
 __all__ = [
     "PlanAdmin",
-    "EndpointCostConfigAdmin",
+    "FeatureCostConfigAdmin",
     "PlanPricingRuleAdmin",
     "UserAdmin",
     "WorkspaceAdmin",

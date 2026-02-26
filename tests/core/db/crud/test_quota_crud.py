@@ -8,73 +8,73 @@ Run with coverage:
     pytest tests/apps/cubex_api/test_quota_crud.py --cov=app.apps.cubex_api.db.crud.quota --cov-report=term-missing -v
 """
 
-from app.apps.cubex_api.db.crud.quota import (
-    EndpointCostConfigDB,
+from app.core.db.crud.quota import (
+    FeatureCostConfigDB,
     PlanPricingRuleDB,
-    endpoint_cost_config_db,
+    feature_cost_config_db,
     plan_pricing_rule_db,
 )
 
 
-class TestEndpointCostConfigDBImports:
-    """Test suite for EndpointCostConfigDB imports and initialization."""
+class TestFeatureCostConfigDBImports:
+    """Test suite for FeatureCostConfigDB imports and initialization."""
 
-    def test_endpoint_cost_config_db_import(self):
-        """Test that EndpointCostConfigDB class can be imported."""
-        assert EndpointCostConfigDB is not None
+    def test_feature_cost_config_db_import(self):
+        """Test that FeatureCostConfigDB class can be imported."""
+        assert FeatureCostConfigDB is not None
 
-    def test_endpoint_cost_config_db_instance_exists(self):
+    def test_feature_cost_config_db_instance_exists(self):
         """Test that the global instance exists."""
-        assert endpoint_cost_config_db is not None
+        assert feature_cost_config_db is not None
 
-    def test_endpoint_cost_config_db_is_correct_type(self):
+    def test_feature_cost_config_db_is_correct_type(self):
         """Test that global instance is correct type."""
-        assert isinstance(endpoint_cost_config_db, EndpointCostConfigDB)
+        assert isinstance(feature_cost_config_db, FeatureCostConfigDB)
 
-    def test_endpoint_cost_config_db_has_model(self):
+    def test_feature_cost_config_db_has_model(self):
         """Test that the CRUD class has the correct model."""
-        from app.apps.cubex_api.db.models.quota import EndpointCostConfig
+        from app.core.db.models.quota import FeatureCostConfig
 
-        assert endpoint_cost_config_db.model == EndpointCostConfig
+        assert feature_cost_config_db.model == FeatureCostConfig
 
 
-class TestEndpointCostConfigDBMethods:
-    """Test suite for EndpointCostConfigDB method signatures."""
+class TestFeatureCostConfigDBMethods:
+    """Test suite for FeatureCostConfigDB method signatures."""
 
     def test_has_get_by_endpoint_method(self):
         """Test that get_by_endpoint method exists."""
-        assert hasattr(endpoint_cost_config_db, "get_by_endpoint")
-        assert callable(endpoint_cost_config_db.get_by_endpoint)
+        assert hasattr(feature_cost_config_db, "get_by_endpoint")
+        assert callable(feature_cost_config_db.get_by_endpoint)
 
     def test_has_get_all_active_method(self):
         """Test that get_all_active method exists."""
-        assert hasattr(endpoint_cost_config_db, "get_all_active")
-        assert callable(endpoint_cost_config_db.get_all_active)
+        assert hasattr(feature_cost_config_db, "get_all_active")
+        assert callable(feature_cost_config_db.get_all_active)
 
     def test_has_create_or_update_method(self):
         """Test that create_or_update method exists."""
-        assert hasattr(endpoint_cost_config_db, "create_or_update")
-        assert callable(endpoint_cost_config_db.create_or_update)
+        assert hasattr(feature_cost_config_db, "create_or_update")
+        assert callable(feature_cost_config_db.create_or_update)
 
     def test_has_inherited_create_method(self):
         """Test that create method is inherited from BaseDB."""
-        assert hasattr(endpoint_cost_config_db, "create")
-        assert callable(endpoint_cost_config_db.create)
+        assert hasattr(feature_cost_config_db, "create")
+        assert callable(feature_cost_config_db.create)
 
     def test_has_inherited_get_by_id_method(self):
         """Test that get_by_id method is inherited from BaseDB."""
-        assert hasattr(endpoint_cost_config_db, "get_by_id")
-        assert callable(endpoint_cost_config_db.get_by_id)
+        assert hasattr(feature_cost_config_db, "get_by_id")
+        assert callable(feature_cost_config_db.get_by_id)
 
     def test_has_inherited_update_method(self):
         """Test that update method is inherited from BaseDB."""
-        assert hasattr(endpoint_cost_config_db, "update")
-        assert callable(endpoint_cost_config_db.update)
+        assert hasattr(feature_cost_config_db, "update")
+        assert callable(feature_cost_config_db.update)
 
     def test_has_inherited_delete_method(self):
         """Test that delete method is inherited from BaseDB."""
-        assert hasattr(endpoint_cost_config_db, "delete")
-        assert callable(endpoint_cost_config_db.delete)
+        assert hasattr(feature_cost_config_db, "delete")
+        assert callable(feature_cost_config_db.delete)
 
 
 class TestPlanPricingRuleDBImports:
@@ -94,7 +94,7 @@ class TestPlanPricingRuleDBImports:
 
     def test_plan_pricing_rule_db_has_model(self):
         """Test that the CRUD class has the correct model."""
-        from app.apps.cubex_api.db.models.quota import PlanPricingRule
+        from app.core.db.models.quota import PlanPricingRule
 
         assert plan_pricing_rule_db.model == PlanPricingRule
 
@@ -141,29 +141,29 @@ class TestPlanPricingRuleDBMethods:
 class TestCRUDExportsFromInit:
     """Test suite for CRUD exports from __init__.py."""
 
-    def test_endpoint_cost_config_db_exported(self):
-        """Test that endpoint_cost_config_db is exported from crud init."""
-        from app.apps.cubex_api.db.crud import endpoint_cost_config_db as exported_db
+    def test_feature_cost_config_db_exported(self):
+        """Test that feature_cost_config_db is exported from crud init."""
+        from app.core.db.crud import feature_cost_config_db as exported_db
 
-        assert exported_db is endpoint_cost_config_db
+        assert exported_db is feature_cost_config_db
 
     def test_plan_pricing_rule_db_exported(self):
         """Test that plan_pricing_rule_db is exported from crud init."""
-        from app.apps.cubex_api.db.crud import plan_pricing_rule_db as exported_db
+        from app.core.db.crud import plan_pricing_rule_db as exported_db
 
         assert exported_db is plan_pricing_rule_db
 
-    def test_endpoint_cost_config_db_class_exported(self):
-        """Test that EndpointCostConfigDB class is exported from crud init."""
-        from app.apps.cubex_api.db.crud import (
-            EndpointCostConfigDB as ExportedClass,
+    def test_feature_cost_config_db_class_exported(self):
+        """Test that FeatureCostConfigDB class is exported from crud init."""
+        from app.core.db.crud import (
+            FeatureCostConfigDB as ExportedClass,
         )
 
-        assert ExportedClass is EndpointCostConfigDB
+        assert ExportedClass is FeatureCostConfigDB
 
     def test_plan_pricing_rule_db_class_exported(self):
         """Test that PlanPricingRuleDB class is exported from crud init."""
-        from app.apps.cubex_api.db.crud import (
+        from app.core.db.crud import (
             PlanPricingRuleDB as ExportedClass,
         )
 

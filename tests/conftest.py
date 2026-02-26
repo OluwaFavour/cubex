@@ -493,7 +493,7 @@ async def basic_api_plan_pricing_rule(db_session: AsyncSession, basic_api_plan):
     """
     from decimal import Decimal
 
-    from app.apps.cubex_api.db.models import PlanPricingRule
+    from app.core.db.models import PlanPricingRule
 
     # Check if pricing rule already exists
     result = await db_session.execute(

@@ -21,14 +21,18 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.apps.cubex_api.schemas.workspace import (
+from app.apps.cubex_career.schemas.internal import (
     UsageCommitRequest,
     UsageCommitResponse,
     UsageValidateRequest,
     UsageValidateResponse,
 )
 from app.apps.cubex_api.services.quota import quota_service
-from app.core.dependencies import get_async_session, InternalAPIKeyDep
+from app.core.dependencies import (
+    CurrentActiveUser,
+    get_async_session,
+    InternalAPIKeyDep,
+)
 
 
 router = APIRouter(prefix="/internal", tags=["Internal API"])
@@ -254,6 +258,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
 )
 async def validate_usage(
     request: UsageValidateRequest,
+    current_user: CurrentActiveUser,
     _: InternalAPIKeyDep,  # Validates X-Internal-API-Key header
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> JSONResponse:
@@ -294,7 +299,6 @@ async def validate_usage(
         ) = await quota_service.validate_and_log_usage(
             session=session,
             api_key=request.api_key,
-            feature_key=request.feature_key,
             client_id=request.client_id,
             request_id=request.request_id,
             endpoint=request.endpoint,

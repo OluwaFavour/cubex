@@ -21,7 +21,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.enums import AccessStatus
+from app.core.enums import AccessStatus, FeatureKey
 
 
 def _generate_payload_hash(data: str = "") -> str:
@@ -35,6 +35,7 @@ def make_validate_request(
     api_key: str = "cbx_live_test123abc",
     client_id: str | None = None,
     request_id: str | None = None,
+    feature_key: str = FeatureKey.API_EXTRACT_CUES_RESUME.value,
     endpoint: str = "/test/endpoint",
     method: str = "POST",
     payload_hash: str | None = None,
@@ -51,6 +52,7 @@ def make_validate_request(
         "api_key": api_key,
         "client_id": client_id,
         "request_id": request_id,
+        "feature_key": feature_key,
         "endpoint": endpoint,
         "method": method,
         "payload_hash": payload_hash,
@@ -958,7 +960,7 @@ class TestValidateUsageE2E:
 
         # Mock rate limit to 1000 to avoid hitting limits during benchmark
         with patch(
-            "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+            "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
             new_callable=AsyncMock,
             return_value=1000,
         ):

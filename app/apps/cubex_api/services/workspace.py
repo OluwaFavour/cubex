@@ -23,7 +23,7 @@ from app.apps.cubex_api.db.models import (
     WorkspaceMember,
     WorkspaceInvitation,
 )
-from app.apps.cubex_api.services.quota_cache import QuotaCacheService
+from app.core.services.quota_cache import QuotaCacheService
 from app.core.config import settings, workspace_logger
 from app.core.db.crud import (
     api_subscription_context_db,

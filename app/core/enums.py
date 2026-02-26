@@ -150,6 +150,30 @@ class FailureType(str, Enum):
     VALIDATION_ERROR = "validation_error"  # Request/response validation failed
 
 
+class FeatureKey(str, Enum):
+    API_CAREER_PATH = "api.career_path"
+    API_EXTRACT_KEYWORDS = "api.extract_keywords"
+    API_FEEDBACK_ANALYZER = "api.feedback_analyzer"
+    API_GENERATE_FEEDBACK = "api.generate_feedback"
+    API_JOB_MATCH = "api.job_match"
+    API_EXTRACT_CUES_RESUME = "api.extract_cues.resume"
+    API_EXTRACT_CUES_FEEDBACK = "api.extract_cues.feedback"
+    API_EXTRACT_CUES_INTERVIEW = "api.extract_cues.interview"
+    API_EXTRACT_CUES_ASSESSMENT = "api.extract_cues.assessment"
+    API_REFRAME_FEEDBACK = "api.reframe_feedback"
+
+    CAREER_CAREER_PATH = "career.career_path"
+    CAREER_EXTRACT_KEYWORDS = "career.extract_keywords"
+    CAREER_FEEDBACK_ANALYZER = "career.feedback_analyzer"
+    CAREER_GENERATE_FEEDBACK = "career.generate_feedback"
+    CAREER_JOB_MATCH = "career.job_match"
+    CAREER_EXTRACT_CUES_RESUME = "career.extract_cues.resume"
+    CAREER_EXTRACT_CUES_FEEDBACK = "career.extract_cues.feedback"
+    CAREER_EXTRACT_CUES_INTERVIEW = "career.extract_cues.interview"
+    CAREER_EXTRACT_CUES_ASSESSMENT = "career.extract_cues.assessment"
+    CAREER_REFRAME_FEEDBACK = "career.reframe_feedback"
+
+
 __all__ = [
     "AccessStatus",
     "APIPlanName",
@@ -166,4 +190,5 @@ __all__ = [
     "SubscriptionStatus",
     "UsageLogStatus",
     "WorkspaceStatus",
+    "FeatureKey",
 ]

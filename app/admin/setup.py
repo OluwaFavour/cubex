@@ -10,7 +10,7 @@ from sqladmin import Admin
 
 from app.admin.auth import admin_auth
 from app.admin.views import (
-    EndpointCostConfigAdmin,
+    FeatureCostConfigAdmin,
     PlanAdmin,
     PlanPricingRuleAdmin,
     SubscriptionAdmin,
@@ -45,7 +45,7 @@ def init_admin(app: FastAPI) -> None:
 
     # Register model views
     admin.add_view(PlanAdmin)
-    admin.add_view(EndpointCostConfigAdmin)
+    admin.add_view(FeatureCostConfigAdmin)
     admin.add_view(PlanPricingRuleAdmin)
     admin.add_view(UserAdmin)
     admin.add_view(WorkspaceAdmin)

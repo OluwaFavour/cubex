@@ -22,6 +22,7 @@ from uuid import uuid4
 import pytest
 
 from app.apps.cubex_api.services.quota import RateLimitInfo, quota_service
+from app.core.enums import FeatureKey
 
 
 # ============================================================================
@@ -131,7 +132,7 @@ class TestCheckRateLimitMethod:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=20,
             ),
@@ -154,7 +155,7 @@ class TestCheckRateLimitMethod:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=20,
             ),
@@ -179,7 +180,7 @@ class TestCheckRateLimitMethod:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=20,
             ),
@@ -203,7 +204,7 @@ class TestCheckRateLimitMethod:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=20,
             ),
@@ -226,7 +227,7 @@ class TestCheckRateLimitMethod:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=20,
             ),
@@ -252,7 +253,7 @@ class TestCheckRateLimitMethod:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=20,
             ),
@@ -274,7 +275,7 @@ class TestCheckRateLimitMethod:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=50,  # Custom rate limit
             ) as mock_get_rate_limit,
@@ -299,7 +300,7 @@ class TestCheckRateLimitMethod:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=20,
             ),
@@ -325,7 +326,7 @@ class TestCheckRateLimitMethod:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=20,
             ),
@@ -438,6 +439,7 @@ class TestRateLimitHeadersInResponse:
                 "endpoint": "/test",
                 "method": "POST",
                 "payload_hash": "a" * 64,
+                "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
             },
             headers=internal_api_headers,
         )
@@ -470,6 +472,7 @@ class TestRateLimitHeadersInResponse:
                 "endpoint": "/test",
                 "method": "POST",
                 "payload_hash": "a" * 64,
+                "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
             },
             headers=internal_api_headers,
         )
@@ -528,7 +531,7 @@ class TestRateLimitEdgeCases:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=20,  # Default rate limit
             ) as mock_get_rate_limit,
@@ -734,6 +737,7 @@ class TestRateLimitingEndToEnd:
                     "endpoint": "/test/endpoint",
                     "method": "POST",
                     "payload_hash": "a" * 64,
+                    "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
                 },
                 headers=internal_api_headers,
             )
@@ -790,6 +794,7 @@ class TestRateLimitingEndToEnd:
                     "endpoint": "/test/endpoint",
                     "method": "POST",
                     "payload_hash": "a" * 64,
+                    "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
                 },
                 headers=internal_api_headers,
             )
@@ -821,6 +826,7 @@ class TestRateLimitingEndToEnd:
                     "endpoint": "/test/endpoint",
                     "method": "POST",
                     "payload_hash": "a" * 64,
+                    "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
                 },
                 headers=internal_api_headers,
             )
@@ -866,6 +872,7 @@ class TestRateLimitingEndToEnd:
                     "endpoint": "/test/endpoint",
                     "method": "POST",
                     "payload_hash": "a" * 64,
+                    "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
                 },
                 headers=internal_api_headers,
             )
@@ -907,6 +914,7 @@ class TestRateLimitingEndToEnd:
                     "endpoint": "/test/endpoint",
                     "method": "POST",
                     "payload_hash": "a" * 64,
+                    "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
                 },
                 headers=internal_api_headers,
             )
@@ -1039,6 +1047,7 @@ class TestRateLimitingEndToEnd:
                     "endpoint": "/test",
                     "method": "POST",
                     "payload_hash": "a" * 64,
+                    "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
                 },
                 headers=internal_api_headers,
             )
@@ -1059,6 +1068,7 @@ class TestRateLimitingEndToEnd:
                     "endpoint": "/test",
                     "method": "POST",
                     "payload_hash": "a" * 64,
+                    "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
                 },
                 headers=internal_api_headers,
             )
@@ -1087,7 +1097,7 @@ class TestRateLimitingEndToEnd:
         # Mock a specific rate limit for the plan
         with (
             patch(
-                "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
                 new_callable=AsyncMock,
                 return_value=50,  # Custom rate limit
             ),
@@ -1106,6 +1116,7 @@ class TestRateLimitingEndToEnd:
                     "endpoint": "/test/endpoint",
                     "method": "POST",
                     "payload_hash": "a" * 64,
+                    "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
                 },
                 headers=internal_api_headers,
             )
@@ -1147,6 +1158,7 @@ class TestRateLimitingEndToEnd:
                     "endpoint": "/test/endpoint",
                     "method": "POST",
                     "payload_hash": "a" * 64,
+                    "feature_key": FeatureKey.API_EXTRACT_CUES_RESUME,
                 },
                 headers=internal_api_headers,
             )

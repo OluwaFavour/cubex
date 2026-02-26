@@ -66,8 +66,8 @@ from app.apps.cubex_api.routers import (
 from app.apps.cubex_career.routers import (
     subscription_router as career_subscription_router,
 )
-from app.apps.cubex_api.services import QuotaCacheService
 from app.core.db import AsyncSessionLocal
+from app.core.services import QuotaCacheService
 from app.core.utils import generate_openapi_json, write_to_file_async
 from app.admin import init_admin
 

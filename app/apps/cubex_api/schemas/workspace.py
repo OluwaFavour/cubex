@@ -21,6 +21,7 @@ from pydantic import (
 from app.core.enums import (
     AccessStatus,
     FailureType,
+    FeatureKey,
     InvitationStatus,
     MemberRole,
     MemberStatus,
@@ -594,6 +595,7 @@ class UsageValidateRequest(BaseModel):
             "example": {
                 "request_id": "req_9f0c2a7e-acde-4b9a-8b2f-83cc71a3c9a2",
                 "client_id": "ws_550e8400e29b41d4a716446655440000",
+                "feature_key": "api.analyze",
                 "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
                 "endpoint": "/v1/extract-cues/resume",
                 "method": "POST",
@@ -618,6 +620,9 @@ class UsageValidateRequest(BaseModel):
             description="Workspace client ID in format ws_<workspace_uuid_hex>",
             pattern=r"^ws_[a-f0-9]{32}$",
         ),
+    ]
+    feature_key: Annotated[
+        FeatureKey, Field(description="Feature Key (e.g., 'api.analyze')")
     ]
     api_key: Annotated[
         str,

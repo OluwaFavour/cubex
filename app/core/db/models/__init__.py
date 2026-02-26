@@ -1,5 +1,6 @@
 from app.core.db.models.otp import OTPToken
 from app.core.db.models.plan import Plan, FeatureSchema
+from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule
 from app.core.db.models.refresh_token import RefreshToken
 from app.core.db.models.subscription import Subscription, StripeEventLog
 from app.core.db.models.user import User, OAuthAccount
@@ -25,6 +26,8 @@ __all__ = [
     "OAuthAccount",
     "OTPToken",
     "Plan",
+    "FeatureCostConfig",
+    "PlanPricingRule",
     "RefreshToken",
     "StripeEventLog",
     "Subscription",

@@ -3,7 +3,7 @@ SQLAdmin configuration for Cubex.
 
 This module provides an admin interface for managing:
 - Plans (subscription plans)
-- EndpointCostConfig (API endpoint pricing)
+- FeatureCostConfig (API endpoint pricing)
 - PlanPricingRule (plan multipliers and rate limits)
 - Users (read-only view)
 - Workspaces (read-only view)

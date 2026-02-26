@@ -1,8 +1,6 @@
 """
-Quota models for cubex_api.
-
-This module provides models for API usage pricing and cost configuration:
-- EndpointCostConfig: Defines internal credit cost per endpoint
+This module provides models for Feature usage pricing and cost configuration:
+- FeatureCostConfig: Defines internal credit cost per feature
 - PlanPricingRule: Defines pricing multipliers, credit allocations, and rate limits per plan
 """
 
@@ -10,17 +8,26 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.core.db.models.base import BaseModel
+from app.core.enums import FeatureKey, ProductType
 
 if TYPE_CHECKING:
     from app.core.db.models.plan import Plan
 
 
-class EndpointCostConfig(BaseModel):
+class FeatureCostConfig(BaseModel):
     """
     Model for endpoint cost configuration.
 
@@ -28,33 +35,34 @@ class EndpointCostConfig(BaseModel):
     This allows dynamic pricing based on endpoint resource consumption.
 
     Attributes:
-        endpoint: The API endpoint path (e.g., '/api/v1/analyze').
+        feature: The API feature key (e.g., 'api.analyze').
         internal_cost_credits: The internal credit cost for calling this endpoint.
     """
 
-    __tablename__ = "endpoint_cost_configs"
+    __tablename__ = "feature_cost_configs"
 
-    endpoint: Mapped[str] = mapped_column(
-        String(512),
+    feature_key: Mapped[FeatureKey] = mapped_column(
+        Enum(FeatureKey, native_enum=False, name="feature_key"),
         nullable=False,
         unique=True,
         index=True,
-        comment="API endpoint path (e.g., '/api/v1/analyze')",
+        comment="Feature Key (e.g., 'api.analyze')",
     )
-
+    product_type: Mapped[ProductType] = mapped_column(
+        Enum(ProductType, native_enum=False, name="product_type"),
+        nullable=False,
+        index=True,
+        default=ProductType.API,
+        comment="Product this plan belongs to (API or CAREER)",
+    )
     internal_cost_credits: Mapped[Decimal] = mapped_column(
         Numeric(precision=12, scale=2),
         nullable=False,
         default=Decimal("1.0"),
-        comment="Internal credit cost for this endpoint",
+        comment="Internal credit cost for this feature",
     )
 
-    __table_args__ = (Index("ix_endpoint_cost_configs_endpoint_lookup", "endpoint"),)
-
-    @validates("endpoint")
-    def normalize_endpoint(self, key: str, value: str) -> str:
-        """Normalize endpoint to lowercase for consistent lookups."""
-        return value.lower() if value else value
+    __table_args__ = (Index("ix_feature_cost_configs_feature_lookup", "feature_key"),)
 
 
 class PlanPricingRule(BaseModel):
@@ -100,11 +108,15 @@ class PlanPricingRule(BaseModel):
         comment="Credits allocated to users on this plan",
     )
 
-    rate_limit_per_minute: Mapped[int] = mapped_column(
+    rate_limit_per_minute: Mapped[int | None] = mapped_column(
         Integer,
-        nullable=False,
-        default=20,
+        nullable=True,
         comment="Maximum API requests allowed per minute",
+    )
+    rate_limit_per_day: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Maximum API requests allowed per day",
     )
 
     # Relationship

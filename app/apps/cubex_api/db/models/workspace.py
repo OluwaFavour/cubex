@@ -33,6 +33,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db.models.base import BaseModel
 from app.core.enums import (
     FailureType,
+    FeatureKey,
     InvitationStatus,
     MemberRole,
     MemberStatus,
@@ -570,6 +571,7 @@ class UsageLog(BaseModel):
         api_key_id: Foreign key to the API key used.
         workspace_id: Foreign key to the workspace (denormalized for efficient queries).
         request_id: Globally unique request ID for idempotency.
+        feature_key: The key of feature being used.
         fingerprint_hash: Hash of endpoint+method+payload_hash+usage_estimate.
         access_status: The access decision (GRANTED/DENIED) for this request.
         endpoint: The API endpoint path being called.
@@ -588,6 +590,7 @@ class UsageLog(BaseModel):
         Index("ix_usage_logs_api_key_created", "api_key_id", "created_at"),
         Index("ix_usage_logs_status", "status"),
         Index("ix_usage_logs_endpoint", "endpoint"),
+        Index("ix_usage_logs_feature_key", "feature_key"),
         Index(
             "ix_usage_logs_request_fingerprint_workspace",
             "request_id",
@@ -631,6 +634,13 @@ class UsageLog(BaseModel):
         String(10),
         nullable=False,
         comment="Access decision: 'granted' or 'denied'",
+    )
+
+    feature_key: Mapped[FeatureKey] = mapped_column(
+        Enum(FeatureKey, native_enum=False, name="feature_key"),
+        nullable=False,
+        index=True,
+        comment="Feature Key (e.g., 'api.analyze')",
     )
 
     endpoint: Mapped[str] = mapped_column(

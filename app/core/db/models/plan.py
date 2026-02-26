@@ -26,7 +26,7 @@ from app.core.db.models.base import BaseModel
 from app.core.enums import PlanType, ProductType
 
 if TYPE_CHECKING:
-    from app.apps.cubex_api.db.models.quota import PlanPricingRule
+    from app.core.db.models.quota import PlanPricingRule
 
 
 # ============================================================================

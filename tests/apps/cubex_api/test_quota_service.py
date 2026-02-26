@@ -254,6 +254,7 @@ class TestUsageValidateRequestNormalization:
     def test_endpoint_normalized_to_lowercase(self):
         """Test that endpoint is normalized to lowercase."""
         from app.apps.cubex_api.schemas.workspace import UsageValidateRequest
+        from app.core.enums import FeatureKey
 
         request = UsageValidateRequest(
             request_id="req_123",
@@ -262,12 +263,14 @@ class TestUsageValidateRequestNormalization:
             endpoint="/V1/EXTRACT-CUES/RESUME",
             method="POST",
             payload_hash="a" * 64,
+            feature_key=FeatureKey.API_EXTRACT_CUES_RESUME,
         )
         assert request.endpoint == "/v1/extract-cues/resume"
 
     def test_method_normalized_to_uppercase(self):
         """Test that method is normalized to uppercase."""
         from app.apps.cubex_api.schemas.workspace import UsageValidateRequest
+        from app.core.enums import FeatureKey
 
         request = UsageValidateRequest(
             request_id="req_123",
@@ -276,12 +279,14 @@ class TestUsageValidateRequestNormalization:
             endpoint="/v1/analyze",
             method="post",
             payload_hash="a" * 64,
+            feature_key=FeatureKey.API_EXTRACT_CUES_RESUME,
         )
         assert request.method == "POST"
 
     def test_mixed_case_normalization(self):
         """Test both fields normalized with mixed case input."""
         from app.apps.cubex_api.schemas.workspace import UsageValidateRequest
+        from app.core.enums import FeatureKey
 
         request = UsageValidateRequest(
             request_id="req_123",
@@ -290,6 +295,7 @@ class TestUsageValidateRequestNormalization:
             endpoint="/Api/V1/Analyze",
             method="Post",
             payload_hash="a" * 64,
+            feature_key=FeatureKey.API_EXTRACT_CUES_RESUME,
         )
         assert request.endpoint == "/api/v1/analyze"
         assert request.method == "POST"
@@ -838,7 +844,7 @@ class TestQuotaCacheServiceFallback:
 
     def test_fallback_method_exists(self):
         """Test that get_plan_credits_allocation_with_fallback method exists."""
-        from app.apps.cubex_api.services.quota_cache import QuotaCacheService
+        from app.core.services.quota_cache import QuotaCacheService
 
         assert hasattr(QuotaCacheService, "get_plan_credits_allocation_with_fallback")
         assert callable(QuotaCacheService.get_plan_credits_allocation_with_fallback)
@@ -847,7 +853,7 @@ class TestQuotaCacheServiceFallback:
         """Test that fallback method has correct signature."""
         import inspect
 
-        from app.apps.cubex_api.services.quota_cache import QuotaCacheService
+        from app.core.services.quota_cache import QuotaCacheService
 
         sig = inspect.signature(
             QuotaCacheService.get_plan_credits_allocation_with_fallback
@@ -860,7 +866,7 @@ class TestQuotaCacheServiceFallback:
     @pytest.mark.asyncio
     async def test_returns_default_when_plan_id_is_none(self):
         """Test that default is returned when plan_id is None."""
-        from app.apps.cubex_api.services.quota_cache import QuotaCacheService
+        from app.core.services.quota_cache import QuotaCacheService
 
         # Mock session not needed when plan_id is None
         result = await QuotaCacheService.get_plan_credits_allocation_with_fallback(
