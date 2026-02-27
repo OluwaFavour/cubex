@@ -1370,22 +1370,74 @@ class TestCancelSubscription:
             assert "status" not in data  # Not immediately canceled
 
     @pytest.mark.asyncio
-    async def test_cancel_immediately(self, career_service):
-        """Immediate cancel sets CANCELED status and canceled_at."""
+    async def test_cancel_immediately_downgrades_to_free(self, career_service):
+        """Immediate cancel downgrades to free plan instead of just marking CANCELED."""
+        sub = MagicMock(
+            id=uuid4(),
+            stripe_subscription_id="sub_cancel_now",
+        )
+        free_plan = MagicMock(id=uuid4())
+        updated_sub = MagicMock(id=sub.id)
+
+        with (
+            patch(
+                "app.apps.cubex_career.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch(
+                "app.apps.cubex_career.services.subscription.Stripe"
+            ) as mock_stripe,
+            patch(
+                "app.apps.cubex_career.services.subscription.plan_db"
+            ) as mock_plan_db,
+        ):
+            mock_sub_db.get_by_user = AsyncMock(return_value=sub)
+            mock_sub_db.update = AsyncMock(return_value=updated_sub)
+            mock_stripe.cancel_subscription = AsyncMock()
+            mock_plan_db.get_free_plan = AsyncMock(return_value=free_plan)
+
+            result = await career_service.cancel_subscription(
+                session=AsyncMock(),
+                user_id=uuid4(),
+                cancel_at_period_end=False,
+            )
+
+            assert result is updated_sub
+            update_data = mock_sub_db.update.call_args
+            data = (
+                update_data.args[2]
+                if len(update_data.args) > 2
+                else update_data.kwargs.get("data", {})
+            )
+            assert data["status"] == SubscriptionStatus.ACTIVE
+            assert data["plan_id"] == free_plan.id
+            assert data["stripe_subscription_id"] is None
+            assert data["cancel_at_period_end"] is False
+            assert data["canceled_at"] is not None
+
+    @pytest.mark.asyncio
+    async def test_cancel_immediately_falls_back_when_no_free_plan(self, career_service):
+        """Immediate cancel falls back to CANCELED if free plan is missing."""
         sub = MagicMock(
             id=uuid4(),
             stripe_subscription_id="sub_cancel_now",
         )
         updated_sub = MagicMock(id=sub.id)
 
-        with patch(
-            "app.apps.cubex_career.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_career.services.subscription.Stripe"
-        ) as mock_stripe:
+        with (
+            patch(
+                "app.apps.cubex_career.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch(
+                "app.apps.cubex_career.services.subscription.Stripe"
+            ) as mock_stripe,
+            patch(
+                "app.apps.cubex_career.services.subscription.plan_db"
+            ) as mock_plan_db,
+        ):
             mock_sub_db.get_by_user = AsyncMock(return_value=sub)
             mock_sub_db.update = AsyncMock(return_value=updated_sub)
             mock_stripe.cancel_subscription = AsyncMock()
+            mock_plan_db.get_free_plan = AsyncMock(return_value=None)
 
             result = await career_service.cancel_subscription(
                 session=AsyncMock(),

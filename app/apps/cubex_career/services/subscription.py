@@ -701,8 +701,23 @@ class CareerSubscriptionService:
         # Update our record
         updates: dict[str, Any] = {"cancel_at_period_end": cancel_at_period_end}
         if not cancel_at_period_end:
-            updates["status"] = SubscriptionStatus.CANCELED
-            updates["canceled_at"] = datetime.now(timezone.utc)
+            # Immediate cancellation: downgrade to free plan right away
+            # so the user isn't left in a CANCELED state until the webhook fires.
+            free_plan = await plan_db.get_free_plan(
+                session, product_type=ProductType.CAREER
+            )
+            if free_plan:
+                updates["status"] = SubscriptionStatus.ACTIVE
+                updates["plan_id"] = free_plan.id
+                updates["stripe_subscription_id"] = None
+                updates["cancel_at_period_end"] = False
+                updates["canceled_at"] = datetime.now(timezone.utc)
+            else:
+                stripe_logger.error(
+                    "Free Career plan not found — marking as canceled only"
+                )
+                updates["status"] = SubscriptionStatus.CANCELED
+                updates["canceled_at"] = datetime.now(timezone.utc)
 
         updated_subscription = await subscription_db.update(
             session,
