@@ -112,7 +112,7 @@ pytest --tb=short
 ### Main Application Tests
 
 - `test_main.py` - FastAPI app initialization and health checks (33 tests)
-- `test_utils.py` - Utility functions in `app.shared.utils` (76 tests)
+- `test_utils.py` - Utility functions in `app.core.utils` (76 tests)
 
 ### Services Tests
 
@@ -343,7 +343,7 @@ class TestMyEndpoint:
 async def admin_user(db_session: AsyncSession):
     """Create an admin user."""
     from uuid import uuid4
-    from app.shared.db.models import User
+    from app.core.db.models import User
 
     user = User(
         id=uuid4(),
@@ -381,8 +381,8 @@ async def premium_subscription(
     """Create a premium subscription."""
     from uuid import uuid4
     from datetime import datetime, timezone
-    from app.shared.db.models import Subscription
-    from app.shared.enums import SubscriptionStatus
+    from app.core.db.models import Subscription
+    from app.core.enums import SubscriptionStatus
 
     subscription = Subscription(
         id=uuid4(),
@@ -424,10 +424,10 @@ class TestStripeWebhook:
         }
 
         with patch(
-            "app.shared.routers.webhook.Stripe.verify_webhook_signature",
+            "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.shared.routers.webhook.publish_event",
+            "app.core.routers.webhook.publish_event",
             new_callable=AsyncMock,
         ) as mock_publish:
             response = await client.post(
@@ -465,11 +465,11 @@ class TestGoogleOAuth:
         }
 
         with patch(
-            "app.shared.services.oauth.google.GoogleOAuth.exchange_code",
+            "app.core.services.oauth.google.GoogleOAuth.exchange_code",
             new_callable=AsyncMock,
             return_value={"access_token": "google_token"},
         ), patch(
-            "app.shared.services.oauth.google.GoogleOAuth.get_user_info",
+            "app.core.services.oauth.google.GoogleOAuth.get_user_info",
             new_callable=AsyncMock,
             return_value=mock_user_info,
         ):
@@ -532,7 +532,7 @@ async def test_signup_creates_user(self, client, db_session):
 @pytest.mark.asyncio
 async def test_signup_sends_verification_email(self, client):
     """Should queue verification email."""
-    with patch("app.shared.services.auth.publish_event") as mock:
+    with patch("app.core.services.auth.publish_event") as mock:
         await client.post("/auth/signup", json={...})
     mock.assert_called_once()
 
@@ -556,17 +556,17 @@ class TestRouterConfiguration:
 
     def test_router_is_api_router(self):
         from fastapi import APIRouter
-        from app.shared.routers.auth import router
+        from app.core.routers.auth import router
 
         assert isinstance(router, APIRouter)
 
     def test_router_has_correct_prefix(self):
-        from app.shared.routers.auth import router
+        from app.core.routers.auth import router
 
         assert router.prefix == "/auth"
 
     def test_router_has_correct_tags(self):
-        from app.shared.routers.auth import router
+        from app.core.routers.auth import router
 
         assert "Authentication" in router.tags
 ```
@@ -702,7 +702,7 @@ async def test_with_mock(client: AsyncClient):
 
 ## Coverage
 
-### Current Test Count: 952+ tests
+### Current Test Count: 1600+ tests
 
 Check coverage with:
 

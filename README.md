@@ -1,0 +1,835 @@
+# CueBX
+
+![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)
+[![Tests](https://github.com/OluwaFavour/cubex/actions/workflows/tests.yml/badge.svg)](https://github.com/OluwaFavour/cubex/actions/workflows/tests.yml)
+
+A multi-product SaaS platform that provides AI-powered developer tools and career services through a unified API. CueBX ships two products — **CueBX API** (workspace-based developer tooling with team collaboration, role-based access, and per-seat billing) and **CueBX Career** (an individual subscription service for AI-assisted career development).
+
+---
+
+## Table of Contents
+
+- [Tech Stack](#tech-stack)
+- [Architecture Overview](#architecture-overview)
+- [Flow Diagrams](#flow-diagrams)
+  - [Authentication](#authentication-flow)
+  - [Workspace Lifecycle](#workspace-lifecycle)
+  - [Subscriptions and Payments](#subscriptions-and-payments-flow)
+  - [Messaging Pipeline](#messaging-pipeline)
+  - [Usage and Quota Enforcement](#usage-and-quota-enforcement)
+  - [Scheduler Jobs](#scheduler-jobs)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Docker](#docker)
+- [CLI Reference](#cli-reference)
+- [API Endpoints](#api-endpoints)
+- [Environment Variables](#environment-variables)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Contributing](#contributing)
+- [License](#license)
+- [Submodule Docs](#submodule-docs)
+
+---
+
+## Tech Stack
+
+| Category | Technology |
+| ---------- | ----------- |
+| **Framework** | FastAPI + Uvicorn |
+| **Language** | Python 3.13 |
+| **Database** | PostgreSQL 16 (asyncpg) |
+| **ORM / Migrations** | SQLAlchemy 2.0 (async) + Alembic |
+| **Cache / Rate Limiting** | Redis 7 |
+| **Message Broker** | RabbitMQ 3 (aio-pika) |
+| **Payments** | Stripe |
+| **Background Jobs** | APScheduler |
+| **Admin Panel** | SQLAdmin |
+| **Email** | Brevo (HTTP API) |
+| **File Storage** | Cloudinary |
+| **Monitoring** | Sentry |
+| **Templating** | Jinja2 |
+| **CLI** | Typer + Rich |
+| **Auth** | JWT (PyJWT) + bcrypt + OAuth2 (Google, GitHub) |
+
+---
+
+## Architecture Overview
+
+```text
+                                    ┌──────────────────────────────────────────────────┐
+                                    │                  External Services                │
+                                    │  Stripe · Brevo · Cloudinary · Google · GitHub   │
+                                    └──────────────────────┬───────────────────────────┘
+                                                           │
+                                                           ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                      FastAPI Application                                    │
+│                                                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
+│  │  Auth        │  │  Workspaces │  │  Subscriptions│  │  Support     │  │  Admin       │   │
+│  │  /auth/*     │  │  /api/*     │  │  /api/* +     │  │  /api/*     │  │  /admin      │   │
+│  │             │  │             │  │  /career/*    │  │             │  │  (SQLAdmin)  │   │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬───────┘  └──────┬──────┘  └──────┬───────┘   │
+│         │                │                │                 │                │            │
+│         └────────────────┴────────────────┴─────────────────┴────────────────┘            │
+│                                           │                                               │
+│  ┌────────────────────────────────────────┴──────────────────────────────────────────┐    │
+│  │                              Core Services Layer                                  │    │
+│  │  AuthService · RedisService · QuotaCacheService · BrevoService · Renderer · ...   │    │
+│  └──────────┬──────────────────────────┬─────────────────────────────┬───────────────┘    │
+│             │                          │                             │                     │
+│  ┌──────────▼──────────┐   ┌──────────▼──────────┐   ┌──────────────▼──────────────┐     │
+│  │  PostgreSQL (asyncpg)│   │  Redis               │   │  RabbitMQ (aio-pika)        │     │
+│  │  Models + CRUD       │   │  Cache + Rate Limits  │   │  Queues + Retry + DLQ       │     │
+│  └─────────────────────┘   └─────────────────────┘   └─────────────────────────────┘     │
+│                                                                                           │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+
+   Separate Processes (Docker targets):
+
+   ┌──────────────────────┐          ┌──────────────────────┐
+   │   Scheduler (worker)  │          │   Consumer (worker)   │
+   │   APScheduler         │          │   RabbitMQ Consumer   │
+   │   • Cleanup users     │          │   • Email handlers    │
+   │   • Expire usage logs │          │   • Stripe handlers   │
+   └──────────────────────┘          │   • Usage handlers    │
+                                      └──────────────────────┘
+```
+
+---
+
+## Flow Diagrams
+
+### Authentication Flow
+
+```text
+                                ┌──────────────┐
+                                │   Client     │
+                                └──────┬───────┘
+                                       │
+                        ┌──────────────┼──────────────┐
+                        │              │              │
+                   Email/Pass     OAuth (Google    Password
+                   Signup         or GitHub)       Reset
+                        │              │              │
+                        ▼              ▼              ▼
+                  ┌──────────┐  ┌───────────┐  ┌──────────────┐
+                  │ POST     │  │ GET       │  │ POST         │
+                  │ /signup  │  │ /oauth/   │  │ /password/   │
+                  └────┬─────┘  │ {provider}│  │ reset        │
+                       │        └─────┬─────┘  └──────┬───────┘
+                       ▼              │               │
+                ┌────────────┐        ▼               ▼
+                │ Create     │  ┌───────────┐  ┌──────────────┐
+                │ User (DB)  │  │ Redirect  │  │ Generate OTP │
+                └────┬───────┘  │ to        │  │ (HMAC-based) │
+                     │          │ Provider  │  └──────┬───────┘
+                     ▼          └─────┬─────┘         │
+              ┌────────────┐         │               ▼
+              │ Generate   │         ▼         ┌──────────────┐
+              │ OTP        │  ┌───────────┐    │ Queue Email  │──▶ RabbitMQ
+              │ (HMAC)     │  │ Callback  │    │ (Brevo)      │
+              └────┬───────┘  │ Exchange  │    └──────────────┘
+                   │          │ Code →    │
+                   ▼          │ Tokens    │
+            ┌────────────┐    └─────┬─────┘
+            │ Queue Email│          │
+            │ via        │──▶ RabbitMQ
+            │ RabbitMQ   │          │
+            └────┬───────┘          │
+                 │                  │
+                 ▼                  ▼
+          ┌────────────┐     ┌───────────┐
+          │ POST       │     │ Return    │
+          │ /signup/   │     │ JWT +     │
+          │ verify     │     │ Refresh   │
+          │ (OTP)      │     │ Token     │
+          └────┬───────┘     └───────────┘
+               │
+               ▼
+        ┌────────────┐      ┌──────────────────────────────────┐
+        │ JWT +      │      │         Token Lifecycle          │
+        │ Refresh    │      │                                  │
+        │ Tokens     │      │  Access Token ──(expires)──▶     │
+        └────────────┘      │    POST /token/refresh           │
+                            │       │                          │
+                            │       ▼                          │
+                            │  New Access Token                │
+                            │                                  │
+                            │  POST /signout ──▶ Revoke        │
+                            │  POST /signout/all ──▶ Revoke All│
+                            └──────────────────────────────────┘
+```
+
+### Workspace Lifecycle
+
+```text
+  Owner                                            Invited User
+    │                                                    │
+    ▼                                                    │
+┌────────────┐                                           │
+│ POST       │                                           │
+│ /workspaces│   Creates personal workspace              │
+│ /activate  │   with owner membership                   │
+└────┬───────┘                                           │
+     │                                                   │
+     ▼                                                   │
+┌────────────┐                                           │
+│ Workspace  │ status: ACTIVE                            │
+│ (DB)       │ type: PERSONAL                            │
+└────┬───────┘                                           │
+     │                                                   │
+     ├──────────── Manage API Keys ──────────────┐       │
+     │  POST   /workspaces/{id}/api-keys         │       │
+     │  DELETE /workspaces/{id}/api-keys/{key_id} │       │
+     │                                            │       │
+     ├──────────── Invite Members ───────────────┐│       │
+     │  POST /workspaces/{id}/invitations        ││       │
+     │         │                                 ││       │
+     │         ▼                                 ││       │
+     │  ┌──────────────┐                         ││       │
+     │  │ Queue Email  │──▶ RabbitMQ ──▶ Brevo ──┼┼──▶ Email
+     │  │ Invitation   │                         ││       │
+     │  └──────────────┘                         ││       │
+     │                                           ││       ▼
+     │                                           ││  ┌────────────┐
+     │                                           ││  │ POST       │
+     │                                           ││  │ /workspaces│
+     │                                           ││  │ /invitations│
+     │                                           ││  │ /accept    │
+     │                                           ││  └────┬───────┘
+     │                                           ││       │
+     │                                           ││       ▼
+     │                                           ││  Member added
+     │                                           ││  role: MEMBER
+     │                                           ││       │
+     │                                           ││       │
+     ├──────────── Manage Members ───────────────┘│       │
+     │  PUT /members/{id}/role   (ADMIN/MEMBER)   │       │
+     │  PUT /members/{id}/status (ACTIVE/SUSPENDED)│       │
+     │  DELETE /members/{id}     (remove)          │       │
+     │                                             │       │
+     ├──────────── Transfer Ownership ─────────────┘       │
+     │  POST /workspaces/{id}/transfer-ownership           │
+     │         │                                           │
+     │         ▼                                           │
+     │  Old owner → ADMIN, Target member → OWNER           │
+     │                                                     │
+     └──────────── Leave Workspace ────────────────────────┘
+        POST /workspaces/{id}/leave
+```
+
+### Subscriptions and Payments Flow
+
+```text
+  Client                      CueBX API                  Stripe                 RabbitMQ
+    │                            │                          │                      │
+    │  GET /plans                │                          │                      │
+    │ ──────────────────────────▶│                          │                      │
+    │  List available plans      │                          │                      │
+    │ ◀──────────────────────────│                          │                      │
+    │                            │                          │                      │
+    │  POST /checkout            │                          │                      │
+    │ ──────────────────────────▶│                          │                      │
+    │                            │  Create Checkout Session │                      │
+    │                            │ ────────────────────────▶│                      │
+    │                            │  Return session URL      │                      │
+    │                            │ ◀────────────────────────│                      │
+    │  Redirect to Stripe        │                          │                      │
+    │ ◀──────────────────────────│                          │                      │
+    │                            │                          │                      │
+    │  ═══════════ User completes payment on Stripe ═══════════                    │
+    │                            │                          │                      │
+    │                            │  Webhook: checkout       │                      │
+    │                            │  .session.completed      │                      │
+    │                            │ ◀────────────────────────│                      │
+    │                            │                          │                      │
+    │                            │  Verify signature        │                      │
+    │                            │  Publish to queue ──────────────────────────────▶│
+    │                            │                          │                      │
+    │                            │                          │              ┌───────▼───────┐
+    │                            │                          │              │ Worker:       │
+    │                            │                          │              │ Create        │
+    │                            │                          │              │ Subscription  │
+    │                            │                          │              │ + Quota       │
+    │                            │                          │              │ + Email       │
+    │                            │                          │              └───────────────┘
+    │                            │                          │                      │
+    │  ═══════════ Ongoing subscription management ═════════════                   │
+    │                            │                          │                      │
+    │  GET /preview-upgrade      │                          │                      │
+    │ ──────────────────────────▶│  Preview proration       │                      │
+    │ ◀──────────────────────────│ ◀───────────────────────▶│                      │
+    │                            │                          │                      │
+    │  POST /upgrade             │  Update subscription     │                      │
+    │ ──────────────────────────▶│ ────────────────────────▶│                      │
+    │ ◀──────────────────────────│ ◀────────────────────────│                      │
+    │                            │                          │                      │
+    │  POST /cancel              │  Cancel at period end    │                      │
+    │ ──────────────────────────▶│ ────────────────────────▶│                      │
+    │ ◀──────────────────────────│ ◀────────────────────────│                      │
+    │                            │                          │                      │
+    │                            │  Webhook: subscription   │                      │
+    │                            │  .updated / .deleted     │                      │
+    │                            │ ◀────────────────────────│                      │
+    │                            │  Publish to queue ──────────────────────────────▶│
+    │                            │                          │              ┌───────▼───────┐
+    │                            │                          │              │ Worker:       │
+    │                            │                          │              │ Update/Delete │
+    │                            │                          │              │ Subscription  │
+    │                            │                          │              │ + Email       │
+    │                            │                          │              └───────────────┘
+```
+
+### Messaging Pipeline
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                          12 Queue Triplets                                       │
+│                                                                                  │
+│  Email Queues:          otp_emails, password_reset_confirmation_emails,          │
+│                         subscription_activated_emails, subscription_canceled_*,  │
+│                         payment_failed_emails, workspace_invitation_emails       │
+│                                                                                  │
+│  Stripe Queues:         stripe_checkout_completed, stripe_subscription_updated,  │
+│                         stripe_subscription_deleted, stripe_payment_failed       │
+│                                                                                  │
+│  Usage Queues:          usage_commits, career_usage_commits                      │
+└──────────────────────────────────────────────────────────────────────────────────┘
+
+For each queue:
+
+  Publisher                Main Queue               Handler
+     │                        │                        │
+     │   publish_event()      │                        │
+     │ ──────────────────────▶│   process_message()    │
+     │                        │ ──────────────────────▶│
+     │                        │                        │
+     │                        │          ┌─────────────┤
+     │                        │          │             │
+     │                        │     (success)     (failure)
+     │                        │          │             │
+     │                        │          ▼             ▼
+     │                        │        [ACK]     Check x-retry-attempt
+     │                        │                        │
+     │                        │          ┌─────────────┤
+     │                        │          │             │
+     │                        │   (retries left)  (retries exhausted)
+     │                        │          │             │
+     │                        │          ▼             ▼
+     │                        │   ┌────────────┐  ┌────────────────┐
+     │                        │   │Retry Queue │  │Dead Letter     │
+     │                        │   │ (with TTL) │  │Queue           │
+     │                        │   └─────┬──────┘  └───────┬────────┘
+     │                        │         │                 │
+     │                        │   (TTL expires)     ┌─────▼─────┐
+     │                        │         │           │ Email     │
+     │                        │◀────────┘           │ Alert to  │
+     │                        │ (re-delivered       │ Admin     │
+     │                        │  to main queue)     └───────────┘
+
+  Retry Config:
+    Email queues:   TTL 30s, max 3 retries
+    Stripe queues:  TTL 60s, max 3-5 retries
+    Usage queues:   TTL 30s, max 3 retries
+```
+
+> **Deep dive:** See [app/infrastructure/messaging/README.md](app/infrastructure/messaging/README.md) for handler examples, multi-retry strategies, and troubleshooting.
+
+### Usage and Quota Enforcement
+
+```text
+  External Service                CueBX Internal API            QuotaCacheService
+       │                                │                              │
+       │  POST /internal/usage/validate │                              │
+       │  Headers: X-Internal-API-Key   │                              │
+       │ ──────────────────────────────▶│                              │
+       │                                │  Check quota + rate limit    │
+       │                                │ ────────────────────────────▶│
+       │                                │                              │
+       │                                │    ┌─────────────────────────┤
+       │                                │    │                         │
+       │                                │ (within quota)         (exceeded)
+       │                                │    │                         │
+       │                                │    ▼                         ▼
+       │  200 OK (allowed)              │  Return OK              Return 429
+       │ ◀──────────────────────────────│◀─────────────────────────────│
+       │                                │                              │
+       │  ═══════ Service performs the AI operation ═══════            │
+       │                                │                              │
+       │  POST /internal/usage/commit   │                              │
+       │ ──────────────────────────────▶│                              │
+       │                                │  Decrement credits           │
+       │                                │ ────────────────────────────▶│
+       │                                │  Create UsageLog (COMMITTED) │
+       │  200 OK                        │  Publish to usage queue      │
+       │ ◀──────────────────────────────│ ──────▶ RabbitMQ             │
+       │                                │                              │
+
+  Quota Cache (Redis or Memory):
+    ┌──────────────────────────────────────────────────────┐
+    │  Per-workspace snapshot:                             │
+    │    credits_remaining, credits_used, rate counters    │
+    │                                                      │
+    │  Loaded from:                                        │
+    │    PlanPricingRule (credits, rate limits)             │
+    │    FeatureCostConfig (per-feature credit costs)      │
+    │    Subscription status + plan tier                   │
+    │                                                      │
+    │  Refreshed on:                                       │
+    │    Subscription change, plan upgrade, cache miss     │
+    └──────────────────────────────────────────────────────┘
+```
+
+### Scheduler Jobs
+
+```text
+  APScheduler (AsyncIOScheduler)
+  Persistent job stores backed by PostgreSQL
+       │
+       ├──── Job Store: "cleanups" ────────────────────────────────┐
+       │     Table: scheduler_cleanup_jobs                         │
+       │                                                           │
+       │     ┌─────────────────────────────────────────────┐       │
+       │     │ cleanup_soft_deleted_users                   │       │
+       │     │ Trigger: CronTrigger, daily at 03:00 UTC    │       │
+       │     │ Action: Permanently delete users where       │       │
+       │     │   is_deleted=True and deleted_at > 30 days   │       │
+       │     └─────────────────────────────────────────────┘       │
+       │                                                           │
+       ├──── Job Store: "usage_logs" ──────────────────────────────┤
+       │     Table: scheduler_usage_log_jobs                       │
+       │                                                           │
+       │     ┌─────────────────────────────────────────────┐       │
+       │     │ expire_pending_usage_logs                    │       │
+       │     │ Trigger: IntervalTrigger, every 5 minutes    │       │
+       │     │ Action: Set status=EXPIRED for usage logs    │       │
+       │     │   with status=PENDING older than 15 min      │       │
+       │     └─────────────────────────────────────────────┘       │
+       │                                                           │
+       │     ┌─────────────────────────────────────────────┐       │
+       │     │ expire_pending_career_usage_logs             │       │
+       │     │ Trigger: IntervalTrigger, every 5 minutes    │       │
+       │     │ Action: Same as above for career usage logs  │       │
+       │     └─────────────────────────────────────────────┘       │
+       │                                                           │
+       └───────────────────────────────────────────────────────────┘
+
+  Standalone mode initializes: Database, Redis, Brevo, Renderer
+  before starting the scheduler event loop.
+```
+
+> **Deep dive:** See [app/infrastructure/scheduler/README.md](app/infrastructure/scheduler/README.md) for job configuration, custom triggers, and Docker usage.
+
+---
+
+## Project Structure
+
+```text
+cubex/
+├── app/
+│   ├── main.py                         # FastAPI app, lifespan, middleware, routers
+│   ├── admin/                          # SQLAdmin panel (/admin)
+│   │   ├── auth.py                     #   HMAC-signed admin authentication
+│   │   ├── views.py                    #   Model views (Plan, User, Workspace, …)
+│   │   └── setup.py                    #   Mount admin on FastAPI app
+│   ├── apps/
+│   │   ├── cubex_api/                  # Workspace product
+│   │   │   ├── db/                     #   Models + CRUD (Workspace, WorkspaceMember, …)
+│   │   │   ├── routers/                #   Workspace, Subscription, Support, Internal
+│   │   │   ├── schemas/                #   Pydantic request/response models
+│   │   │   ├── services/               #   Business logic (workspace, subscription, quota)
+│   │   │   └── dependencies.py         #   Auth + workspace access guards
+│   │   └── cubex_career/               # Career product (same layout)
+│   │       ├── db/
+│   │       ├── routers/
+│   │       ├── schemas/
+│   │       ├── services/
+│   │       └── dependencies.py
+│   ├── core/
+│   │   ├── config.py                   # Pydantic Settings + 18 component loggers
+│   │   ├── enums.py                    # All shared enums
+│   │   ├── utils.py                    # Utility functions
+│   │   ├── logger.py                   # Logger + Sentry setup
+│   │   ├── data/                       #   plans.json (subscription plan seed data)
+│   │   ├── db/                         #   SQLAlchemy engine, base model, shared CRUD
+│   │   ├── dependencies/               #   Session, auth, internal API key deps
+│   │   ├── exceptions/                 #   Custom exception types + 17 handlers
+│   │   ├── routers/                    #   Auth router, Webhook router
+│   │   ├── schemas/                    #   Shared Pydantic schemas
+│   │   └── services/                   #   Auth, Redis, Brevo, Cloudinary, QuotaCache, OAuth…
+│   ├── infrastructure/
+│   │   ├── messaging/                  # RabbitMQ: connection, publisher, consumer, queues
+│   │   │   └── handlers/              #   Email, Stripe event, usage commit handlers
+│   │   └── scheduler/                  # APScheduler: jobs + standalone entrypoint
+│   └── templates/                      # Jinja2 templates (emails, alerts)
+├── migrations/                         # Alembic migration versions
+├── tests/                              # Pytest test suite (1600+ tests)
+├── manage.py                           # Typer CLI (runserver, migrate, syncplans, …)
+├── docker-compose.yml                  # Local dev: API + Scheduler + Worker + Postgres + Redis + RabbitMQ
+├── Dockerfile                          # Multi-stage: api / scheduler / worker targets
+├── render.yaml                         # Render deployment blueprint
+├── alembic.ini                         # Alembic configuration
+├── pyproject.toml                      # Project metadata + pytest config
+├── requirements.txt                    # Runtime dependencies
+└── requirements-dev.txt                # Dev/test dependencies
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Python 3.13+** (see `.python-version`)
+- **Docker & Docker Compose** (for PostgreSQL, Redis, RabbitMQ)
+- **Git**
+
+### 1. Clone and set up the virtual environment
+
+```bash
+git clone https://github.com/OluwaFavour/cubex.git
+cd cubex
+python -m venv .venv
+
+# Linux / macOS
+source .venv/bin/activate
+
+# Windows
+.\.venv\Scripts\Activate.ps1
+
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
+
+### 2. Configure environment variables
+
+```bash
+cp .env.example .env
+# Edit .env with your values (DATABASE_URL, REDIS_URL, etc.)
+```
+
+### 3. Start infrastructure services
+
+```bash
+docker compose --profile dev up -d
+```
+
+This starts **PostgreSQL 16**, **Redis 7**, and **RabbitMQ 3** with management UI.
+
+### 4. Run database migrations and seed plans
+
+```bash
+python manage.py migrate
+python manage.py syncplans
+```
+
+### 5. Start the development server
+
+```bash
+python manage.py runserver
+```
+
+The API is now available at **<http://localhost:8000>**. Visit:
+
+- **Swagger UI:** <http://localhost:8000/docs>
+- **ReDoc:** <http://localhost:8000/redoc>
+- **Admin Panel:** <http://localhost:8000/admin>
+- **RabbitMQ Management:** <http://localhost:15672> (guest/guest)
+
+---
+
+## Docker
+
+### Build targets
+
+The Dockerfile provides three build targets:
+
+| Target | Description | Command |
+| -------- | ------------ | --------- |
+| `api` | FastAPI server on port 8000 | `uvicorn app.main:app --host 0.0.0.0 --port 8000` |
+| `scheduler` | APScheduler background jobs | `python -m app.infrastructure.scheduler.main` |
+| `worker` | RabbitMQ message consumer | `python -m app.infrastructure.messaging.main` |
+
+```bash
+# Build individual targets
+docker build --target api -t cubex-api .
+docker build --target scheduler -t cubex-scheduler .
+docker build --target worker -t cubex-worker .
+```
+
+### Compose profiles
+
+| Profile | Services | Use Case |
+| --------- | ---------- | ---------- |
+| `dev` | api + scheduler + worker + postgres + redis + rabbitmq | Full local development |
+| `api-only` | api only | When infra services run externally |
+| `scheduler-only` | scheduler only | Isolated scheduler deployment |
+| `worker-only` | worker only | Isolated worker deployment |
+
+```bash
+# Full local environment
+docker compose --profile dev up -d
+
+# Only the API (external Postgres, Redis, RabbitMQ)
+docker compose --profile api-only up -d
+
+# Run migrations in Docker
+docker compose run --rm api alembic upgrade head
+
+# View logs
+docker compose logs -f api
+docker compose logs -f worker scheduler
+```
+
+---
+
+## CLI Reference
+
+All commands are run via `python manage.py <command>`.
+
+| Command | Description |
+| --------- | ------------- |
+| `runserver` | Start Uvicorn dev server (auto-reload in debug mode) |
+| `migrate` | Run `alembic upgrade head` |
+| `makemigrations [comment]` | Generate a new Alembic migration (`--autogenerate`) |
+| `showmigrations` | Show Alembic migration history |
+| `clearalembic` | Delete all rows from `alembic_version` table |
+| `createextensions <exts>` | Ensure PostgreSQL extensions exist (e.g. `citext`) |
+| `syncplans [--dry-run]` | Upsert subscription plans from `app/core/data/plans.json` |
+| `generateopenapi` | Re-generate `openapi.json` from current app |
+| `runbroker` | Start RabbitMQ via Docker |
+| `startngrok` | Expose localhost:8000 via ngrok tunnel |
+
+---
+
+## API Endpoints
+
+The API is organized into 8 route groups with 53 endpoints total:
+
+| Prefix | Tag | Endpoints | Description |
+| -------- | ----- | ----------- | ------------- |
+| `/auth` | Authentication | 14 | Signup, signin, OTP verify, OAuth, JWT refresh, password reset, sessions, profile |
+| `/webhooks` | Webhooks | 1 | Stripe webhook receiver |
+| `/api` | API - Workspaces | 14 | CRUD, members, invitations, API keys, ownership transfer |
+| `/api` | API - Subscriptions | 9 | Plans, checkout, seats, upgrade, cancel, reactivate |
+| `/api` | API - Support | 1 | Contact sales form |
+| `/api` | API - Internal API | 2 | Usage validate + commit (service-to-service) |
+| `/career` | Career - Subscriptions | 8 | Plans, checkout, upgrade, cancel, activate |
+| `/career` | Career - Internal API | 2 | Usage validate + commit (service-to-service) |
+| `/health` | Health Check | 1 | DB + Redis connectivity check |
+
+**Full reference:** Start the server and visit `/docs` (Swagger) or `/redoc`.
+
+---
+
+## Environment Variables
+
+### Application
+
+| Variable | Description | Default |
+| ---------- | ------------- | --------- |
+| `ENVIRONMENT` | `development` or `production` | `development` |
+| `API_DOMAIN` | Public API URL | `http://localhost:8000` |
+| `DEBUG` | Enable debug mode | `false` |
+| `ROOT_PATH` | API version prefix | `/v1` |
+
+### Database & Cache
+
+| Variable | Description | Default |
+| ---------- | ------------- | --------- |
+| `DATABASE_URL` | PostgreSQL connection string (asyncpg) | **required** |
+| `REDIS_URL` | Redis connection string | `redis://localhost:6379/0` |
+| `RABBITMQ_URL` | RabbitMQ AMQP connection string | `amqp://guest:guest@localhost:5672//` |
+
+### Authentication
+
+| Variable | Description | Default |
+| ---------- | ------------- | --------- |
+| `JWT_SECRET_KEY` | JWT signing secret | `another_supersecret_key` * |
+| `SESSION_SECRET_KEY` | Session cookie signing secret | `supersecretkey` * |
+| `OTP_HMAC_SECRET` | HMAC key for OTP generation | `otp_hmac_secret_key_change_in_production` * |
+
+### OAuth
+
+| Variable | Description | Default |
+| ---------- | ------------- | --------- |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | (empty) |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | (empty) |
+| `GITHUB_CLIENT_ID` | GitHub OAuth client ID | (empty) |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret | (empty) |
+| `OAUTH_REDIRECT_BASE_URI` | OAuth callback base URL | `http://localhost:8000/auth` |
+
+### External Services
+
+| Variable | Description | Default |
+| ---------- | ------------- | --------- |
+| `STRIPE_API_KEY` | Stripe secret API key | `your_stripe_api_key` * |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | `your_stripe_webhook_secret` * |
+| `BREVO_API_KEY` | Brevo email API key | `your_brevo_api_key` |
+| `BREVO_SENDER_EMAIL` | From email address | `your_brevo_sender_email` |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | `your_cloudinary_cloud_name` |
+| `CLOUDINARY_API_KEY` | Cloudinary API key | `your_cloudinary_api_key` |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret | `your_cloudinary_api_secret` |
+
+### Admin & Monitoring
+
+| Variable | Description | Default |
+| ---------- | ------------- | --------- |
+| `ADMIN_USERNAME` | SQLAdmin login username | `admin` |
+| `ADMIN_PASSWORD` | SQLAdmin login password | `admin_password_change_in_production` * |
+| `INTERNAL_API_SECRET` | Service-to-service API key | `internal_api_secret_change_in_production` * |
+| `SENTRY_DSN` | Sentry error tracking DSN | (empty) |
+| `SENTRY_ENVIRONMENT` | Sentry environment label | `development` |
+| `ADMIN_ALERT_EMAIL` | Email for DLQ/system alerts | (none) |
+
+### Infrastructure Flags
+
+| Variable | Description | Default |
+| ---------- | ------------- | --------- |
+| `ENABLE_SCHEDULER` | Start APScheduler in API process | `true` |
+| `ENABLE_MESSAGING` | Start RabbitMQ consumers in API process | `true` |
+
+> \* Marked variables **must** be changed in production. The app validates this at startup when `ENVIRONMENT=production` and will refuse to start if insecure defaults are detected.
+
+See `.env.example` for a copy-paste template with all variables.
+
+---
+
+## Testing
+
+The test suite uses **pytest** with real PostgreSQL (via testcontainers), automatic transaction rollback, and auto-mocked external services.
+
+```bash
+# Run full suite
+pytest
+
+# Run with short output (recommended for large suites)
+pytest tests/ -x -q --tb=short
+
+# Run specific module
+pytest tests/core/routers/test_auth.py
+
+# Run with coverage report
+pytest --cov=app --cov-report=html
+# Then open htmlcov/index.html
+
+# Skip slow tests
+pytest -m "not slow"
+```
+
+### Test markers
+
+| Marker | Purpose |
+| -------- | --------- |
+| `slow` | Long-running tests |
+| `integration` | Integration tests requiring real services |
+| `unit` | Pure unit tests |
+
+### Coverage
+
+Coverage is configured in `pyproject.toml` and reports against the `app/` package. CI uploads results to Codecov.
+
+> **Full guide:** See [tests/README.md](tests/README.md) for fixture reference, endpoint testing patterns, custom fixtures, and troubleshooting.
+
+---
+
+## Deployment
+
+> **Note:** The Render deployment is temporary and subject to change.
+
+### Render (current)
+
+The project deploys to [Render](https://render.com) as three services defined in `render.yaml`:
+
+| Service | Type | Plan | Docker Target |
+| --------- | ------ | ------ | --------------- |
+| cubex-api | Web Service | Free | `api` |
+| cubex-worker | Background Worker | Starter | `worker` |
+| cubex-scheduler | Background Worker | Starter | `scheduler` |
+
+**Pre-deploy command:** `pip install -r requirements.txt && alembic upgrade head`
+
+**Auto-generated secrets** (via Render): `SESSION_SECRET_KEY`, `JWT_SECRET_KEY`, `OTP_HMAC_SECRET`, `INTERNAL_API_SECRET`, `ADMIN_PASSWORD`
+
+**Manual secrets** (set in Render dashboard): `DATABASE_URL`, `REDIS_URL`, `RABBITMQ_URL`, all Stripe keys, all OAuth keys, Brevo keys, Sentry DSN, Cloudinary keys.
+
+### CI
+
+GitHub Actions runs the full test suite on every push/PR to `main` and `dev`. See `.github/workflows/tests.yml`.
+
+---
+
+## Contributing
+
+### Branch naming
+
+Use the following prefixes when creating branches:
+
+| Prefix | Purpose | Example |
+| -------- | --------- | --------- |
+| `feature/` | New features | `feature/dlq-dashboard` |
+| `fix/` | Bug fixes | `fix/scheduler-auth-failure` |
+| `refactor/` | Code restructuring | `refactor/quota-cache-pattern` |
+
+### Workflow
+
+1. **Sync with `dev`** — always pull the latest `dev` before starting work.
+
+   ```bash
+   git checkout dev
+   git pull origin dev
+   ```
+
+2. **Create a branch from `dev`** — never branch from `main` directly.
+
+   ```bash
+   git checkout -b feature/my-feature
+   ```
+
+3. **Make your changes** — write tests for new functionality, ensure existing tests pass.
+
+   ```bash
+   pytest tests/ -x -q --tb=short
+   ```
+
+4. **Sync with `dev` before pushing** — rebase or merge to resolve conflicts early.
+
+   ```bash
+   git fetch origin dev
+   git rebase origin/dev
+   ```
+
+5. **Push and create a Pull Request** — target `dev` as the base branch.
+
+   ```bash
+   git push origin feature/my-feature
+   ```
+
+6. **PR requirements:**
+   - All tests pass in CI
+   - Descriptive PR title and description
+   - Link to any related GitHub issues
+
+### Code style
+
+- **Formatter:** Black
+- **Linter:** Ruff
+- **Type checker:** Pyright
+
+---
+
+## License
+
+> *(To be added)*
+
+---
+
+## Submodule Docs
+
+Detailed documentation for specific subsystems:
+
+- **[Messaging Infrastructure](app/infrastructure/messaging/README.md)** — RabbitMQ queues, retry strategies, DLQ, handlers, consumer setup
+- **[Scheduler Infrastructure](app/infrastructure/scheduler/README.md)** — APScheduler jobs, job stores, standalone mode, Docker usage
+- **[Test Suite](tests/README.md)** — Fixtures, endpoint testing guide, coverage, writing tests
