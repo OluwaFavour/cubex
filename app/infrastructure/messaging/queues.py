@@ -196,3 +196,4 @@ def get_queue_configs() -> list[QueueConfig]:
         QueueConfig.model_validate(config, from_attributes=True)
         for config in QUEUE_CONFIG
     ]
+

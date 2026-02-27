@@ -1,8 +1,6 @@
 """
 CRUD operations for Career usage log model.
 
-This module provides database operations for managing career usage logs,
-including idempotency checks, committing, expiring, and credit summation.
 """
 
 from datetime import datetime, timezone
@@ -279,3 +277,4 @@ __all__ = [
     "CareerUsageLogDB",
     "career_usage_log_db",
 ]
+

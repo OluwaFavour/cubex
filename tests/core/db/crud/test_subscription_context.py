@@ -1,10 +1,6 @@
 """
 Test suite for Subscription Context CRUD operations.
 
-This module contains comprehensive unit tests for the APISubscriptionContextDB
-and CareerSubscriptionContextDB CRUD classes. Tests cover all CRUD operations
-including context creation, retrieval by workspace/user, and retrieval by subscription.
-
 Run all tests:
     pytest tests/core/db/crud/test_subscription_context.py -v
 
@@ -31,47 +27,38 @@ from app.core.db.models.subscription_context import (
 
 
 class TestAPISubscriptionContextDBImport:
-    """Test suite for APISubscriptionContextDB import and initialization."""
 
     def test_import_api_subscription_context_db(self):
-        """Test that APISubscriptionContextDB can be imported."""
         assert APISubscriptionContextDB is not None
 
     def test_import_from_crud_module(self):
-        """Test that api_subscription_context_db can be imported from crud module."""
         from app.core.db.crud import api_subscription_context_db
 
         assert api_subscription_context_db is not None
 
     def test_api_subscription_context_db_instance(self):
-        """Test that APISubscriptionContextDB can be instantiated."""
         db = APISubscriptionContextDB()
         assert db is not None
         assert db.model == APISubscriptionContext
 
 
 class TestCareerSubscriptionContextDBImport:
-    """Test suite for CareerSubscriptionContextDB import and initialization."""
 
     def test_import_career_subscription_context_db(self):
-        """Test that CareerSubscriptionContextDB can be imported."""
         assert CareerSubscriptionContextDB is not None
 
     def test_import_from_crud_module(self):
-        """Test that career_subscription_context_db can be imported from crud module."""
         from app.core.db.crud import career_subscription_context_db
 
         assert career_subscription_context_db is not None
 
     def test_career_subscription_context_db_instance(self):
-        """Test that CareerSubscriptionContextDB can be instantiated."""
         db = CareerSubscriptionContextDB()
         assert db is not None
         assert db.model == CareerSubscriptionContext
 
 
 class TestAPISubscriptionContextDBGetByWorkspace:
-    """Test suite for APISubscriptionContextDB.get_by_workspace method."""
 
     @pytest.fixture
     def api_context_db(self):
@@ -80,7 +67,6 @@ class TestAPISubscriptionContextDBGetByWorkspace:
 
     @pytest.mark.asyncio
     async def test_get_by_workspace_returns_context(self, api_context_db):
-        """Test that get_by_workspace returns context when found."""
         mock_session = AsyncMock()
         workspace_id = uuid4()
         subscription_id = uuid4()
@@ -109,7 +95,6 @@ class TestAPISubscriptionContextDBGetByWorkspace:
 
     @pytest.mark.asyncio
     async def test_get_by_workspace_returns_none_when_not_found(self, api_context_db):
-        """Test that get_by_workspace returns None when context not found."""
         mock_session = AsyncMock()
         workspace_id = uuid4()
 
@@ -125,7 +110,6 @@ class TestAPISubscriptionContextDBGetByWorkspace:
 
     @pytest.mark.asyncio
     async def test_get_by_workspace_filters_deleted(self, api_context_db):
-        """Test that get_by_workspace excludes deleted contexts."""
         mock_session = AsyncMock()
         workspace_id = uuid4()
 
@@ -142,7 +126,6 @@ class TestAPISubscriptionContextDBGetByWorkspace:
 
 
 class TestAPISubscriptionContextDBGetBySubscription:
-    """Test suite for APISubscriptionContextDB.get_by_subscription method."""
 
     @pytest.fixture
     def api_context_db(self):
@@ -151,7 +134,6 @@ class TestAPISubscriptionContextDBGetBySubscription:
 
     @pytest.mark.asyncio
     async def test_get_by_subscription_returns_context(self, api_context_db):
-        """Test that get_by_subscription returns context when found."""
         mock_session = AsyncMock()
         workspace_id = uuid4()
         subscription_id = uuid4()
@@ -176,7 +158,6 @@ class TestAPISubscriptionContextDBGetBySubscription:
     async def test_get_by_subscription_returns_none_when_not_found(
         self, api_context_db
     ):
-        """Test that get_by_subscription returns None when context not found."""
         mock_session = AsyncMock()
         subscription_id = uuid4()
 
@@ -192,7 +173,6 @@ class TestAPISubscriptionContextDBGetBySubscription:
 
 
 class TestCareerSubscriptionContextDBGetByUser:
-    """Test suite for CareerSubscriptionContextDB.get_by_user method."""
 
     @pytest.fixture
     def career_context_db(self):
@@ -201,7 +181,6 @@ class TestCareerSubscriptionContextDBGetByUser:
 
     @pytest.mark.asyncio
     async def test_get_by_user_returns_context(self, career_context_db):
-        """Test that get_by_user returns context when found."""
         mock_session = AsyncMock()
         user_id = uuid4()
         subscription_id = uuid4()
@@ -224,7 +203,6 @@ class TestCareerSubscriptionContextDBGetByUser:
 
     @pytest.mark.asyncio
     async def test_get_by_user_returns_none_when_not_found(self, career_context_db):
-        """Test that get_by_user returns None when context not found."""
         mock_session = AsyncMock()
         user_id = uuid4()
 
@@ -240,7 +218,6 @@ class TestCareerSubscriptionContextDBGetByUser:
 
     @pytest.mark.asyncio
     async def test_get_by_user_filters_deleted(self, career_context_db):
-        """Test that get_by_user excludes deleted contexts."""
         mock_session = AsyncMock()
         user_id = uuid4()
 
@@ -257,7 +234,6 @@ class TestCareerSubscriptionContextDBGetByUser:
 
 
 class TestCareerSubscriptionContextDBGetBySubscription:
-    """Test suite for CareerSubscriptionContextDB.get_by_subscription method."""
 
     @pytest.fixture
     def career_context_db(self):
@@ -266,7 +242,6 @@ class TestCareerSubscriptionContextDBGetBySubscription:
 
     @pytest.mark.asyncio
     async def test_get_by_subscription_returns_context(self, career_context_db):
-        """Test that get_by_subscription returns context when found."""
         mock_session = AsyncMock()
         user_id = uuid4()
         subscription_id = uuid4()
@@ -291,7 +266,6 @@ class TestCareerSubscriptionContextDBGetBySubscription:
     async def test_get_by_subscription_returns_none_when_not_found(
         self, career_context_db
     ):
-        """Test that get_by_subscription returns None when context not found."""
         mock_session = AsyncMock()
         subscription_id = uuid4()
 
@@ -307,10 +281,8 @@ class TestCareerSubscriptionContextDBGetBySubscription:
 
 
 class TestSubscriptionContextDBInheritance:
-    """Test that context DB classes inherit from BaseDB correctly."""
 
     def test_api_context_db_inherits_base_methods(self):
-        """Test that APISubscriptionContextDB inherits BaseDB methods."""
         db = APISubscriptionContextDB()
 
         # BaseDB methods should be available
@@ -321,7 +293,6 @@ class TestSubscriptionContextDBInheritance:
         assert hasattr(db, "delete")
 
     def test_career_context_db_inherits_base_methods(self):
-        """Test that CareerSubscriptionContextDB inherits BaseDB methods."""
         db = CareerSubscriptionContextDB()
 
         # BaseDB methods should be available
@@ -333,11 +304,9 @@ class TestSubscriptionContextDBInheritance:
 
 
 class TestSubscriptionContextDBCreate:
-    """Test context creation operations."""
 
     @pytest.mark.asyncio
     async def test_api_context_create(self):
-        """Test creating API subscription context."""
         mock_session = AsyncMock()
         mock_session.add = MagicMock()
         mock_session.flush = AsyncMock()
@@ -365,7 +334,6 @@ class TestSubscriptionContextDBCreate:
 
     @pytest.mark.asyncio
     async def test_career_context_create(self):
-        """Test creating Career subscription context."""
         mock_session = AsyncMock()
         mock_session.add = MagicMock()
         mock_session.flush = AsyncMock()
@@ -390,3 +358,4 @@ class TestSubscriptionContextDBCreate:
 
             assert result.user_id == user_id
             assert result.subscription_id == subscription_id
+

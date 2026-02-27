@@ -1,8 +1,6 @@
 """
 Redis service for caching and rate limiting.
 
-This module provides a singleton Redis client for async operations
-including caching, rate limiting counters, and distributed state management.
 """
 
 from __future__ import annotations
@@ -365,7 +363,6 @@ class RedisService:
             return False
 
         try:
-            # SET key value NX EX ttl - atomically set if not exists with expiry
             result = await cls._client.set(key, value, nx=True, ex=ttl)
             was_set = result is not None
             redis_logger.debug(
@@ -614,3 +611,4 @@ class RedisService:
 
 
 __all__ = ["RedisService"]
+

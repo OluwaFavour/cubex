@@ -39,11 +39,6 @@ from app.core.enums import (
 )
 
 
-# ============================================================================
-# Plan Management
-# ============================================================================
-
-
 class PlanAdmin(ModelView, model=Plan):
     """Admin view for subscription plans."""
 
@@ -216,11 +211,6 @@ class PlanAdmin(ModelView, model=Plan):
     }
 
 
-# ============================================================================
-# Quota Configuration
-# ============================================================================
-
-
 class FeatureCostConfigAdmin(ModelView, model=FeatureCostConfig):
     """Admin view for feature pricing configuration."""
 
@@ -342,11 +332,6 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
         return super().details_query(request).options(plan_pricing_rule_db.plan_loader)
 
 
-# ============================================================================
-# User Management (Read-Only)
-# ============================================================================
-
-
 class UserAdmin(ModelView, model=User):
     """Admin view for users (read-only)."""
 
@@ -395,11 +380,6 @@ class UserAdmin(ModelView, model=User):
     can_delete = False
     can_view_details = True
     can_export = True
-
-
-# ============================================================================
-# Workspace Management (Read-Only)
-# ============================================================================
 
 
 class WorkspaceAdmin(ModelView, model=Workspace):
@@ -499,11 +479,6 @@ class WorkspaceMemberAdmin(ModelView, model=WorkspaceMember):
     can_export = True
 
 
-# ============================================================================
-# Subscription Management
-# ============================================================================
-
-
 class SubscriptionAdmin(ModelView, model=Subscription):
     """Admin view for subscriptions."""
 
@@ -577,11 +552,6 @@ class SubscriptionAdmin(ModelView, model=Subscription):
     can_export = True
 
 
-# ============================================================================
-# Custom Filters
-# ============================================================================
-
-
 class DateRangeFilter:
     """Custom filter for date range filtering on datetime columns."""
 
@@ -645,11 +615,6 @@ class DateRangeFilter:
             )
 
         return query
-
-
-# ============================================================================
-# Usage Log Management (Read-Only)
-# ============================================================================
 
 
 class UsageLogAdmin(ModelView, model=UsageLog):
@@ -801,3 +766,4 @@ __all__ = [
     "SubscriptionAdmin",
     "UsageLogAdmin",
 ]
+

@@ -12,11 +12,6 @@ from app.apps.cubex_api.schemas.subscription import PlanResponse
 from app.core.enums import SubscriptionStatus
 
 
-# ============================================================================
-# Subscription Schemas
-# ============================================================================
-
-
 class CareerSubscriptionResponse(BaseModel):
     """Schema for Career subscription response."""
 
@@ -46,11 +41,6 @@ class CareerSubscriptionResponse(BaseModel):
     cancel_at_period_end: bool
     canceled_at: datetime | None
     plan: PlanResponse | None = None
-
-
-# ============================================================================
-# Checkout Schemas
-# ============================================================================
 
 
 class CareerCheckoutRequest(BaseModel):
@@ -85,11 +75,6 @@ class CareerCheckoutResponse(BaseModel):
 
     checkout_url: str
     session_id: str
-
-
-# ============================================================================
-# Upgrade Schemas
-# ============================================================================
 
 
 class CareerUpgradePreviewRequest(BaseModel):
@@ -148,11 +133,6 @@ class CareerUpgradeRequest(BaseModel):
     new_plan_id: UUID
 
 
-# ============================================================================
-# Cancel Schema
-# ============================================================================
-
-
 class CareerCancelRequest(BaseModel):
     """Schema for canceling Career subscription."""
 
@@ -161,11 +141,6 @@ class CareerCancelRequest(BaseModel):
     )
 
     cancel_at_period_end: bool = True
-
-
-# ============================================================================
-# Message Schema
-# ============================================================================
 
 
 class CareerMessageResponse(BaseModel):
@@ -191,3 +166,4 @@ __all__ = [
     "CareerCancelRequest",
     "CareerMessageResponse",
 ]
+

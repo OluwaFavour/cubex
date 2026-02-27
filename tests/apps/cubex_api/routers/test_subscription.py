@@ -11,11 +11,6 @@ from uuid import uuid4
 from app.core.enums import SubscriptionStatus
 
 
-# ============================================================================
-# Test List Plans
-# ============================================================================
-
-
 class TestListPlans:
     """Tests for GET /api/subscriptions/plans"""
 
@@ -29,7 +24,6 @@ class TestListPlans:
         assert "plans" in data
         assert len(data["plans"]) >= 1
 
-        # Verify plan structure
         plan = data["plans"][0]
         assert "id" in plan
         assert "name" in plan
@@ -57,11 +51,6 @@ class TestListPlans:
 
         # Plans should be publicly accessible
         assert response.status_code == 200
-
-
-# ============================================================================
-# Test Get Plan
-# ============================================================================
 
 
 class TestGetPlan:
@@ -97,11 +86,6 @@ class TestGetPlan:
         data = response.json()
         assert "min_seats" in data
         assert "max_seats" in data
-
-
-# ============================================================================
-# Test Get Workspace Subscription
-# ============================================================================
 
 
 class TestGetWorkspaceSubscription:
@@ -182,11 +166,6 @@ class TestGetWorkspaceSubscription:
         assert "features" in data["plan"]
 
 
-# ============================================================================
-# Test Create Checkout
-# ============================================================================
-
-
 class TestCreateCheckout:
     """Tests for POST /api/subscriptions/workspaces/{workspace_id}/checkout"""
 
@@ -250,11 +229,6 @@ class TestCreateCheckout:
         assert response.status_code == 422
 
 
-# ============================================================================
-# Test Update Seats
-# ============================================================================
-
-
 class TestUpdateSeats:
     """Tests for PATCH /api/subscriptions/workspaces/{workspace_id}/seats"""
 
@@ -308,11 +282,6 @@ class TestUpdateSeats:
         assert response.status_code == 422
 
 
-# ============================================================================
-# Test Cancel Subscription
-# ============================================================================
-
-
 class TestCancelSubscription:
     """Tests for POST /api/subscriptions/workspaces/{workspace_id}/cancel"""
 
@@ -353,11 +322,6 @@ class TestCancelSubscription:
         assert response.status_code == 404
 
 
-# ============================================================================
-# Test Reactivate Workspace
-# ============================================================================
-
-
 class TestReactivateWorkspace:
     """Tests for POST /api/subscriptions/workspaces/{workspace_id}/reactivate"""
 
@@ -393,11 +357,6 @@ class TestReactivateWorkspace:
 
         # May succeed or fail based on business logic, but should not error on format
         assert response.status_code in [200, 400, 404]
-
-
-# ============================================================================
-# Test Preview Upgrade
-# ============================================================================
 
 
 class TestPreviewUpgrade:
@@ -455,11 +414,6 @@ class TestPreviewUpgrade:
         assert response.status_code == 404
 
 
-# ============================================================================
-# Test Upgrade Plan
-# ============================================================================
-
-
 class TestUpgradePlan:
     """Tests for POST /api/subscriptions/workspaces/{workspace_id}/upgrade"""
 
@@ -513,11 +467,6 @@ class TestUpgradePlan:
         )
 
         assert response.status_code == 404
-
-
-# ============================================================================
-# Edge Cases
-# ============================================================================
 
 
 class TestSubscriptionEdgeCases:
@@ -601,3 +550,4 @@ class TestSubscriptionEdgeCases:
         assert float(data["credits_allocation"]) > 0
         # Credits used should be 0 for new subscription
         assert float(data["credits_used"]) == 0.0
+

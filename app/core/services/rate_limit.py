@@ -1,9 +1,6 @@
 """
 Rate limiting service with configurable backends.
 
-This module provides rate limiting functionality with support for both
-in-memory and Redis backends. It includes stackable FastAPI dependencies
-for per-IP, per-user, and per-endpoint rate limiting.
 """
 
 from abc import ABC, abstractmethod
@@ -123,7 +120,6 @@ class MemoryBackend(RateLimitBackend):
         if key in self._store:
             count, reset_at = self._store[key]
 
-            # Check if window has expired
             if now >= reset_at:
                 # Window expired, start fresh
                 reset_at = datetime.fromtimestamp(
@@ -138,7 +134,6 @@ class MemoryBackend(RateLimitBackend):
                     reset_at=reset_at,
                 )
 
-            # Check if limit exceeded
             if count >= limit:
                 retry_after = int((reset_at - now).total_seconds())
                 rate_limit_logger.warning(
@@ -254,18 +249,15 @@ class RedisBackend(RateLimitBackend):
                 ),
             )
 
-        # Set expiration on first request
         if count == 1:
             await RedisService.expire(key, window)
 
-        # Get TTL for reset time
         ttl = await RedisService.ttl(key)
         if ttl is None or ttl < 0:
             ttl = window
 
         reset_at = datetime.fromtimestamp(now.timestamp() + ttl, tz=timezone.utc)
 
-        # Check if limit exceeded
         if count > limit:
             rate_limit_logger.warning(
                 f"Rate limit exceeded for key: {key}, count: {count}, retry after: {ttl}s"
@@ -635,3 +627,4 @@ __all__ = [
     "rate_limit_by_user",
     "rate_limit_by_endpoint",
 ]
+

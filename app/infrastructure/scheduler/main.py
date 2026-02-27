@@ -1,10 +1,6 @@
 """
 Scheduler Module for CubeX Application.
 
-This module provides the APScheduler-based task scheduler for running
-background jobs. It can be run standalone via Docker or integrated
-into the FastAPI lifespan.
-
 Standalone Usage:
     python -m app.infrastructure.scheduler.main
 
@@ -29,7 +25,6 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger("apscheduler").setLevel(logging.DEBUG)
 
 scheduler = AsyncIOScheduler(
-    # Create jobstores per job
     jobstores={
         "cleanups": SQLAlchemyJobStore(
             url=settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql"),
@@ -149,12 +144,10 @@ async def main() -> None:
     scheduler_logger.info("Starting standalone scheduler...")
 
     try:
-        # Initialize Redis service
         scheduler_logger.info("Initializing Redis service...")
         await RedisService.init(settings.REDIS_URL)
         scheduler_logger.info("Redis service initialized successfully.")
 
-        # Initialize Brevo Service
         scheduler_logger.info("Initializing Brevo service...")
         await BrevoService.init(
             api_key=settings.BREVO_API_KEY,
@@ -163,7 +156,6 @@ async def main() -> None:
         )
         scheduler_logger.info("Brevo service initialized successfully.")
 
-        # Initialize template renderer
         scheduler_logger.info("Initializing template renderer...")
         Renderer.initialize("app/templates")
         scheduler_logger.info("Template renderer initialized successfully.")
@@ -181,7 +173,6 @@ async def main() -> None:
         raise
 
     finally:
-        # Cleanup
         scheduler_logger.info("Shutting down scheduler...")
 
         if scheduler.running:
@@ -196,3 +187,4 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
+

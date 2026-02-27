@@ -1,10 +1,6 @@
 """
 Quota Cache Service for O(1) cost lookups.
 
-This module provides caching for feature costs and plan pricing
-multipliers with support for both in-memory and Redis backends.
-The cache is populated at startup and updated via SQLAlchemy
-event listeners when the underlying tables are modified.
 """
 
 from abc import ABC, abstractmethod
@@ -21,11 +17,6 @@ from app.core.services.redis_service import RedisService
 
 if TYPE_CHECKING:
     from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule
-
-
-# =============================================================================
-# Backend Abstract Base Class
-# =============================================================================
 
 
 class QuotaCacheBackend(ABC):
@@ -119,11 +110,6 @@ class QuotaCacheBackend(ABC):
         pass
 
 
-# =============================================================================
-# Memory Backend
-# =============================================================================
-
-
 class MemoryBackend(QuotaCacheBackend):
     """
     In-memory quota cache backend using dictionaries.
@@ -212,11 +198,6 @@ class MemoryBackend(QuotaCacheBackend):
         self._plan_credits.clear()
         self._plan_rate_limits.clear()
         self._plan_rate_day_limit.clear()
-
-
-# =============================================================================
-# Redis Backend
-# =============================================================================
 
 
 class RedisBackend(QuotaCacheBackend):
@@ -333,21 +314,11 @@ class RedisBackend(QuotaCacheBackend):
         Note: This uses SCAN to find keys by pattern, which is safe
         but may be slow for large datasets.
         """
-        # Delete all feature cost keys
         await RedisService.delete_pattern(f"{self.FEATURE_COST_PREFIX}*")
-        # Delete all plan multiplier keys
         await RedisService.delete_pattern(f"{self.PLAN_MULTIPLIER_PREFIX}*")
-        # Delete all plan credits keys
         await RedisService.delete_pattern(f"{self.PLAN_CREDITS_PREFIX}*")
-        # Delete all plan rate limit keys
         await RedisService.delete_pattern(f"{self.PLAN_RATE_LIMIT_PREFIX}*")
-        # Delete all plan rate day limit keys
         await RedisService.delete_pattern(f"{self.PLAN_RATE_DAY_LIMIT_PREFIX}*")
-
-
-# =============================================================================
-# Quota Cache Service
-# =============================================================================
 
 
 class QuotaCacheService:
@@ -397,7 +368,6 @@ class QuotaCacheService:
 
         app_logger.info(f"Initializing QuotaCacheService with {backend} backend...")
 
-        # Initialize backend
         if backend == "redis":
             cls._backend = RedisBackend()
         else:
@@ -411,7 +381,6 @@ class QuotaCacheService:
             PlanPricingRule,
         )
 
-        # Load feature costs
         result = await session.execute(
             select(FeatureCostConfig).where(
                 FeatureCostConfig.is_deleted == False  # noqa: E712
@@ -473,9 +442,6 @@ class QuotaCacheService:
 
         app_logger.debug("SQLAlchemy event listeners registered for quota cache.")
 
-    # =========================================================================
-    # Feature Cost Event Handlers
-    # =========================================================================
 
     @classmethod
     def _on_feature_change(
@@ -531,9 +497,6 @@ class QuotaCacheService:
         except RuntimeError:
             asyncio.run(_delete())
 
-    # =========================================================================
-    # Plan Pricing Rule Event Handlers
-    # =========================================================================
 
     @classmethod
     def _on_pricing_change(cls, mapper, connection, target: "PlanPricingRule") -> None:
@@ -598,9 +561,6 @@ class QuotaCacheService:
         except RuntimeError:
             asyncio.run(_delete())
 
-    # =========================================================================
-    # Public API - O(1) Lookups
-    # =========================================================================
 
     @classmethod
     async def get_feature_cost(cls, feature_key: FeatureKey) -> Decimal:
@@ -795,3 +755,4 @@ class QuotaCacheService:
 
 
 __all__ = ["QuotaCacheService", "QuotaCacheBackend", "MemoryBackend", "RedisBackend"]
+

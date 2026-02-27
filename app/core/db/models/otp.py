@@ -1,8 +1,6 @@
 """
 OTP Token model for storing one-time password verification codes.
 
-This module provides the OTPToken model for secure OTP storage with
-HMAC-hashed codes for queryable verification.
 """
 
 from datetime import datetime
@@ -89,3 +87,4 @@ class OTPToken(BaseModel):
 
 
 __all__ = ["OTPToken"]
+

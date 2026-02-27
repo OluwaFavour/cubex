@@ -200,7 +200,6 @@ class TestContactSalesRateLimiting:
             )
 
             assert response.status_code == 201
-            # Verify rate limit was called with lowercase email
             mock_rate_limit.assert_called_once()
             call_args = mock_rate_limit.call_args
             assert call_args[0][0] == "test@example.com"
@@ -358,3 +357,4 @@ class TestSupportSchemas:
 
         assert ContactSalesRequest is not None
         assert ContactSalesResponse is not None
+

@@ -1,7 +1,6 @@
 """
 Workspace router for cubex_api.
 
-This module provides endpoints for:
 - Workspace CRUD operations
 - Member management (invite, enable/disable, remove)
 - Invitation management
@@ -76,16 +75,10 @@ from app.apps.cubex_api.db.models import (
 router = APIRouter(prefix="/workspaces")
 
 
-# ============================================================================
-# Helper Functions
-# ============================================================================
-
-
 async def _build_workspace_response(
     session: AsyncSession, workspace: Workspace
 ) -> WorkspaceResponse:
     """Build WorkspaceResponse from Workspace model."""
-    # Get seat count
     seat_count = (
         workspace.api_subscription_context.subscription.seat_count
         if workspace.api_subscription_context
@@ -96,7 +89,6 @@ async def _build_workspace_response(
     )
     available_seats = seat_count - enabled_count
 
-    # Get credits
     credits_used = (
         workspace.api_subscription_context.credits_used
         if workspace.api_subscription_context
@@ -153,11 +145,6 @@ def _build_invitation_response(invitation: WorkspaceInvitation) -> InvitationRes
         created_at=invitation.created_at,
         inviter_email=invitation.inviter.email if invitation.inviter else None,
     )
-
-
-# ============================================================================
-# Workspace Endpoints
-# ============================================================================
 
 
 @router.get(
@@ -381,7 +368,6 @@ async def get_workspace(
     """Get workspace details."""
     request_logger.info(f"GET /workspaces/{workspace_id} - user={current_user.id}")
     async with session.begin():
-        # Check user has access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -391,7 +377,6 @@ async def get_workspace(
         workspace = await workspace_service.get_workspace(session, workspace_id)
         members = workspace.members if workspace.members else []
 
-        # Get subscription info
         subscription = (
             workspace.api_subscription_context.subscription
             if workspace.api_subscription_context
@@ -400,7 +385,6 @@ async def get_workspace(
         seat_count = subscription.seat_count if subscription else 0
         enabled_count = len([m for m in members if m.status == MemberStatus.ENABLED])
 
-        # Get credits
         credits_used = (
             subscription.api_context.credits_used
             if subscription and subscription.api_context
@@ -516,11 +500,6 @@ async def update_workspace(
         raise NotFoundException(str(e.message)) from e
 
 
-# ============================================================================
-# Member Endpoints
-# ============================================================================
-
-
 @router.get(
     "/{workspace_id}/members",
     response_model=list[WorkspaceMemberResponse],
@@ -594,7 +573,6 @@ async def list_members(
         f"GET /workspaces/{workspace_id}/members - user={current_user.id}"
     )
     async with session.begin():
-        # Check access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -1085,11 +1063,6 @@ async def transfer_ownership(
         raise NotFoundException(str(e.message)) from e
 
 
-# ============================================================================
-# Invitation Endpoints
-# ============================================================================
-
-
 @router.get(
     "/{workspace_id}/invitations",
     response_model=InvitationListResponse,
@@ -1153,7 +1126,6 @@ async def list_invitations(
         f"GET /workspaces/{workspace_id}/invitations - user={current_user.id}"
     )
     async with session.begin():
-        # Check admin access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -1265,7 +1237,6 @@ async def create_invitation(
         f"- user={current_user.id} email={data.email}"
     )
 
-    # Validate callback URL is in allowed CORS origins
     if not OAuthStateManager.validate_callback_url(data.callback_url):
         raise BadRequestException(
             "Invalid callback URL. Must be in allowed origins and use HTTPS in production."
@@ -1390,11 +1361,6 @@ async def revoke_invitation(
         raise NotFoundException(str(e.message)) from e
 
 
-# ============================================================================
-# Public Invitation Accept Endpoint
-# ============================================================================
-
-
 @router.post(
     "/invitations/accept",
     response_model=WorkspaceMemberResponse,
@@ -1491,11 +1457,6 @@ async def accept_invitation(
         raise PaymentRequiredException(str(e.message)) from e
 
 
-# ============================================================================
-# Manual Activation Endpoint
-# ============================================================================
-
-
 @router.post(
     "/activate",
     response_model=WorkspaceResponse,
@@ -1558,11 +1519,6 @@ async def activate_personal_workspace(
         f"POST /workspaces/activate - workspace={workspace.id} for user={current_user.id}"
     )
     return workspace_response
-
-
-# ============================================================================
-# API Key Endpoints
-# ============================================================================
 
 
 def _build_api_key_response(api_key) -> APIKeyResponse:
@@ -1674,7 +1630,6 @@ async def create_api_key(
     )
 
     async with session.begin():
-        # Get member and verify admin permission
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -1762,7 +1717,6 @@ async def list_api_keys(
     )
 
     async with session.begin():
-        # Verify user is a member of the workspace
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -1847,7 +1801,6 @@ async def revoke_api_key(
 
     try:
         async with session.begin():
-            # Get member and verify admin permission
             member = await workspace_member_db.get_member(
                 session, workspace_id, current_user.id
             )
@@ -1872,3 +1825,4 @@ async def revoke_api_key(
 
 
 __all__ = ["router"]
+

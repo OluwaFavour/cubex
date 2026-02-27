@@ -29,11 +29,6 @@ from app.core.enums import (
 )
 
 
-# ============================================================================
-# Workspace Schemas
-# ============================================================================
-
-
 class WorkspaceCreate(BaseModel):
     """Schema for creating a new workspace."""
 
@@ -247,11 +242,6 @@ class WorkspaceListResponse(BaseModel):
     workspaces: list[WorkspaceResponse]
 
 
-# ============================================================================
-# Member Schemas
-# ============================================================================
-
-
 class MemberStatusUpdate(BaseModel):
     """Schema for updating member status."""
 
@@ -272,11 +262,6 @@ class MemberRoleUpdate(BaseModel):
         MemberRole,
         Field(description="New member role: admin or member"),
     ]
-
-
-# ============================================================================
-# Invitation Schemas
-# ============================================================================
 
 
 class InvitationCreate(BaseModel):
@@ -391,11 +376,6 @@ class InvitationCreatedResponse(BaseModel):
     invitation_url: str
 
 
-# ============================================================================
-# Message Schemas
-# ============================================================================
-
-
 class MessageResponse(BaseModel):
     """Generic message response."""
 
@@ -407,11 +387,6 @@ class MessageResponse(BaseModel):
 
     message: str
     success: bool = True
-
-
-# ============================================================================
-# API Key Schemas
-# ============================================================================
 
 
 class APIKeyCreate(BaseModel):
@@ -532,11 +507,6 @@ class APIKeyListResponse(BaseModel):
     )
 
     api_keys: list[APIKeyResponse]
-
-
-# ============================================================================
-# Usage Validation Schemas (Internal API)
-# ============================================================================
 
 
 class ClientInfo(BaseModel):
@@ -853,3 +823,4 @@ __all__ = [
     "UsageMetrics",
     "FailureDetails",
 ]
+

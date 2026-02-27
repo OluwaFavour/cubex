@@ -285,7 +285,6 @@ class Stripe:
                 )
                 resp.raise_for_status()
 
-                # Parse response body
                 try:
                     body = resp.json()
                 except ValueError:
@@ -306,7 +305,6 @@ class Stripe:
                 except ValueError:
                     err_body = {"error": {"message": exc.response.text}}
 
-                # Extract Stripe error details
                 error_data = err_body.get("error", {})
                 error_type = error_data.get("type")
                 error_code = error_data.get("code")
@@ -1050,7 +1048,6 @@ class Stripe:
         if billing_scheme is not None:
             payload["billing_scheme"] = billing_scheme
         if tiers is not None:
-            # Convert Tier objects to dicts
             tiers_list: list[dict[str, Any]] = [
                 tier.model_dump(exclude_unset=True) if isinstance(tier, Tier) else tier
                 for tier in tiers
@@ -1334,7 +1331,6 @@ class Stripe:
         endpoint = f"/v1/subscriptions/{subscription_id}"
 
         if cancel_at_period_end:
-            # Update subscription to cancel at period end
             payload = {
                 "cancel_at_period_end": True,
                 "proration_behavior": "create_prorations" if prorate else "none",
@@ -1385,7 +1381,6 @@ class Stripe:
         if proration_date is not None:
             payload["proration_date"] = proration_date
 
-        # --- build subscription item updates if needed ---
         needs_item_update = (
             new_price_id is not None
             or quantity is not None
@@ -1473,7 +1468,6 @@ class Stripe:
                 if "quantity" in item:
                     payload[f"items[{idx}][quantity]"] = item["quantity"]
 
-        # --- non-item subscription fields ---
         if metadata is not None:
             payload["metadata"] = metadata
         if default_payment_method is not None:
@@ -1613,7 +1607,6 @@ class Stripe:
             If Stripe request fails.
         """
 
-        # ---- validation ----
         if new_price_id is None and quantity is None and new_seat_price_id is None:
             raise ValueError(
                 "At least one change must be provided: "
@@ -1628,14 +1621,12 @@ class Stripe:
         if quantity is not None and quantity <= 0:
             raise ValueError("quantity must be a positive integer.")
 
-        # ---- fetch subscription ----
         subscription = await cls.get_subscription(subscription_id)
         items = subscription.items.data
 
         if not items:
             raise StripeAPIException("Subscription has no subscription items.")
 
-        # ---- helpers ----
         def find_item_by_price(price_id: str) -> SubscriptionItem | None:
             return next((item for item in items if item.price.id == price_id), None)
 
@@ -1653,7 +1644,6 @@ class Stripe:
                 items[0],
             )
 
-        # ---- build subscription item update list ----
         stripe_items: list[dict[str, Any]] = []
 
         # Base plan update (price change)
@@ -1708,7 +1698,6 @@ class Stripe:
         if not stripe_items:
             raise ValueError("No subscription item updates could be constructed.")
 
-        # ---- payload ----
         payload: dict[str, Any] = {
             "customer": subscription.customer,
             "subscription": subscription_id,
@@ -1723,7 +1712,6 @@ class Stripe:
             payload[f"subscription_details[items][{idx}][price]"] = item["price"]
             payload[f"subscription_details[items][{idx}][quantity]"] = item["quantity"]
 
-        # ---- request ----
         endpoint = "/v1/invoices/create_preview"
         body = await cls._request("POST", endpoint, data=payload)
 
@@ -1928,3 +1916,4 @@ class Stripe:
 
         body = await cls._request("POST", endpoint, data=payload)
         return BillingPortalSession.model_validate(body)
+

@@ -19,7 +19,6 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     ROOT_PATH: str = "/v1"
 
-    # Cleanup settings
     USER_SOFT_DELETE_RETENTION_DAYS: int = 30
 
     # Usage log settings
@@ -264,3 +263,4 @@ __all__ = [
     "usage_logger",
     "career_logger",
 ]
+

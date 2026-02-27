@@ -1,8 +1,6 @@
 """
 Support router for cubex_api.
 
-This module provides endpoints for support-related functionality
-such as sales inquiries.
 """
 
 from typing import Annotated
@@ -83,10 +81,8 @@ async def contact_sales(
     """Submit a sales inquiry request."""
     request_logger.info(f"POST /support/contact-sales - email={data.email}")
 
-    # Check rate limit by email
     await _check_email_rate_limit(data.email, request.url.path)
 
-    # Create sales request record
     async with session.begin():
         sales_request = await sales_request_db.create(
             session,
@@ -111,3 +107,4 @@ async def contact_sales(
 
 
 __all__ = ["router"]
+

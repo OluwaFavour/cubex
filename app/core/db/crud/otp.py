@@ -1,8 +1,6 @@
 """
 CRUD operations for OTPToken model.
 
-This module provides database operations for OTP token management including
-creation, verification, and cleanup of expired tokens.
 """
 
 from datetime import datetime, timezone
@@ -226,3 +224,4 @@ class OTPTokenDB(BaseDB[OTPToken]):
 
 
 __all__ = ["OTPTokenDB"]
+

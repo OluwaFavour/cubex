@@ -20,11 +20,9 @@ from app.infrastructure.messaging.queues import QueueConfig, RetryQueue
 
 
 class TestStartConsumers:
-    """Test suite for start_consumers function."""
 
     @pytest.mark.asyncio
     async def test_start_consumers_basic_setup(self):
-        """Test basic consumer setup with no retry queues."""
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
         mock_queue = AsyncMock()
@@ -50,27 +48,22 @@ class TestStartConsumers:
             # Test with keep_alive=False to return immediately
             result = await start_consumers(keep_alive=False)
 
-            # Verify connection and channel setup
             mock_get_conn.assert_called_once()
             mock_connection.channel.assert_called_once()
             mock_channel.set_qos.assert_called_once_with(prefetch_count=10)
 
-            # Verify main queue declaration
             mock_channel.declare_queue.assert_called_once_with(
                 "test_queue", durable=True
             )
 
-            # Verify consumer registration
             mock_queue.consume.assert_called_once()
             consume_args = mock_queue.consume.call_args
             assert consume_args.kwargs["no_ack"] is False
 
-            # Verify connection returned
             assert result == mock_connection
 
     @pytest.mark.asyncio
     async def test_start_consumers_with_single_retry_queue(self):
-        """Test consumer setup with single retry queue."""
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
         mock_main_queue = AsyncMock()
@@ -105,15 +98,12 @@ class TestStartConsumers:
 
             result = await start_consumers(keep_alive=False)
 
-            # Verify both queues declared
             assert mock_channel.declare_queue.call_count == 2
 
-            # Verify main queue declaration
             main_call = mock_channel.declare_queue.call_args_list[0]
             assert main_call.args[0] == "test_queue"
             assert main_call.kwargs["durable"] is True
 
-            # Verify retry queue declaration with correct arguments
             retry_call = mock_channel.declare_queue.call_args_list[1]
             assert retry_call.args[0] == "test_queue_retry"
             assert retry_call.kwargs["durable"] is True
@@ -128,7 +118,6 @@ class TestStartConsumers:
 
     @pytest.mark.asyncio
     async def test_start_consumers_with_multiple_retry_queues(self):
-        """Test consumer setup with multiple retry queues."""
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
         mock_main_queue = AsyncMock()
@@ -164,10 +153,8 @@ class TestStartConsumers:
 
             result = await start_consumers(keep_alive=False)
 
-            # Verify main + 3 retry queues declared
             assert mock_channel.declare_queue.call_count == 4
 
-            # Verify main queue
             main_call = mock_channel.declare_queue.call_args_list[0]
             assert main_call.args[0] == "test_queue"
 
@@ -194,7 +181,6 @@ class TestStartConsumers:
 
     @pytest.mark.asyncio
     async def test_start_consumers_with_dead_letter_queue(self):
-        """Test consumer setup with dead letter queue."""
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
         mock_main_queue = AsyncMock()
@@ -226,10 +212,8 @@ class TestStartConsumers:
 
             result = await start_consumers(keep_alive=False)
 
-            # Verify both queues declared
             assert mock_channel.declare_queue.call_count == 2
 
-            # Verify dead letter queue declaration
             dlx_call = mock_channel.declare_queue.call_args_list[1]
             assert dlx_call.args[0] == "test_queue_dead"
             assert dlx_call.kwargs["durable"] is True
@@ -240,7 +224,6 @@ class TestStartConsumers:
 
     @pytest.mark.asyncio
     async def test_start_consumers_registers_consumer_with_correct_handler(self):
-        """Test that consumer is registered with correct handler and parameters."""
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
         mock_queue = AsyncMock()
@@ -272,15 +255,12 @@ class TestStartConsumers:
 
             result = await start_consumers(keep_alive=False)
 
-            # Verify consumer registration
             mock_queue.consume.assert_called_once()
             consume_call = mock_queue.consume.call_args
 
-            # Extract the partial function
             consumer_callback = consume_call.args[0]
             assert isinstance(consumer_callback, partial)
 
-            # Verify it's wrapping process_message with correct keywords
             assert consumer_callback.func.__name__ == "process_message"
             assert consumer_callback.keywords["handler"] == sample_handler
             assert consumer_callback.keywords["channel"] == mock_channel
@@ -289,21 +269,18 @@ class TestStartConsumers:
             assert consumer_callback.keywords["max_retries"] == 5
             assert consumer_callback.keywords["dead_letter_queue"] == "test_dead"
 
-            # Verify no_ack is False
             assert consume_call.kwargs["no_ack"] is False
 
             assert result == mock_connection
 
     @pytest.mark.asyncio
     async def test_start_consumers_multiple_queues(self):
-        """Test consumer setup with multiple queues."""
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
 
         mock_connection.channel = AsyncMock(return_value=mock_channel)
         mock_channel.set_qos = AsyncMock()
 
-        # Create mock queues for 2 main queues
         mock_queue1 = AsyncMock()
         mock_queue2 = AsyncMock()
         queue_returns = [mock_queue1, mock_queue2]
@@ -332,12 +309,10 @@ class TestStartConsumers:
 
             result = await start_consumers(keep_alive=False)
 
-            # Verify both queues declared
             assert mock_channel.declare_queue.call_count == 2
             assert mock_channel.declare_queue.call_args_list[0].args[0] == "queue1"
             assert mock_channel.declare_queue.call_args_list[1].args[0] == "queue2"
 
-            # Verify both consumers registered
             mock_queue1.consume.assert_called_once()
             mock_queue2.consume.assert_called_once()
 
@@ -345,7 +320,6 @@ class TestStartConsumers:
 
     @pytest.mark.asyncio
     async def test_start_consumers_qos_setting(self):
-        """Test that QoS is set correctly to prefetch 10 messages."""
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
         mock_queue = AsyncMock()
@@ -370,12 +344,10 @@ class TestStartConsumers:
 
             await start_consumers(keep_alive=False)
 
-            # Verify QoS was set with prefetch_count=10
             mock_channel.set_qos.assert_called_once_with(prefetch_count=10)
 
     @pytest.mark.asyncio
     async def test_start_consumers_keep_alive_true_runs_forever(self):
-        """Test that keep_alive=True runs forever until interrupted."""
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
         mock_queue = AsyncMock()
@@ -391,7 +363,6 @@ class TestStartConsumers:
 
         queue_config = QueueConfig(name="test_queue", handler=sample_handler)
 
-        # Create a future that will be cancelled
         future = asyncio.Future()
 
         async def cancel_future():
@@ -415,12 +386,10 @@ class TestStartConsumers:
             with pytest.raises(asyncio.CancelledError):
                 await start_consumers(keep_alive=True)
 
-            # Verify connection was closed
             mock_connection.close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_start_consumers_retry_queues_converted_to_dict(self):
-        """Test that retry_queues are converted to dict when passed to consumer."""
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
         mock_queue = AsyncMock()
@@ -455,11 +424,9 @@ class TestStartConsumers:
 
             await start_consumers(keep_alive=False)
 
-            # Verify consumer was registered
             mock_queue.consume.assert_called_once()
             consumer_callback = mock_queue.consume.call_args.args[0]
 
-            # Verify retry_queues was converted to list of dicts
             retry_queues = consumer_callback.keywords["retry_queues"]
             assert retry_queues == [
                 {"name": "retry1", "ttl": 30000},
@@ -468,7 +435,6 @@ class TestStartConsumers:
 
     @pytest.mark.asyncio
     async def test_start_consumers_complete_configuration(self):
-        """Test consumer with all configuration options."""
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
 
@@ -503,17 +469,15 @@ class TestStartConsumers:
 
             result = await start_consumers(keep_alive=False)
 
-            # Verify all 4 queues declared
             assert mock_channel.declare_queue.call_count == 4
 
-            # Verify queue names
             call_args_list = mock_channel.declare_queue.call_args_list
             assert call_args_list[0].args[0] == "main_queue"
             assert call_args_list[1].args[0] == "retry_30s"
             assert call_args_list[2].args[0] == "retry_5m"
             assert call_args_list[3].args[0] == "main_queue_dead"
 
-            # Verify consumer registered
             queue_returns[0].consume.assert_called_once()
 
             assert result == mock_connection
+

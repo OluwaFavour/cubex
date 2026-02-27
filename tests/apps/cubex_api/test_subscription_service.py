@@ -1,7 +1,6 @@
 """
 Test suite for SubscriptionService.
 
-This module contains comprehensive tests for the SubscriptionService including:
 - Checkout session creation
 - Webhook event handling
 - Seat management
@@ -28,26 +27,21 @@ from app.core.enums import (
 
 
 class TestSubscriptionServiceInit:
-    """Test suite for SubscriptionService initialization."""
 
     def test_service_import(self):
-        """Test that SubscriptionService can be imported."""
         from app.apps.cubex_api.services.subscription import SubscriptionService
 
         assert SubscriptionService is not None
 
     def test_service_singleton_exists(self):
-        """Test that subscription_service singleton is accessible."""
         from app.apps.cubex_api.services.subscription import subscription_service
 
         assert subscription_service is not None
 
 
 class TestSubscriptionExceptions:
-    """Test suite for subscription-related exceptions."""
 
     def test_subscription_not_found_exception(self):
-        """Test SubscriptionNotFoundException."""
         from app.apps.cubex_api.services.subscription import (
             SubscriptionNotFoundException,
         )
@@ -56,14 +50,12 @@ class TestSubscriptionExceptions:
         assert exc is not None
 
     def test_invalid_seat_count_exception(self):
-        """Test InvalidSeatCountException."""
         from app.apps.cubex_api.services.subscription import InvalidSeatCountException
 
         exc = InvalidSeatCountException()
         assert exc is not None
 
     def test_seat_downgrade_blocked_exception(self):
-        """Test SeatDowngradeBlockedException."""
         from app.apps.cubex_api.services.subscription import (
             SeatDowngradeBlockedException,
         )
@@ -72,14 +64,12 @@ class TestSubscriptionExceptions:
         assert exc is not None
 
     def test_plan_not_found_exception(self):
-        """Test PlanNotFoundException."""
         from app.apps.cubex_api.services.subscription import PlanNotFoundException
 
         exc = PlanNotFoundException()
         assert exc is not None
 
     def test_plan_downgrade_not_allowed_exception(self):
-        """Test PlanDowngradeNotAllowedException."""
         from app.apps.cubex_api.services.subscription import (
             PlanDowngradeNotAllowedException,
         )
@@ -89,7 +79,6 @@ class TestSubscriptionExceptions:
         assert "downgrade" in str(exc.message).lower()
 
     def test_same_plan_exception(self):
-        """Test SamePlanException."""
         from app.apps.cubex_api.services.subscription import SamePlanException
 
         exc = SamePlanException()
@@ -98,10 +87,8 @@ class TestSubscriptionExceptions:
 
 
 class TestSubscriptionServiceEnums:
-    """Test that the service correctly uses enums."""
 
     def test_subscription_status_values(self):
-        """Test SubscriptionStatus enum values are correctly used."""
         assert SubscriptionStatus.ACTIVE.value == "active"
         assert SubscriptionStatus.PAST_DUE.value == "past_due"
         assert SubscriptionStatus.CANCELED.value == "canceled"
@@ -109,13 +96,11 @@ class TestSubscriptionServiceEnums:
         assert SubscriptionStatus.TRIALING.value == "trialing"
 
     def test_plan_type_values(self):
-        """Test PlanType enum values are correctly used."""
         assert PlanType.FREE.value == "free"
         assert PlanType.PAID.value == "paid"
 
 
 class TestSubscriptionServiceMethods:
-    """Test suite for SubscriptionService method signatures."""
 
     @pytest.fixture
     def service(self):
@@ -125,114 +110,93 @@ class TestSubscriptionServiceMethods:
         return SubscriptionService()
 
     def test_has_create_checkout_session_method(self, service):
-        """Test that create_checkout_session method exists."""
         assert hasattr(service, "create_checkout_session")
         assert callable(service.create_checkout_session)
 
     def test_has_handle_checkout_completed_method(self, service):
-        """Test that handle_checkout_completed method exists."""
         assert hasattr(service, "handle_checkout_completed")
         assert callable(service.handle_checkout_completed)
 
     def test_has_handle_subscription_updated_method(self, service):
-        """Test that handle_subscription_updated method exists."""
         assert hasattr(service, "handle_subscription_updated")
         assert callable(service.handle_subscription_updated)
 
     def test_has_handle_subscription_deleted_method(self, service):
-        """Test that handle_subscription_deleted method exists."""
         assert hasattr(service, "handle_subscription_deleted")
         assert callable(service.handle_subscription_deleted)
 
     def test_has_update_seat_count_method(self, service):
-        """Test that update_seat_count method exists."""
         assert hasattr(service, "update_seat_count")
         assert callable(service.update_seat_count)
 
     def test_has_cancel_subscription_method(self, service):
-        """Test that cancel_subscription method exists."""
         assert hasattr(service, "cancel_subscription")
         assert callable(service.cancel_subscription)
 
     def test_has_reactivate_workspace_method(self, service):
-        """Test that reactivate_workspace method exists."""
         assert hasattr(service, "reactivate_workspace")
         assert callable(service.reactivate_workspace)
 
     def test_has_get_subscription_method(self, service):
-        """Test that get_subscription method exists."""
         assert hasattr(service, "get_subscription")
         assert callable(service.get_subscription)
 
     def test_has_preview_upgrade_method(self, service):
-        """Test that preview_upgrade method exists."""
         assert hasattr(service, "preview_subscription_change")
         assert callable(service.preview_subscription_change)
 
     def test_has_upgrade_plan_method(self, service):
-        """Test that upgrade_plan method exists."""
         assert hasattr(service, "upgrade_plan")
         assert callable(service.upgrade_plan)
 
 
 class TestSubscriptionModelIntegration:
-    """Test subscription model integration."""
 
     def test_subscription_model_import(self):
-        """Test that Subscription model can be imported."""
         from app.core.db.models.subscription import Subscription
 
         assert Subscription is not None
 
     def test_stripe_event_log_model_import(self):
-        """Test that StripeEventLog model can be imported."""
         from app.core.db.models.subscription import StripeEventLog
 
         assert StripeEventLog is not None
 
     def test_plan_model_import(self):
-        """Test that Plan model can be imported."""
         from app.core.db.models.plan import Plan
 
         assert Plan is not None
 
 
 class TestSubscriptionCRUDIntegration:
-    """Test subscription CRUD integration."""
 
     def test_subscription_db_import(self):
-        """Test that subscription_db can be imported."""
         from app.core.db.crud import subscription_db
 
         assert subscription_db is not None
 
     def test_plan_db_import(self):
-        """Test that plan_db can be imported."""
         from app.core.db.crud import plan_db
 
         assert plan_db is not None
 
     def test_stripe_event_log_db_import(self):
-        """Test that stripe_event_log_db can be imported."""
         from app.core.db.crud import stripe_event_log_db
 
         assert stripe_event_log_db is not None
 
     def test_api_subscription_context_db_import(self):
-        """Test that api_subscription_context_db can be imported."""
         from app.core.db.crud import api_subscription_context_db
 
         assert api_subscription_context_db is not None
 
     def test_career_subscription_context_db_import(self):
-        """Test that career_subscription_context_db can be imported."""
         from app.core.db.crud import career_subscription_context_db
 
         assert career_subscription_context_db is not None
 
 
 class TestSubscriptionServiceContextIntegration:
-    """Test subscription service context table integration."""
 
     @pytest.fixture
     def service(self):
@@ -242,50 +206,39 @@ class TestSubscriptionServiceContextIntegration:
         return SubscriptionService()
 
     def test_service_uses_product_type(self, service):
-        """Test that service handles ProductType correctly."""
         # Service should use ProductType.API for workspace subscriptions
         assert ProductType.API.value == "api"
         assert ProductType.CAREER.value == "career"
 
     def test_api_subscription_context_model_import(self):
-        """Test that APISubscriptionContext can be imported."""
         from app.core.db.models.subscription_context import APISubscriptionContext
 
         assert APISubscriptionContext is not None
 
     def test_career_subscription_context_model_import(self):
-        """Test that CareerSubscriptionContext can be imported."""
         from app.core.db.models.subscription_context import CareerSubscriptionContext
 
         assert CareerSubscriptionContext is not None
 
     def test_subscription_has_api_context_relationship(self):
-        """Test that Subscription model has api_context relationship."""
         from app.core.db.models.subscription import Subscription
 
         subscription = Subscription()
         assert hasattr(subscription, "api_context")
 
     def test_subscription_has_career_context_relationship(self):
-        """Test that Subscription model has career_context relationship."""
         from app.core.db.models.subscription import Subscription
 
         subscription = Subscription()
         assert hasattr(subscription, "career_context")
 
     def test_subscription_has_product_type_attribute(self):
-        """Test that Subscription model has product_type attribute."""
         from app.core.db.models.subscription import Subscription
 
         subscription = Subscription()
         assert hasattr(subscription, "product_type")
 
     def test_subscription_product_type_default(self):
-        """Test that Subscription can be created with API product type.
-
-        Note: Default values are applied by the database on INSERT,
-        so we just verify the attribute can be explicitly set.
-        """
         from app.core.db.models.subscription import Subscription
 
         subscription = Subscription(
@@ -297,7 +250,6 @@ class TestSubscriptionServiceContextIntegration:
 
 
 class TestSubscriptionServiceAPIContextCreation:
-    """Test API subscription context creation in service."""
 
     @pytest.fixture
     def service(self):
@@ -308,17 +260,14 @@ class TestSubscriptionServiceAPIContextCreation:
 
     @pytest.mark.asyncio
     async def test_handle_checkout_completed_creates_context(self):
-        """Test that handle_checkout_completed creates APISubscriptionContext."""
         from app.apps.cubex_api.services.subscription import SubscriptionService
 
         service = SubscriptionService()
 
-        # Verify service has handle_checkout_completed method
         assert hasattr(service, "handle_checkout_completed")
         assert callable(service.handle_checkout_completed)
 
     def test_service_imports_api_context_db(self):
-        """Test that service can import api_subscription_context_db."""
         from app.core.db.crud import api_subscription_context_db
 
         assert api_subscription_context_db is not None
@@ -326,17 +275,14 @@ class TestSubscriptionServiceAPIContextCreation:
 
 
 class TestSubscriptionDBMethods:
-    """Test SubscriptionDB methods for context-based lookups."""
 
     def test_subscription_db_has_get_by_workspace(self):
-        """Test that SubscriptionDB has get_by_workspace method."""
         from app.core.db.crud import subscription_db
 
         assert hasattr(subscription_db, "get_by_workspace")
         assert callable(subscription_db.get_by_workspace)
 
     def test_subscription_db_has_get_by_user(self):
-        """Test that SubscriptionDB has get_by_user method."""
         from app.core.db.crud import subscription_db
 
         assert hasattr(subscription_db, "get_by_user")
@@ -344,7 +290,6 @@ class TestSubscriptionDBMethods:
 
     @pytest.mark.asyncio
     async def test_get_by_workspace_signature(self):
-        """Test get_by_workspace method signature."""
         from app.core.db.crud import subscription_db
 
         import inspect
@@ -352,13 +297,11 @@ class TestSubscriptionDBMethods:
         sig = inspect.signature(subscription_db.get_by_workspace)
         params = list(sig.parameters.keys())
 
-        # Should have session and workspace_id parameters
         assert "session" in params
         assert "workspace_id" in params
 
     @pytest.mark.asyncio
     async def test_get_by_user_signature(self):
-        """Test get_by_user method signature."""
         from app.core.db.crud import subscription_db
 
         import inspect
@@ -366,13 +309,11 @@ class TestSubscriptionDBMethods:
         sig = inspect.signature(subscription_db.get_by_user)
         params = list(sig.parameters.keys())
 
-        # Should have session and user_id parameters
         assert "session" in params
         assert "user_id" in params
 
 
 class TestCheckoutSessionLineItems:
-    """Test suite for dual-line-item checkout (base + seat pricing)."""
 
     @pytest.fixture
     def service(self):
@@ -422,7 +363,6 @@ class TestCheckoutSessionLineItems:
     async def test_checkout_creates_dual_line_items_for_seat_plan(
         self, service, mock_plan_with_seats, mock_user
     ):
-        """Test that checkout session creates two line items for plans with seat pricing."""
 
         workspace_id = uuid4()
         seat_count = 5
@@ -454,14 +394,11 @@ class TestCheckoutSessionLineItems:
                 user=mock_user,
             )
 
-            # Verify Stripe.create_checkout_session was called
             mock_stripe.create_checkout_session.assert_called_once()
             call_kwargs = mock_stripe.create_checkout_session.call_args.kwargs
 
-            # Extract line_items
             line_items = call_kwargs.get("line_items", [])
 
-            # Should have 2 line items: base + seats
             assert len(line_items) == 2
 
             # First item: base price (quantity=1)
@@ -476,7 +413,6 @@ class TestCheckoutSessionLineItems:
     async def test_checkout_creates_single_line_item_for_plan_without_seats(
         self, service, mock_plan_without_seats, mock_user
     ):
-        """Test that checkout session creates one line item for plans without seat pricing."""
         workspace_id = uuid4()
         seat_count = 1
 
@@ -507,11 +443,9 @@ class TestCheckoutSessionLineItems:
                 user=mock_user,
             )
 
-            # Verify Stripe.create_checkout_session was called
             mock_stripe.create_checkout_session.assert_called_once()
             call_kwargs = mock_stripe.create_checkout_session.call_args.kwargs
 
-            # Extract line_items
             line_items = call_kwargs.get("line_items", [])
 
             # Should have 1 line item: base only (no seats)
@@ -523,7 +457,6 @@ class TestCheckoutSessionLineItems:
 
 
 class TestUpdateSeatCountWithSeatPriceId:
-    """Test suite for update_seat_count with seat_price_id."""
 
     @pytest.fixture
     def service(self):
@@ -551,7 +484,6 @@ class TestUpdateSeatCountWithSeatPriceId:
     async def test_update_seat_count_passes_seat_price_id(
         self, service, mock_subscription_with_seats
     ):
-        """Test that update_seat_count passes seat_price_id to Stripe.update_subscription."""
         workspace_id = uuid4()
         new_seat_count = 10
 
@@ -576,7 +508,6 @@ class TestUpdateSeatCountWithSeatPriceId:
                 new_seat_count=new_seat_count,
             )
 
-            # Verify Stripe.update_subscription was called with seat_price_id
             mock_stripe.update_subscription.assert_called_once()
             call_kwargs = mock_stripe.update_subscription.call_args.kwargs
 
@@ -589,7 +520,6 @@ class TestUpdateSeatCountWithSeatPriceId:
     async def test_update_seat_count_downgrade_no_proration(
         self, service, mock_subscription_with_seats
     ):
-        """Test that downgrading seats uses no proration."""
         workspace_id = uuid4()
         new_seat_count = 3  # Less than current 5
 
@@ -616,13 +546,11 @@ class TestUpdateSeatCountWithSeatPriceId:
                 new_seat_count=new_seat_count,
             )
 
-            # Verify downgrade uses no proration
             call_kwargs = mock_stripe.update_subscription.call_args.kwargs
             assert call_kwargs.get("proration_behavior") == "none"
 
 
 class TestHandleSubscriptionUpdated:
-    """Test suite for handle_subscription_updated with old and new subscription structures."""
 
     @pytest.fixture
     def service(self):
@@ -727,7 +655,6 @@ class TestHandleSubscriptionUpdated:
         mock_db_subscription_with_seats,
         mock_stripe_subscription_dual_item,
     ):
-        """Test that dual-item subscription syncs seat count from seat item."""
         from decimal import Decimal
 
         with patch(
@@ -754,7 +681,6 @@ class TestHandleSubscriptionUpdated:
                 stripe_subscription_id="sub_123",
             )
 
-            # Verify update was called with correct seat count from seat item
             update_call = mock_sub_db.update.call_args
             updates = (
                 update_call.args[2]
@@ -776,7 +702,6 @@ class TestHandleSubscriptionUpdated:
         mock_db_subscription_with_seats,
         mock_stripe_subscription_single_item,
     ):
-        """Test that single-item subscription (legacy) syncs seat count from first item."""
         from decimal import Decimal
 
         with patch(
@@ -803,7 +728,6 @@ class TestHandleSubscriptionUpdated:
                 stripe_subscription_id="sub_123",
             )
 
-            # Verify update was called - legacy behavior uses first item quantity
             mock_sub_db.update.assert_called_once()
 
             # Amount should be $29 * 5 = $145
@@ -818,7 +742,6 @@ class TestHandleSubscriptionUpdated:
 
 
 class TestHandleCheckoutCompletedAmount:
-    """Test suite for handle_checkout_completed amount calculation with dual-line items."""
 
     @pytest.fixture
     def service(self):
@@ -882,7 +805,6 @@ class TestHandleCheckoutCompletedAmount:
     async def test_checkout_dual_items_calculates_total_amount(
         self, service, mock_stripe_subscription_dual_items
     ):
-        """Test that checkout with dual items calculates correct total amount."""
         from decimal import Decimal
         from uuid import uuid4
 
@@ -930,7 +852,6 @@ class TestHandleCheckoutCompletedAmount:
                 seat_count=5,
             )
 
-            # Verify create was called
             mock_sub_db.create.assert_called_once()
 
             # Check the amount calculation: $29 (base) + $45 (5 * $9 seats) = $74
@@ -948,7 +869,6 @@ class TestHandleCheckoutCompletedAmount:
     async def test_checkout_single_item_calculates_amount(
         self, service, mock_stripe_subscription_single_item
     ):
-        """Test that checkout with single item calculates correct amount."""
         from decimal import Decimal
         from uuid import uuid4
 
@@ -996,10 +916,8 @@ class TestHandleCheckoutCompletedAmount:
                 seat_count=5,
             )
 
-            # Verify create was called
             mock_sub_db.create.assert_called_once()
 
-            # Check the amount calculation: $29 * 5 = $145
             create_call = mock_sub_db.create.call_args
             create_data = (
                 create_call.args[1]
@@ -1011,13 +929,7 @@ class TestHandleCheckoutCompletedAmount:
             assert create_data.get("amount") == expected_amount
 
 
-# ============================================================================
-# Phase 3: handle_checkout_completed Business Logic Tests
-# ============================================================================
-
-
 class TestHandleCheckoutCompletedLogic:
-    """Test suite for handle_checkout_completed business logic paths."""
 
     @pytest.fixture
     def service(self):
@@ -1049,7 +961,6 @@ class TestHandleCheckoutCompletedLogic:
 
     @pytest.mark.asyncio
     async def test_idempotency_returns_existing(self, service, mock_stripe_sub):
-        """If subscription already exists, return it without creating new."""
         existing = MagicMock(id=uuid4())
 
         with patch(
@@ -1077,7 +988,6 @@ class TestHandleCheckoutCompletedLogic:
     async def test_deactivates_existing_free_subscription(
         self, service, mock_stripe_sub
     ):
-        """Existing free subscription is marked CANCELED before creating new."""
         current_sub = MagicMock(id=uuid4())
         plan = MagicMock(id=uuid4(), stripe_price_id="price_base_123")
         new_sub = MagicMock(id=uuid4())
@@ -1120,7 +1030,6 @@ class TestHandleCheckoutCompletedLogic:
                 seat_count=1,
             )
 
-            # Verify old sub was canceled
             cancel_call = mock_sub_db.update.call_args_list[0]
             cancel_data = (
                 cancel_call.args[2]
@@ -1131,7 +1040,6 @@ class TestHandleCheckoutCompletedLogic:
 
     @pytest.mark.asyncio
     async def test_creates_new_context_when_none_exists(self, service, mock_stripe_sub):
-        """New context is created when workspace has no previous context."""
         plan = MagicMock(id=uuid4(), stripe_price_id="price_base_123")
         new_sub = MagicMock(id=uuid4())
         workspace_id = uuid4()
@@ -1184,7 +1092,6 @@ class TestHandleCheckoutCompletedLogic:
 
     @pytest.mark.asyncio
     async def test_updates_existing_context(self, service, mock_stripe_sub):
-        """Existing context is updated to point to the new subscription."""
         plan = MagicMock(id=uuid4(), stripe_price_id="price_base_123")
         new_sub = MagicMock(id=uuid4())
         workspace_id = uuid4()
@@ -1237,7 +1144,6 @@ class TestHandleCheckoutCompletedLogic:
 
     @pytest.mark.asyncio
     async def test_activates_workspace(self, service, mock_stripe_sub):
-        """Workspace is set to ACTIVE after checkout."""
         from app.core.enums import WorkspaceStatus
 
         plan = MagicMock(id=uuid4(), stripe_price_id="price_base_123")
@@ -1286,7 +1192,6 @@ class TestHandleCheckoutCompletedLogic:
 
     @pytest.mark.asyncio
     async def test_sends_activation_email(self, service, mock_stripe_sub):
-        """Activation email is published after successful checkout."""
         plan_id = uuid4()
         plan = MagicMock(id=plan_id, stripe_price_id="price_base_123")
         plan.name = "Professional"
@@ -1343,7 +1248,6 @@ class TestHandleCheckoutCompletedLogic:
 
     @pytest.mark.asyncio
     async def test_plan_not_found_raises(self, service, mock_stripe_sub):
-        """Missing plan raises PlanNotFoundException."""
         from app.apps.cubex_api.services.subscription import PlanNotFoundException
 
         with patch(
@@ -1369,13 +1273,7 @@ class TestHandleCheckoutCompletedLogic:
                 )
 
 
-# ============================================================================
-# Phase 4: handle_subscription_deleted Tests
-# ============================================================================
-
-
 class TestHandleSubscriptionDeleted:
-    """Test suite for handle_subscription_deleted business logic."""
 
     @pytest.fixture
     def service(self):
@@ -1385,7 +1283,6 @@ class TestHandleSubscriptionDeleted:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_not_found(self, service):
-        """Returns None when subscription not found in DB."""
         with patch(
             "app.apps.cubex_api.services.subscription.subscription_db"
         ) as mock_sub_db:
@@ -1400,7 +1297,6 @@ class TestHandleSubscriptionDeleted:
 
     @pytest.mark.asyncio
     async def test_marks_subscription_canceled(self, service):
-        """Subscription is marked CANCELED with canceled_at timestamp."""
         api_context = MagicMock(workspace_id=uuid4())
         subscription = MagicMock(
             id=uuid4(),
@@ -1445,7 +1341,6 @@ class TestHandleSubscriptionDeleted:
 
     @pytest.mark.asyncio
     async def test_freezes_workspace_for_api_subscription(self, service):
-        """Workspace is frozen when API subscription is deleted."""
         from app.core.enums import WorkspaceStatus
 
         workspace_id = uuid4()
@@ -1486,7 +1381,6 @@ class TestHandleSubscriptionDeleted:
 
     @pytest.mark.asyncio
     async def test_no_freeze_when_no_api_context(self, service):
-        """No workspace freeze when subscription has no API context."""
         subscription = MagicMock(
             id=uuid4(),
             product_type=ProductType.API,
@@ -1514,13 +1408,7 @@ class TestHandleSubscriptionDeleted:
             mock_ws_db.update_status.assert_not_called()
 
 
-# ============================================================================
-# Phase 5: handle_subscription_updated Extended Tests
-# ============================================================================
-
-
 class TestHandleSubscriptionUpdatedLogic:
-    """Test suite for handle_subscription_updated business logic paths."""
 
     @pytest.fixture
     def service(self):
@@ -1575,7 +1463,6 @@ class TestHandleSubscriptionUpdatedLogic:
 
     @pytest.mark.asyncio
     async def test_invalid_subscription_id_raises_value_error(self, service):
-        """Empty or non-string subscription ID raises ValueError."""
         with pytest.raises(ValueError, match="Invalid Stripe subscription ID"):
             await service.handle_subscription_updated(
                 session=AsyncMock(),
@@ -1584,7 +1471,6 @@ class TestHandleSubscriptionUpdatedLogic:
 
     @pytest.mark.asyncio
     async def test_not_found_returns_none(self, service):
-        """Returns None when subscription not in DB."""
         with patch(
             "app.apps.cubex_api.services.subscription.subscription_db"
         ) as mock_sub_db:
@@ -1599,7 +1485,6 @@ class TestHandleSubscriptionUpdatedLogic:
 
     @pytest.mark.asyncio
     async def test_status_mapping_active(self, service, mock_db_sub):
-        """Stripe 'active' status maps to ACTIVE."""
         stripe_sub = self._make_stripe_sub(status="active")
 
         with patch(
@@ -1634,7 +1519,6 @@ class TestHandleSubscriptionUpdatedLogic:
 
     @pytest.mark.asyncio
     async def test_status_mapping_past_due(self, service, mock_db_sub):
-        """Stripe 'past_due' status maps to PAST_DUE."""
         stripe_sub = self._make_stripe_sub(status="past_due")
 
         with patch(
@@ -1669,7 +1553,6 @@ class TestHandleSubscriptionUpdatedLogic:
 
     @pytest.mark.asyncio
     async def test_status_canceled_freezes_workspace(self, service, mock_db_sub):
-        """CANCELED status triggers workspace freeze."""
         from app.core.enums import WorkspaceStatus
 
         stripe_sub = self._make_stripe_sub(status="canceled")
@@ -1708,7 +1591,6 @@ class TestHandleSubscriptionUpdatedLogic:
     async def test_active_status_reactivates_frozen_workspace(
         self, service, mock_db_sub
     ):
-        """ACTIVE status reactivates a FROZEN workspace."""
         from app.core.enums import WorkspaceStatus
 
         stripe_sub = self._make_stripe_sub(status="active")
@@ -1743,7 +1625,6 @@ class TestHandleSubscriptionUpdatedLogic:
 
     @pytest.mark.asyncio
     async def test_canceled_at_propagated(self, service, mock_db_sub):
-        """canceled_at from Stripe is propagated to DB update."""
         stripe_sub = self._make_stripe_sub(status="canceled")
         stripe_sub.canceled_at = 1702000000
 
@@ -1782,7 +1663,6 @@ class TestHandleSubscriptionUpdatedLogic:
 
     @pytest.mark.asyncio
     async def test_billing_period_change_resets_credits(self, service, mock_db_sub):
-        """Credits are reset when billing period changes."""
         stripe_sub = self._make_stripe_sub(status="active")
         # Change period to trigger reset
         stripe_sub.items.data[0].current_period_start = 1702678400  # New period
@@ -1814,13 +1694,7 @@ class TestHandleSubscriptionUpdatedLogic:
             )
 
 
-# ============================================================================
-# Phase 6: API create_checkout_session tests
-# ============================================================================
-
-
 class TestCreateCheckoutSessionLogic:
-    """Tests for SubscriptionService.create_checkout_session."""
 
     SVC = "app.apps.cubex_api.services.subscription"
 
@@ -1848,7 +1722,6 @@ class TestCreateCheckoutSessionLogic:
 
     @pytest.mark.asyncio
     async def test_happy_path_with_seat_pricing(self, service):
-        """Creates checkout with dual line items for seat plan."""
         plan = self._make_plan(has_seats=True)
         user = MagicMock(id=uuid4(), email="u@test.com", full_name="Test")
         user.stripe_customer_id = "cus_123"
@@ -1876,7 +1749,6 @@ class TestCreateCheckoutSessionLogic:
 
     @pytest.mark.asyncio
     async def test_plan_not_purchasable_raises(self, service):
-        """Raises when plan cannot be purchased."""
         from app.apps.cubex_api.services.subscription import PlanNotFoundException
 
         plan = self._make_plan(can_purchase=False)
@@ -1897,7 +1769,6 @@ class TestCreateCheckoutSessionLogic:
 
     @pytest.mark.asyncio
     async def test_invalid_seat_count_raises(self, service):
-        """Raises when seat count exceeds plan limits."""
         from app.apps.cubex_api.services.subscription import (
             InvalidSeatCountException,
         )
@@ -1920,7 +1791,6 @@ class TestCreateCheckoutSessionLogic:
 
     @pytest.mark.asyncio
     async def test_existing_paid_subscription_raises(self, service):
-        """Raises when workspace already has a paid subscription."""
         from app.apps.cubex_api.services.subscription import (
             CannotUpgradeFreeWorkspace,
         )
@@ -1947,7 +1817,6 @@ class TestCreateCheckoutSessionLogic:
 
     @pytest.mark.asyncio
     async def test_ensure_stripe_customer_creates_new(self, service):
-        """Creates Stripe customer when user has none."""
         plan = self._make_plan()
         user = MagicMock(id=uuid4(), email="new@test.com", full_name="New")
         user.stripe_customer_id = None
@@ -1979,13 +1848,7 @@ class TestCreateCheckoutSessionLogic:
             mock_stripe.create_customer.assert_called_once()
 
 
-# ============================================================================
-# Phase 6: API cancel_subscription tests
-# ============================================================================
-
-
 class TestCancelSubscriptionLogic:
-    """Tests for SubscriptionService.cancel_subscription."""
 
     SVC = "app.apps.cubex_api.services.subscription"
 
@@ -1997,7 +1860,6 @@ class TestCancelSubscriptionLogic:
 
     @pytest.mark.asyncio
     async def test_cancel_at_period_end(self, service):
-        """Period-end cancel sets flag, does NOT freeze workspace."""
         sub = MagicMock(
             id=uuid4(),
             stripe_subscription_id="sub_cancel_period",
@@ -2030,7 +1892,6 @@ class TestCancelSubscriptionLogic:
 
     @pytest.mark.asyncio
     async def test_cancel_immediately_freezes_workspace(self, service):
-        """Immediate cancel sets CANCELED, freezes workspace."""
         workspace_id = uuid4()
         sub = MagicMock(
             id=uuid4(),
@@ -2070,7 +1931,6 @@ class TestCancelSubscriptionLogic:
 
     @pytest.mark.asyncio
     async def test_not_found_raises(self, service):
-        """Raises when no subscription found for workspace."""
         from app.apps.cubex_api.services.subscription import (
             SubscriptionNotFoundException,
         )
@@ -2084,13 +1944,7 @@ class TestCancelSubscriptionLogic:
                 )
 
 
-# ============================================================================
-# Phase 6: API reactivate_workspace tests
-# ============================================================================
-
-
 class TestReactivateWorkspaceLogic:
-    """Tests for SubscriptionService.reactivate_workspace."""
 
     SVC = "app.apps.cubex_api.services.subscription"
 
@@ -2102,7 +1956,6 @@ class TestReactivateWorkspaceLogic:
 
     @pytest.mark.asyncio
     async def test_happy_path_reactivates(self, service):
-        """Reactivates workspace and re-enables owner."""
         from app.core.enums import WorkspaceStatus
 
         workspace_id = uuid4()
@@ -2138,7 +1991,6 @@ class TestReactivateWorkspaceLogic:
 
     @pytest.mark.asyncio
     async def test_too_many_members_raises(self, service):
-        """Raises when selected members exceed seat count."""
         from app.apps.cubex_api.services.subscription import (
             InvalidSeatCountException,
         )
@@ -2172,7 +2024,6 @@ class TestReactivateWorkspaceLogic:
 
     @pytest.mark.asyncio
     async def test_not_found_raises(self, service):
-        """Raises when no active subscription found."""
         from app.apps.cubex_api.services.subscription import (
             SubscriptionNotFoundException,
         )
@@ -2186,13 +2037,7 @@ class TestReactivateWorkspaceLogic:
                 )
 
 
-# ============================================================================
-# Phase 6: API preview_subscription_change tests
-# ============================================================================
-
-
 class TestPreviewSubscriptionChangeLogic:
-    """Tests for SubscriptionService.preview_subscription_change."""
 
     SVC = "app.apps.cubex_api.services.subscription"
 
@@ -2225,7 +2070,6 @@ class TestPreviewSubscriptionChangeLogic:
 
     @pytest.mark.asyncio
     async def test_plan_upgrade_preview(self, service):
-        """Previews a plan upgrade returning invoice."""
         sub = self._make_sub(plan_rank=1)
         new_plan = MagicMock(
             id=uuid4(),
@@ -2261,7 +2105,6 @@ class TestPreviewSubscriptionChangeLogic:
 
     @pytest.mark.asyncio
     async def test_same_plan_raises(self, service):
-        """Raises when target plan is the same."""
         from app.apps.cubex_api.services.subscription import SamePlanException
 
         sub = self._make_sub()
@@ -2288,7 +2131,6 @@ class TestPreviewSubscriptionChangeLogic:
 
     @pytest.mark.asyncio
     async def test_downgrade_raises(self, service):
-        """Raises when target plan has lower rank."""
         from app.apps.cubex_api.services.subscription import (
             PlanDowngradeNotAllowedException,
         )
@@ -2321,7 +2163,6 @@ class TestPreviewSubscriptionChangeLogic:
 
     @pytest.mark.asyncio
     async def test_not_found_raises(self, service):
-        """Raises when subscription not found."""
         from app.apps.cubex_api.services.subscription import (
             SubscriptionNotFoundException,
         )
@@ -2337,13 +2178,7 @@ class TestPreviewSubscriptionChangeLogic:
                 )
 
 
-# ============================================================================
-# Phase 6: API upgrade_plan tests
-# ============================================================================
-
-
 class TestUpgradePlanLogic:
-    """Tests for SubscriptionService.upgrade_plan."""
 
     SVC = "app.apps.cubex_api.services.subscription"
 
@@ -2375,7 +2210,6 @@ class TestUpgradePlanLogic:
 
     @pytest.mark.asyncio
     async def test_happy_path_upgrades(self, service):
-        """Successful upgrade updates Stripe and DB."""
         sub = self._make_sub(plan_rank=1)
         new_plan = MagicMock(
             id=uuid4(),
@@ -2418,7 +2252,6 @@ class TestUpgradePlanLogic:
 
             assert result is updated_sub
             mock_stripe.update_subscription.assert_called_once()
-            # Verify DB updated with new plan_id
             update_data = mock_sub_db.update.call_args
             data = (
                 update_data.args[2]
@@ -2429,7 +2262,6 @@ class TestUpgradePlanLogic:
 
     @pytest.mark.asyncio
     async def test_same_plan_raises(self, service):
-        """Raises when upgrading to same plan."""
         from app.apps.cubex_api.services.subscription import SamePlanException
 
         sub = self._make_sub()
@@ -2456,7 +2288,6 @@ class TestUpgradePlanLogic:
 
     @pytest.mark.asyncio
     async def test_downgrade_raises(self, service):
-        """Raises when target plan rank is lower."""
         from app.apps.cubex_api.services.subscription import (
             PlanDowngradeNotAllowedException,
         )
@@ -2487,7 +2318,6 @@ class TestUpgradePlanLogic:
 
     @pytest.mark.asyncio
     async def test_seats_exceed_new_plan_max_raises(self, service):
-        """Raises when current seat count exceeds new plan max."""
         from app.apps.cubex_api.services.subscription import (
             InvalidSeatCountException,
         )
@@ -2520,7 +2350,6 @@ class TestUpgradePlanLogic:
 
     @pytest.mark.asyncio
     async def test_not_found_raises(self, service):
-        """Raises when subscription not found."""
         from app.apps.cubex_api.services.subscription import (
             SubscriptionNotFoundException,
         )
@@ -2534,3 +2363,4 @@ class TestUpgradePlanLogic:
                     workspace_id=uuid4(),
                     new_plan_id=uuid4(),
                 )
+

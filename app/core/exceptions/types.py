@@ -133,11 +133,6 @@ class InvalidStateException(BadRequestException):
         super().__init__(message)
 
 
-# =============================================================================
-# Stripe Payment Exceptions
-# =============================================================================
-
-
 class StripeAPIException(AppException):
     """Exception raised for Stripe API errors."""
 
@@ -236,3 +231,4 @@ __all__ = [
     "RateLimitException",
     "NotImplementedException",
 ]
+

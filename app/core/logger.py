@@ -84,7 +84,6 @@ def setup_logger(
     Returns:
         logging.Logger: The configured logger instance.
     """
-    # Set Sentry tag for this logger if Sentry is initialized
     if sentry_tag and _sentry_initialized:
         try:
             import sentry_sdk
@@ -123,3 +122,4 @@ def setup_logger(
         logger.addHandler(handler)
 
     return logger
+

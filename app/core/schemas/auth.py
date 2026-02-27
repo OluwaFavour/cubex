@@ -1,8 +1,6 @@
 """
 Authentication schemas for request validation and response serialization.
 
-This module provides Pydantic models for all authentication-related
-API endpoints including:
 - Email signup and verification
 - Email signin with remember me
 - OAuth authentication flows
@@ -27,10 +25,6 @@ from pydantic import (
 from app.core.enums import OAuthProviders
 
 
-# =============================================================================
-# Type Aliases for Reusable Annotated Types
-# =============================================================================
-
 # Password with validation constraints
 PasswordStr = Annotated[
     str,
@@ -46,11 +40,6 @@ OTPCodeStr = Annotated[
 ]
 
 
-# =============================================================================
-# Base Schemas
-# =============================================================================
-
-
 class MessageResponse(BaseModel):
     """Generic message response."""
 
@@ -62,11 +51,6 @@ class MessageResponse(BaseModel):
 
     message: str
     success: bool = True
-
-
-# =============================================================================
-# Signup Schemas
-# =============================================================================
 
 
 class SignupRequest(BaseModel):
@@ -121,11 +105,6 @@ class SignupResponse(BaseModel):
     requires_verification: bool = True
 
 
-# =============================================================================
-# OTP Verification Schemas
-# =============================================================================
-
-
 class OTPVerifyRequest(BaseModel):
     """Request schema for OTP verification."""
 
@@ -149,11 +128,6 @@ class ResendOTPRequest(BaseModel):
     email: Annotated[EmailStr, Field(description="Email to resend OTP to")]
 
 
-# =============================================================================
-# Login Schemas
-# =============================================================================
-
-
 class LoginRequest(BaseModel):
     """Request schema for email signin."""
 
@@ -173,11 +147,6 @@ class LoginRequest(BaseModel):
         bool,
         Field(description="If true, extends refresh token duration to 30 days"),
     ] = False
-
-
-# =============================================================================
-# Token Schemas
-# =============================================================================
 
 
 class TokenResponse(BaseModel):
@@ -234,11 +203,6 @@ class AccessTokenResponse(BaseModel):
     ]
 
 
-# =============================================================================
-# OAuth Schemas
-# =============================================================================
-
-
 class OAuthInitRequest(BaseModel):
     """Request schema for initiating OAuth flow."""
 
@@ -284,11 +248,6 @@ class OAuthCallbackRequest(BaseModel):
 
     code: Annotated[str, Field(description="Authorization code from provider")]
     state: Annotated[str, Field(description="State parameter for CSRF validation")]
-
-
-# =============================================================================
-# Password Reset Schemas
-# =============================================================================
 
 
 class PasswordResetRequest(BaseModel):
@@ -359,11 +318,6 @@ class ChangePasswordRequest(BaseModel):
         return v
 
 
-# =============================================================================
-# Profile Schemas
-# =============================================================================
-
-
 class ProfileResponse(BaseModel):
     """Response schema for user profile."""
 
@@ -429,11 +383,6 @@ class ProfileUpdateRequest(BaseModel):
     ] = None
 
 
-# =============================================================================
-# Session Management Schemas
-# =============================================================================
-
-
 class ActiveSessionResponse(BaseModel):
     """Response schema for an active session."""
 
@@ -482,10 +431,6 @@ class ActiveSessionsResponse(BaseModel):
     total: int
 
 
-# =============================================================================
-# Export all schemas
-# =============================================================================
-
 __all__ = [
     # Base
     "MessageResponse",
@@ -516,3 +461,4 @@ __all__ = [
     "ActiveSessionResponse",
     "ActiveSessionsResponse",
 ]
+

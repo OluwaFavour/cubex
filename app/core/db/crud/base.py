@@ -584,7 +584,6 @@ class BaseDB(Generic[T]):
             DatabaseException: If an error occurs during the operation.
             ValueError: If any unique_field is missing from data.
         """
-        # Validate that all unique fields are in data
         for field in unique_fields:
             if field not in data:
                 raise ValueError(
@@ -592,7 +591,6 @@ class BaseDB(Generic[T]):
                 )
 
         try:
-            # Build exclusion list for updates
             default_exclude = {"id", "created_at", *unique_fields}
             if exclude_from_update:
                 default_exclude.update(exclude_from_update)
@@ -600,7 +598,6 @@ class BaseDB(Generic[T]):
             # Prepare insert data (exclude 'id' to let DB generate it)
             insert_data = {k: v for k, v in data.items() if k != "id"}
 
-            # Add timestamps for new records
             now = datetime.now(timezone.utc)
             if hasattr(self.model, "created_at") and "created_at" not in insert_data:
                 insert_data["created_at"] = now
@@ -617,7 +614,6 @@ class BaseDB(Generic[T]):
             if hasattr(self.model, "updated_at"):
                 update_set["updated_at"] = now
 
-            # Build the INSERT ... ON CONFLICT ... DO UPDATE statement
             stmt = (
                 pg_insert(self.model)
                 .values(**insert_data)
@@ -824,7 +820,6 @@ class BaseDB(Generic[T]):
             DatabaseException: If an error occurs while deleting records or committing the transaction.
         """
         try:
-            # Ensure model has soft-delete fields
             if not hasattr(self.model, "is_deleted") or not hasattr(
                 self.model, "deleted_at"
             ):
@@ -851,3 +846,4 @@ class BaseDB(Generic[T]):
             raise DatabaseException(
                 f"Error permanently deleting soft-deleted {self.model.__name__} records: {str(e)}"
             ) from e
+

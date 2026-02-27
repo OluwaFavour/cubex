@@ -1,9 +1,6 @@
 """
 Career usage log model.
 
-This module provides the CareerUsageLog model for tracking per-user
-usage of career product features. It mirrors the API UsageLog but
-scopes to users instead of workspaces/API keys.
 """
 
 from datetime import datetime
@@ -243,3 +240,4 @@ class CareerUsageLog(BaseModel):
 
 
 __all__ = ["CareerUsageLog"]
+

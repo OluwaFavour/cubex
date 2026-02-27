@@ -1,10 +1,6 @@
 """
 Usage commit message handler for async processing.
 
-This module handles usage commit messages from the queue as an alternative
-to the HTTP commit endpoint. Servers can publish commit requests to the
-'usage_commits' queue instead of calling the HTTP endpoint directly.
-
 The payload schema matches UsageCommitRequest from the HTTP endpoint.
 """
 
@@ -46,7 +42,6 @@ async def handle_usage_commit(event: dict[str, Any]) -> None:
         f"Processing usage commit message: {event.get('usage_id', 'unknown')}"
     )
 
-    # Validate payload against schema
     try:
         request = UsageCommitRequest(**event)
     except ValidationError as e:
@@ -59,7 +54,6 @@ async def handle_usage_commit(event: dict[str, Any]) -> None:
         )
         return  # Don't retry - payload will never be valid
 
-    # Extract metrics if provided
     metrics = None
     if request.metrics:
         metrics = {
@@ -69,7 +63,6 @@ async def handle_usage_commit(event: dict[str, Any]) -> None:
             "latency_ms": request.metrics.latency_ms,
         }
 
-    # Extract failure details if provided
     failure = None
     if request.failure:
         failure = {
@@ -109,3 +102,4 @@ async def handle_usage_commit(event: dict[str, Any]) -> None:
 
 
 __all__ = ["handle_usage_commit"]
+

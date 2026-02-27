@@ -1,8 +1,6 @@
 """
 Shared dependencies for FastAPI endpoints.
 
-This module exports all core FastAPI dependency functions
-used across multiple application modules.
 """
 
 from app.core.dependencies.auth import (
@@ -43,3 +41,4 @@ __all__ = [
     "InvalidInternalAPIKeyException",
     "get_async_session",
 ]
+

@@ -1,16 +1,11 @@
 """
 GitHub OAuth provider implementation.
 
-This module provides OAuth authentication with GitHub, supporting
-the standard authorization code flow.
-
 Example usage:
     from app.core.services.oauth.github import GitHubOAuthService
 
-    # Initialize the service
     await GitHubOAuthService.init()
 
-    # Generate authorization URL
     url = GitHubOAuthService.get_authorization_url(
         redirect_uri="https://app.com/callback",
         state="random_state_token",
@@ -22,11 +17,9 @@ Example usage:
         redirect_uri="https://app.com/callback",
     )
 
-    # Get user information
     user_info = await GitHubOAuthService.get_user_info(tokens.access_token)
     print(f"User email: {user_info.email}")
 
-    # Cleanup
     await GitHubOAuthService.aclose()
 """
 
@@ -381,7 +374,6 @@ class GitHubOAuthService(BaseOAuthProvider):
 
                 user_data = response.json()
 
-                # Get email - may need to fetch from /user/emails endpoint
                 email = user_data.get("email")
                 email_verified = False
 
@@ -420,3 +412,4 @@ class GitHubOAuthService(BaseOAuthProvider):
         raise OAuthException(
             message="Failed to retrieve GitHub user info: network error"
         ) from last_error
+

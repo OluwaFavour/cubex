@@ -52,3 +52,4 @@ async def dispose_db() -> None:
         None
     """
     await async_engine.dispose()
+

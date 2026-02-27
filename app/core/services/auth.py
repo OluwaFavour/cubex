@@ -1,7 +1,6 @@
 """
 Authentication Service for managing user authentication flows.
 
-This module provides a centralized authentication service that handles:
 - Email signup with password hashing and OTP verification
 - Email signin with password verification
 - OAuth authentication (Google, GitHub)
@@ -126,9 +125,6 @@ class AuthService:
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     REFRESH_TOKEN_REMEMBER_DAYS: int = 30
 
-    # =========================================================================
-    # Initialization
-    # =========================================================================
 
     @classmethod
     def init(cls) -> None:
@@ -154,9 +150,6 @@ class AuthService:
         """
         return cls._initialized
 
-    # =========================================================================
-    # Password Utilities
-    # =========================================================================
 
     @classmethod
     def hash_password(cls, password: str) -> str:
@@ -202,9 +195,6 @@ class AuthService:
         except Exception:
             return False
 
-    # =========================================================================
-    # OTP Utilities
-    # =========================================================================
 
     @classmethod
     def generate_otp(cls, length: int | None = None) -> str:
@@ -227,7 +217,6 @@ class AuthService:
         if length is None:
             length = settings.OTP_LENGTH
 
-        # Generate secure random digits
         return "".join(str(secrets.randbelow(10)) for _ in range(length))
 
     @classmethod
@@ -273,14 +262,12 @@ class AuthService:
             commit_self=False,
         )
 
-        # Generate new OTP
         otp_code = cls.generate_otp()
         code_hash = hmac_hash_otp(otp_code, settings.OTP_HMAC_SECRET)
         expires_at = datetime.now(timezone.utc) + timedelta(
             minutes=settings.OTP_EXPIRY_MINUTES
         )
 
-        # Create OTP token
         await otp_token_db.create(
             session=session,
             data={
@@ -361,14 +348,12 @@ class AuthService:
             auth_logger.warning(f"OTP verification failed: invalid code for {email}")
             raise OTPInvalidException()
 
-        # Check attempts
         if token.attempts >= settings.OTP_MAX_ATTEMPTS:
             auth_logger.warning(
                 f"OTP verification failed: too many attempts for {email}"
             )
             raise TooManyAttemptsException()
 
-        # Mark as used
         await otp_token_db.mark_as_used(
             session=session, token=token, commit_self=commit_self
         )
@@ -376,9 +361,6 @@ class AuthService:
         auth_logger.info(f"OTP verified: email={email}, purpose={purpose.value}")
         return True
 
-    # =========================================================================
-    # Email Authentication
-    # =========================================================================
 
     @classmethod
     async def email_signup(
@@ -413,7 +395,6 @@ class AuthService:
             ...     full_name="New User",
             ... )
         """
-        # Check if user exists
         existing = await user_db.get_one_by_conditions(
             session=session,
             conditions=[user_db.model.email == email],
@@ -428,7 +409,6 @@ class AuthService:
         # Hash password
         password_hash = cls.hash_password(password)
 
-        # Create user
         user = await user_db.create(
             session=session,
             data={
@@ -504,19 +484,16 @@ class AuthService:
             auth_logger.warning(f"Signin failed: user not found {email}")
             raise InvalidCredentialsException()
 
-        # Check if OAuth-only user
         if user.password_hash is None:
             auth_logger.warning(f"Signin failed: OAuth-only user {email}")
             raise AuthenticationException(
                 message="This account uses OAuth login. Please sign in with Google or GitHub."
             )
 
-        # Verify password
         if not cls.verify_password(password, user.password_hash):
             auth_logger.warning(f"Signin failed: wrong password {email}")
             raise InvalidCredentialsException()
 
-        # Check if active
         if not user.is_active:
             auth_logger.warning(f"Signin failed: user deactivated {email}")
             raise AuthenticationException(message="This account has been deactivated")
@@ -524,9 +501,6 @@ class AuthService:
         auth_logger.info(f"User signin: email={email}")
         return user
 
-    # =========================================================================
-    # OAuth Authentication
-    # =========================================================================
 
     @classmethod
     def get_oauth_provider(cls, provider: OAuthProviders) -> Type[BaseOAuthProvider]:
@@ -589,7 +563,6 @@ class AuthService:
         # Map provider string to enum
         provider_enum = OAuthProviders(user_info.provider)
 
-        # Check if OAuth account exists
         existing_oauth = await oauth_account_db.get_one_by_conditions(
             session=session,
             conditions=[
@@ -604,7 +577,6 @@ class AuthService:
             # OAuth account exists, return associated user
             user = existing_oauth.user
 
-            # Update user info if changed
             updates = {}
             if user_info.name and not user.full_name:
                 updates["full_name"] = user_info.name
@@ -626,7 +598,6 @@ class AuthService:
             )
             return user
 
-        # Check if user with email exists
         existing_user = await user_db.get_one_by_conditions(
             session=session,
             conditions=[user_db.model.email == user_info.email],
@@ -644,7 +615,6 @@ class AuthService:
                 commit_self=False,
             )
 
-            # Update user info if changed
             updates = {}
             if user_info.name and not existing_user.full_name:
                 updates["full_name"] = user_info.name
@@ -669,7 +639,6 @@ class AuthService:
             )
             return existing_user
 
-        # Create new user
         new_user = await user_db.create(
             session=session,
             data={
@@ -681,7 +650,6 @@ class AuthService:
             commit_self=False,
         )
 
-        # Create OAuth account
         await oauth_account_db.create(
             session=session,
             data={
@@ -721,9 +689,6 @@ class AuthService:
         )
         return new_user
 
-    # =========================================================================
-    # Password Reset
-    # =========================================================================
 
     @classmethod
     async def reset_password(
@@ -769,7 +734,6 @@ class AuthService:
         # Hash new password
         password_hash = cls.hash_password(new_password)
 
-        # Update password
         await user_db.update(
             session=session,
             id=user.id,
@@ -789,9 +753,6 @@ class AuthService:
         auth_logger.info(f"Password reset: email={email}")
         return True
 
-    # =========================================================================
-    # Token Management
-    # =========================================================================
 
     @classmethod
     def hash_token(cls, token: str) -> str:
@@ -868,7 +829,6 @@ class AuthService:
             ... )
             >>> print(tokens.access_token)
         """
-        # Generate access token
         access_token_expires = timedelta(minutes=cls.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_jwt_token(
             data={
@@ -879,11 +839,9 @@ class AuthService:
             expires_delta=access_token_expires,
         )
 
-        # Generate refresh token
         refresh_token = cls._generate_refresh_token()
         refresh_token_hash = cls._hash_refresh_token(refresh_token)
 
-        # Calculate refresh token expiration
         if remember_me:
             refresh_expires_delta = timedelta(days=cls.REFRESH_TOKEN_REMEMBER_DAYS)
         else:
@@ -891,7 +849,6 @@ class AuthService:
 
         refresh_expires_at = datetime.now(timezone.utc) + refresh_expires_delta
 
-        # Store refresh token in database
         await refresh_token_db.create(
             session=session,
             data={
@@ -959,12 +916,10 @@ class AuthService:
 
         user = token_record.user
 
-        # Check if user is still active
         if not user.is_active or user.is_deleted:
             auth_logger.warning(f"Token refresh failed: user inactive {user.email}")
             raise AuthenticationException(message="User account is not active")
 
-        # Generate new access token
         access_token_expires = timedelta(minutes=cls.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_jwt_token(
             data={
@@ -1115,14 +1070,12 @@ class AuthService:
             ... )
             True
         """
-        # Check if user has a password
         if user.password_hash is None:
             auth_logger.warning(f"Password change failed: no password set {user.email}")
             raise AuthenticationException(
                 message="Cannot change password. Account uses OAuth login only."
             )
 
-        # Verify current password
         if not cls.verify_password(current_password, user.password_hash):
             auth_logger.warning(
                 f"Password change failed: wrong current password {user.email}"
@@ -1151,3 +1104,4 @@ class AuthService:
 
         auth_logger.info(f"Password changed: email={user.email}")
         return True
+

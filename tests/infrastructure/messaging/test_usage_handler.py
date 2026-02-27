@@ -19,13 +19,7 @@ from uuid import uuid4
 import pytest
 
 
-# ============================================================================
-# Import / Export Tests
-# ============================================================================
-
-
 class TestUsageHandlerImports:
-    """Test that the handler module exports correctly."""
 
     def test_handle_usage_commit_import(self):
         from app.infrastructure.messaging.handlers.usage_handler import (
@@ -54,17 +48,10 @@ class TestUsageHandlerImports:
         assert config.max_retries == 3
 
 
-# ============================================================================
-# Validation Error Tests
-# ============================================================================
-
-
 class TestUsageHandlerValidation:
-    """Test payload validation and alert behavior."""
 
     @pytest.mark.asyncio
     async def test_invalid_payload_sends_alert_and_returns(self):
-        """Invalid payload sends email alert and does NOT raise (no retry)."""
         from app.infrastructure.messaging.handlers.usage_handler import (
             handle_usage_commit,
         )
@@ -75,7 +62,6 @@ class TestUsageHandlerValidation:
             "app.infrastructure.messaging.handlers.usage_handler.EmailManagerService.send_invalid_payload_alert",
             new_callable=AsyncMock,
         ) as mock_alert:
-            # Should NOT raise
             await handle_usage_commit(invalid_event)
 
             mock_alert.assert_called_once()
@@ -85,7 +71,6 @@ class TestUsageHandlerValidation:
 
     @pytest.mark.asyncio
     async def test_missing_api_key_sends_alert(self):
-        """Missing api_key field sends alert."""
         from app.infrastructure.messaging.handlers.usage_handler import (
             handle_usage_commit,
         )
@@ -104,7 +89,6 @@ class TestUsageHandlerValidation:
 
     @pytest.mark.asyncio
     async def test_missing_usage_id_sends_alert(self):
-        """Missing usage_id field sends alert."""
         from app.infrastructure.messaging.handlers.usage_handler import (
             handle_usage_commit,
         )
@@ -123,7 +107,6 @@ class TestUsageHandlerValidation:
 
     @pytest.mark.asyncio
     async def test_failure_without_details_sends_alert(self):
-        """success=False without failure details sends alert."""
         from app.infrastructure.messaging.handlers.usage_handler import (
             handle_usage_commit,
         )
@@ -143,17 +126,10 @@ class TestUsageHandlerValidation:
             mock_alert.assert_called_once()
 
 
-# ============================================================================
-# Successful Processing Tests
-# ============================================================================
-
-
 class TestUsageHandlerProcessing:
-    """Test successful message processing."""
 
     @pytest.mark.asyncio
     async def test_valid_success_commit_calls_service(self):
-        """Valid success commit calls quota_service.commit_usage correctly."""
         from app.infrastructure.messaging.handlers.usage_handler import (
             handle_usage_commit,
         )
@@ -195,7 +171,6 @@ class TestUsageHandlerProcessing:
 
     @pytest.mark.asyncio
     async def test_valid_success_with_metrics(self):
-        """Valid success commit with metrics extracts them correctly."""
         from app.infrastructure.messaging.handlers.usage_handler import (
             handle_usage_commit,
         )
@@ -241,7 +216,6 @@ class TestUsageHandlerProcessing:
 
     @pytest.mark.asyncio
     async def test_valid_failure_with_details(self):
-        """Valid failure commit with details extracts them correctly."""
         from app.infrastructure.messaging.handlers.usage_handler import (
             handle_usage_commit,
         )
@@ -284,7 +258,6 @@ class TestUsageHandlerProcessing:
 
     @pytest.mark.asyncio
     async def test_commit_rejected_does_not_raise(self):
-        """When commit_usage returns success=False (rejected), handler doesn't raise."""
         from app.infrastructure.messaging.handlers.usage_handler import (
             handle_usage_commit,
         )
@@ -315,17 +288,10 @@ class TestUsageHandlerProcessing:
             await handle_usage_commit(event)
 
 
-# ============================================================================
-# Error Handling Tests
-# ============================================================================
-
-
 class TestUsageHandlerErrorHandling:
-    """Test error handling and retry behavior."""
 
     @pytest.mark.asyncio
     async def test_processing_error_raises_for_retry(self):
-        """Processing error re-raises exception to trigger queue retry."""
         from app.infrastructure.messaging.handlers.usage_handler import (
             handle_usage_commit,
         )
@@ -357,7 +323,6 @@ class TestUsageHandlerErrorHandling:
 
     @pytest.mark.asyncio
     async def test_session_creation_error_raises_for_retry(self):
-        """Session creation error re-raises exception to trigger queue retry."""
         from app.infrastructure.messaging.handlers.usage_handler import (
             handle_usage_commit,
         )
@@ -380,3 +345,4 @@ class TestUsageHandlerErrorHandling:
         ):
             with pytest.raises(RuntimeError, match="Cannot connect to DB"):
                 await handle_usage_commit(event)
+

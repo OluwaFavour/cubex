@@ -1,7 +1,6 @@
 """
 Test suite for QuotaService.
 
-This module contains comprehensive tests for the QuotaService including:
 - API key generation and management
 - Usage validation and logging
 - Usage reverting (idempotent)
@@ -24,10 +23,8 @@ from app.core.enums import AccessStatus, FailureType
 
 
 class TestFailureTypeEnum:
-    """Test suite for FailureType enum."""
 
     def test_failure_type_values(self):
-        """Test that all expected failure types exist."""
         assert FailureType.INTERNAL_ERROR.value == "internal_error"
         assert FailureType.TIMEOUT.value == "timeout"
         assert FailureType.RATE_LIMITED.value == "rate_limited"
@@ -37,15 +34,12 @@ class TestFailureTypeEnum:
         assert FailureType.VALIDATION_ERROR.value == "validation_error"
 
     def test_failure_type_count(self):
-        """Test that we have exactly 7 failure types."""
         assert len(FailureType) == 7
 
 
 class TestUsageEstimateValidation:
-    """Test suite for UsageEstimate schema validation."""
 
     def test_valid_usage_estimate_with_all_fields(self):
-        """Test valid usage estimate with all fields."""
         from app.apps.cubex_api.schemas.workspace import UsageEstimate
 
         estimate = UsageEstimate(
@@ -58,7 +52,6 @@ class TestUsageEstimateValidation:
         assert estimate.model == "gpt-4o"
 
     def test_valid_usage_estimate_with_only_input_chars(self):
-        """Test valid usage estimate with only input_chars."""
         from app.apps.cubex_api.schemas.workspace import UsageEstimate
 
         estimate = UsageEstimate(input_chars=1000)
@@ -67,14 +60,12 @@ class TestUsageEstimateValidation:
         assert estimate.model is None
 
     def test_valid_usage_estimate_with_only_model(self):
-        """Test valid usage estimate with only model."""
         from app.apps.cubex_api.schemas.workspace import UsageEstimate
 
         estimate = UsageEstimate(model="gpt-4o-mini")
         assert estimate.model == "gpt-4o-mini"
 
     def test_invalid_usage_estimate_no_fields(self):
-        """Test that empty usage estimate raises validation error."""
         from app.apps.cubex_api.schemas.workspace import UsageEstimate
 
         with pytest.raises(ValidationError) as exc_info:
@@ -82,7 +73,6 @@ class TestUsageEstimateValidation:
         assert "At least one field must be provided" in str(exc_info.value)
 
     def test_input_chars_max_bound(self):
-        """Test input_chars max bound (10,000,000)."""
         from app.apps.cubex_api.schemas.workspace import UsageEstimate
 
         # Valid at max
@@ -94,7 +84,6 @@ class TestUsageEstimateValidation:
             UsageEstimate(input_chars=10_000_001)
 
     def test_max_output_tokens_max_bound(self):
-        """Test max_output_tokens max bound (2,000,000)."""
         from app.apps.cubex_api.schemas.workspace import UsageEstimate
 
         # Valid at max
@@ -106,7 +95,6 @@ class TestUsageEstimateValidation:
             UsageEstimate(max_output_tokens=2_000_001)
 
     def test_model_max_length(self):
-        """Test model max length (100)."""
         from app.apps.cubex_api.schemas.workspace import UsageEstimate
 
         # Valid at max length
@@ -119,10 +107,8 @@ class TestUsageEstimateValidation:
 
 
 class TestUsageMetricsValidation:
-    """Test suite for UsageMetrics schema validation."""
 
     def test_valid_metrics_all_fields(self):
-        """Test valid metrics with all fields."""
         from app.apps.cubex_api.schemas.workspace import UsageMetrics
 
         metrics = UsageMetrics(
@@ -137,7 +123,6 @@ class TestUsageMetricsValidation:
         assert metrics.latency_ms == 1200
 
     def test_valid_metrics_partial_fields(self):
-        """Test valid metrics with partial fields."""
         from app.apps.cubex_api.schemas.workspace import UsageMetrics
 
         metrics = UsageMetrics(latency_ms=500)
@@ -145,7 +130,6 @@ class TestUsageMetricsValidation:
         assert metrics.model_used is None
 
     def test_valid_metrics_empty(self):
-        """Test valid empty metrics (all optional)."""
         from app.apps.cubex_api.schemas.workspace import UsageMetrics
 
         metrics = UsageMetrics()
@@ -153,7 +137,6 @@ class TestUsageMetricsValidation:
         assert metrics.input_tokens is None
 
     def test_tokens_max_bounds(self):
-        """Test input/output tokens max bounds (2,000,000)."""
         from app.apps.cubex_api.schemas.workspace import UsageMetrics
 
         # Valid at max
@@ -168,7 +151,6 @@ class TestUsageMetricsValidation:
             UsageMetrics(output_tokens=2_000_001)
 
     def test_latency_ms_max_bound(self):
-        """Test latency_ms max bound (3,600,000 = 1 hour)."""
         from app.apps.cubex_api.schemas.workspace import UsageMetrics
 
         # Valid at max
@@ -181,10 +163,8 @@ class TestUsageMetricsValidation:
 
 
 class TestFailureDetailsValidation:
-    """Test suite for FailureDetails schema validation."""
 
     def test_valid_failure_details(self):
-        """Test valid failure details."""
         from app.apps.cubex_api.schemas.workspace import FailureDetails
 
         failure = FailureDetails(
@@ -195,28 +175,24 @@ class TestFailureDetailsValidation:
         assert "500" in failure.reason
 
     def test_failure_type_required(self):
-        """Test that failure_type is required."""
         from app.apps.cubex_api.schemas.workspace import FailureDetails
 
         with pytest.raises(ValidationError):
             FailureDetails(reason="Some error")  # type: ignore
 
     def test_reason_required(self):
-        """Test that reason is required."""
         from app.apps.cubex_api.schemas.workspace import FailureDetails
 
         with pytest.raises(ValidationError):
             FailureDetails(failure_type=FailureType.TIMEOUT)  # type: ignore
 
     def test_reason_min_length(self):
-        """Test reason min length (1)."""
         from app.apps.cubex_api.schemas.workspace import FailureDetails
 
         with pytest.raises(ValidationError):
             FailureDetails(failure_type=FailureType.TIMEOUT, reason="")
 
     def test_reason_max_length(self):
-        """Test reason max length (1000)."""
         from app.apps.cubex_api.schemas.workspace import FailureDetails
 
         # Valid at max length
@@ -232,10 +208,8 @@ class TestFailureDetailsValidation:
 
 
 class TestUsageCommitRequestValidation:
-    """Test suite for UsageCommitRequest schema validation."""
 
     def test_success_without_metrics(self):
-        """Test successful commit without metrics."""
         from app.apps.cubex_api.schemas.workspace import UsageCommitRequest
 
         request = UsageCommitRequest(
@@ -249,10 +223,8 @@ class TestUsageCommitRequestValidation:
 
 
 class TestUsageValidateRequestNormalization:
-    """Test suite for UsageValidateRequest field normalization."""
 
     def test_endpoint_normalized_to_lowercase(self):
-        """Test that endpoint is normalized to lowercase."""
         from app.apps.cubex_api.schemas.workspace import UsageValidateRequest
         from app.core.enums import FeatureKey
 
@@ -268,7 +240,6 @@ class TestUsageValidateRequestNormalization:
         assert request.endpoint == "/v1/extract-cues/resume"
 
     def test_method_normalized_to_uppercase(self):
-        """Test that method is normalized to uppercase."""
         from app.apps.cubex_api.schemas.workspace import UsageValidateRequest
         from app.core.enums import FeatureKey
 
@@ -284,7 +255,6 @@ class TestUsageValidateRequestNormalization:
         assert request.method == "POST"
 
     def test_mixed_case_normalization(self):
-        """Test both fields normalized with mixed case input."""
         from app.apps.cubex_api.schemas.workspace import UsageValidateRequest
         from app.core.enums import FeatureKey
 
@@ -302,10 +272,8 @@ class TestUsageValidateRequestNormalization:
 
 
 class TestUsageCommitRequestMetricsValidation:
-    """Test suite for UsageCommitRequest with metrics."""
 
     def test_success_with_metrics(self):
-        """Test successful commit with metrics."""
         from app.apps.cubex_api.schemas.workspace import (
             UsageCommitRequest,
             UsageMetrics,
@@ -327,7 +295,6 @@ class TestUsageCommitRequestMetricsValidation:
         assert request.metrics.model_used == "gpt-4o"
 
     def test_failure_requires_failure_details(self):
-        """Test that failure=False requires failure details."""
         from app.apps.cubex_api.schemas.workspace import UsageCommitRequest
 
         with pytest.raises(ValidationError) as exc_info:
@@ -339,7 +306,6 @@ class TestUsageCommitRequestMetricsValidation:
         assert "failure details are required" in str(exc_info.value)
 
     def test_failure_with_failure_details(self):
-        """Test failed commit with failure details."""
         from app.apps.cubex_api.schemas.workspace import (
             FailureDetails,
             UsageCommitRequest,
@@ -360,26 +326,21 @@ class TestUsageCommitRequestMetricsValidation:
 
 
 class TestQuotaServiceInit:
-    """Test suite for QuotaService initialization."""
 
     def test_service_import(self):
-        """Test that QuotaService can be imported."""
         from app.apps.cubex_api.services.quota import QuotaService
 
         assert QuotaService is not None
 
     def test_service_singleton_exists(self):
-        """Test that quota_service singleton is accessible."""
         from app.apps.cubex_api.services.quota import quota_service
 
         assert quota_service is not None
 
 
 class TestQuotaServiceExceptions:
-    """Test suite for quota-related exceptions."""
 
     def test_api_key_not_found_exception(self):
-        """Test APIKeyNotFoundException."""
         from app.apps.cubex_api.services.quota import APIKeyNotFoundException
 
         exc = APIKeyNotFoundException()
@@ -387,7 +348,6 @@ class TestQuotaServiceExceptions:
         assert "API key not found" in str(exc.message)
 
     def test_api_key_invalid_exception(self):
-        """Test APIKeyInvalidException."""
         from app.apps.cubex_api.services.quota import APIKeyInvalidException
 
         exc = APIKeyInvalidException()
@@ -395,7 +355,6 @@ class TestQuotaServiceExceptions:
         assert "invalid" in str(exc.message).lower()
 
     def test_usage_log_not_found_exception(self):
-        """Test UsageLogNotFoundException."""
         from app.apps.cubex_api.services.quota import UsageLogNotFoundException
 
         exc = UsageLogNotFoundException()
@@ -404,38 +363,31 @@ class TestQuotaServiceExceptions:
 
 
 class TestQuotaServiceConstants:
-    """Test suite for QuotaService constants."""
 
     def test_api_key_prefix(self):
-        """Test live API key prefix constant."""
         from app.apps.cubex_api.services.quota import API_KEY_PREFIX
 
         assert API_KEY_PREFIX == "cbx_live_"
 
     def test_test_api_key_prefix(self):
-        """Test test API key prefix constant."""
         from app.apps.cubex_api.services.quota import TEST_API_KEY_PREFIX
 
         assert TEST_API_KEY_PREFIX == "cbx_test_"
 
     def test_client_id_prefix(self):
-        """Test client ID prefix constant."""
         from app.apps.cubex_api.services.quota import CLIENT_ID_PREFIX
 
         assert CLIENT_ID_PREFIX == "ws_"
 
 
 class TestAccessStatusEnum:
-    """Test suite for AccessStatus enum."""
 
     def test_access_status_values(self):
-        """Test AccessStatus enum values."""
         assert AccessStatus.GRANTED.value == "granted"
         assert AccessStatus.DENIED.value == "denied"
 
 
 class TestQuotaServiceMethods:
-    """Test suite for QuotaService method signatures."""
 
     @pytest.fixture
     def service(self):
@@ -445,33 +397,27 @@ class TestQuotaServiceMethods:
         return QuotaService()
 
     def test_has_create_api_key_method(self, service):
-        """Test that create_api_key method exists."""
         assert hasattr(service, "create_api_key")
         assert callable(service.create_api_key)
 
     def test_has_list_api_keys_method(self, service):
-        """Test that list_api_keys method exists."""
         assert hasattr(service, "list_api_keys")
         assert callable(service.list_api_keys)
 
     def test_has_revoke_api_key_method(self, service):
-        """Test that revoke_api_key method exists."""
         assert hasattr(service, "revoke_api_key")
         assert callable(service.revoke_api_key)
 
     def test_has_validate_and_log_usage_method(self, service):
-        """Test that validate_and_log_usage method exists."""
         assert hasattr(service, "validate_and_log_usage")
         assert callable(service.validate_and_log_usage)
 
     def test_has_commit_usage_method(self, service):
-        """Test that commit_usage method exists."""
         assert hasattr(service, "commit_usage")
         assert callable(service.commit_usage)
 
 
 class TestAPIKeyGeneration:
-    """Test suite for API key generation."""
 
     @pytest.fixture
     def service(self):
@@ -481,10 +427,8 @@ class TestAPIKeyGeneration:
         return QuotaService()
 
     def test_generate_api_key_format(self, service):
-        """Test that generated live API keys have correct format."""
         raw_key, key_hash, key_prefix = service._generate_api_key()
 
-        # Check raw key format
         assert raw_key.startswith("cbx_live_")
         assert len(raw_key) > 20  # Reasonable length
 
@@ -492,15 +436,12 @@ class TestAPIKeyGeneration:
         assert len(key_hash) == 64
         assert all(c in "0123456789abcdef" for c in key_hash)
 
-        # Check key prefix format
         assert key_prefix.startswith("cbx_live_")
         assert len(key_prefix) == len("cbx_live_") + 5  # prefix + 5 chars
 
     def test_generate_test_api_key_format(self, service):
-        """Test that generated test API keys have correct format."""
         raw_key, key_hash, key_prefix = service._generate_api_key(is_test_key=True)
 
-        # Check raw key format - test keys use cbx_test_ prefix
         assert raw_key.startswith("cbx_test_")
         assert len(raw_key) > 20  # Reasonable length
 
@@ -508,12 +449,10 @@ class TestAPIKeyGeneration:
         assert len(key_hash) == 64
         assert all(c in "0123456789abcdef" for c in key_hash)
 
-        # Check key prefix format
         assert key_prefix.startswith("cbx_test_")
         assert len(key_prefix) == len("cbx_test_") + 5  # prefix + 5 chars
 
     def test_generate_api_key_uniqueness(self, service):
-        """Test that generated API keys are unique."""
         keys = set()
         for _ in range(10):
             raw_key, _, _ = service._generate_api_key()
@@ -524,7 +463,6 @@ class TestAPIKeyGeneration:
 
 
 class TestClientIdParsing:
-    """Test suite for client_id parsing."""
 
     @pytest.fixture
     def service(self):
@@ -534,7 +472,6 @@ class TestClientIdParsing:
         return QuotaService()
 
     def test_parse_valid_client_id(self, service):
-        """Test parsing a valid client_id."""
         test_uuid = uuid4()
         client_id = f"ws_{test_uuid.hex}"
 
@@ -544,7 +481,6 @@ class TestClientIdParsing:
         assert result == test_uuid
 
     def test_parse_client_id_without_prefix(self, service):
-        """Test parsing client_id without prefix returns None."""
         test_uuid = uuid4()
         client_id = test_uuid.hex
 
@@ -553,7 +489,6 @@ class TestClientIdParsing:
         assert result is None
 
     def test_parse_client_id_with_wrong_prefix(self, service):
-        """Test parsing client_id with wrong prefix returns None."""
         test_uuid = uuid4()
         client_id = f"wrong_{test_uuid.hex}"
 
@@ -562,7 +497,6 @@ class TestClientIdParsing:
         assert result is None
 
     def test_parse_client_id_with_invalid_uuid(self, service):
-        """Test parsing client_id with invalid UUID returns None."""
         client_id = "ws_notavaliduuid"
 
         result = service._parse_client_id(client_id)
@@ -571,7 +505,6 @@ class TestClientIdParsing:
 
 
 class TestAPIKeyFormatValidation:
-    """Test suite for API key format validation."""
 
     @pytest.fixture
     def service(self):
@@ -581,7 +514,6 @@ class TestAPIKeyFormatValidation:
         return QuotaService()
 
     def test_validate_valid_api_key_format(self, service):
-        """Test validating a properly formatted live API key."""
         api_key = "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901"
 
         result = service._validate_api_key_format(api_key)
@@ -589,7 +521,6 @@ class TestAPIKeyFormatValidation:
         assert result is True
 
     def test_validate_valid_test_api_key_format(self, service):
-        """Test validating a properly formatted test API key."""
         api_key = "cbx_test_abc123def456ghi789jkl012mno345pqr678stu901"
 
         result = service._validate_api_key_format(api_key)
@@ -597,7 +528,6 @@ class TestAPIKeyFormatValidation:
         assert result is True
 
     def test_validate_api_key_without_prefix(self, service):
-        """Test validating API key without prefix returns False."""
         api_key = "abc123def456ghi789jkl012mno345pqr678stu901"
 
         result = service._validate_api_key_format(api_key)
@@ -605,7 +535,6 @@ class TestAPIKeyFormatValidation:
         assert result is False
 
     def test_validate_api_key_only_prefix(self, service):
-        """Test validating API key that is only the prefix returns False."""
         api_key = "cbx_live_"
 
         result = service._validate_api_key_format(api_key)
@@ -613,7 +542,6 @@ class TestAPIKeyFormatValidation:
         assert result is False
 
     def test_validate_test_api_key_only_prefix(self, service):
-        """Test validating test API key that is only the prefix returns False."""
         api_key = "cbx_test_"
 
         result = service._validate_api_key_format(api_key)
@@ -621,7 +549,6 @@ class TestAPIKeyFormatValidation:
         assert result is False
 
     def test_validate_empty_api_key(self, service):
-        """Test validating empty API key returns False."""
         api_key = ""
 
         result = service._validate_api_key_format(api_key)
@@ -630,22 +557,18 @@ class TestAPIKeyFormatValidation:
 
 
 class TestAPIKeyModelIntegration:
-    """Test APIKey model integration."""
 
     def test_api_key_model_import(self):
-        """Test that APIKey model can be imported."""
         from app.apps.cubex_api.db.models.workspace import APIKey
 
         assert APIKey is not None
 
     def test_usage_log_model_import(self):
-        """Test that UsageLog model can be imported."""
         from app.apps.cubex_api.db.models.workspace import UsageLog
 
         assert UsageLog is not None
 
     def test_models_in_init(self):
-        """Test that models are exported from __init__."""
         from app.apps.cubex_api.db.models import APIKey, UsageLog
 
         assert APIKey is not None
@@ -653,22 +576,18 @@ class TestAPIKeyModelIntegration:
 
 
 class TestAPIKeyCRUDIntegration:
-    """Test APIKey CRUD integration."""
 
     def test_api_key_db_import(self):
-        """Test that api_key_db can be imported."""
         from app.apps.cubex_api.db.crud.workspace import api_key_db
 
         assert api_key_db is not None
 
     def test_usage_log_db_import(self):
-        """Test that usage_log_db can be imported."""
         from app.apps.cubex_api.db.crud.workspace import usage_log_db
 
         assert usage_log_db is not None
 
     def test_crud_in_init(self):
-        """Test that CRUD instances are exported from __init__."""
         from app.apps.cubex_api.db.crud import api_key_db, usage_log_db
 
         assert api_key_db is not None
@@ -676,10 +595,8 @@ class TestAPIKeyCRUDIntegration:
 
 
 class TestQuotaServiceExports:
-    """Test QuotaService exports from __init__."""
 
     def test_exports_from_services_init(self):
-        """Test that QuotaService is exported from services __init__."""
         from app.apps.cubex_api.services import (
             QuotaService,
             quota_service,
@@ -702,10 +619,8 @@ class TestQuotaServiceExports:
 
 
 class TestBillingPeriodCalculation:
-    """Test suite for _calculate_billing_period helper."""
 
     def test_uses_subscription_period_when_available(self):
-        """Test that subscription period is used when both start/end are available."""
         from datetime import datetime, timezone
 
         from app.apps.cubex_api.services.quota import quota_service
@@ -726,7 +641,6 @@ class TestBillingPeriodCalculation:
         assert period_end == sub_end
 
     def test_falls_back_to_workspace_created_when_no_subscription(self):
-        """Test 30-day rolling periods from workspace creation when no subscription."""
         from datetime import datetime, timezone, timedelta
 
         from app.apps.cubex_api.services.quota import quota_service
@@ -750,7 +664,6 @@ class TestBillingPeriodCalculation:
         assert period_end == expected_end
 
     def test_first_period_is_workspace_creation_date(self):
-        """Test that first period starts at workspace creation."""
         from datetime import datetime, timezone, timedelta
 
         from app.apps.cubex_api.services.quota import quota_service
@@ -770,7 +683,6 @@ class TestBillingPeriodCalculation:
         assert period_end == workspace_created + timedelta(days=30)
 
     def test_handles_naive_datetime(self):
-        """Test that naive datetimes are handled correctly."""
         from datetime import datetime, timezone
 
         from app.apps.cubex_api.services.quota import quota_service
@@ -791,7 +703,6 @@ class TestBillingPeriodCalculation:
         assert period_end.tzinfo == timezone.utc
 
     def test_partial_subscription_period_falls_back(self):
-        """Test that partial subscription period (only start) falls back to workspace."""
         from datetime import datetime, timezone, timedelta
 
         from app.apps.cubex_api.services.quota import quota_service
@@ -815,17 +726,14 @@ class TestBillingPeriodCalculation:
 
 
 class TestUsageLogSumCredits:
-    """Test suite for UsageLogDB.sum_credits_for_period."""
 
     def test_sum_credits_method_exists(self):
-        """Test that sum_credits_for_period method exists."""
         from app.apps.cubex_api.db.crud.workspace import usage_log_db
 
         assert hasattr(usage_log_db, "sum_credits_for_period")
         assert callable(usage_log_db.sum_credits_for_period)
 
     def test_sum_credits_method_signature(self):
-        """Test that sum_credits_for_period has correct signature."""
         import inspect
 
         from app.apps.cubex_api.db.crud.workspace import usage_log_db
@@ -840,17 +748,14 @@ class TestUsageLogSumCredits:
 
 
 class TestQuotaCacheServiceFallback:
-    """Test suite for QuotaCacheService.get_plan_credits_allocation_with_fallback."""
 
     def test_fallback_method_exists(self):
-        """Test that get_plan_credits_allocation_with_fallback method exists."""
         from app.core.services.quota_cache import QuotaCacheService
 
         assert hasattr(QuotaCacheService, "get_plan_credits_allocation_with_fallback")
         assert callable(QuotaCacheService.get_plan_credits_allocation_with_fallback)
 
     def test_fallback_method_signature(self):
-        """Test that fallback method has correct signature."""
         import inspect
 
         from app.core.services.quota_cache import QuotaCacheService
@@ -865,7 +770,6 @@ class TestQuotaCacheServiceFallback:
 
     @pytest.mark.asyncio
     async def test_returns_default_when_plan_id_is_none(self):
-        """Test that default is returned when plan_id is None."""
         from app.core.services.quota_cache import QuotaCacheService
 
         # Mock session not needed when plan_id is None
@@ -875,3 +779,4 @@ class TestQuotaCacheServiceFallback:
         )
 
         assert result == QuotaCacheService.DEFAULT_PLAN_CREDITS
+

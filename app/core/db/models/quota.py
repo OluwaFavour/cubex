@@ -1,5 +1,4 @@
 """
-This module provides models for Feature usage pricing and cost configuration:
 - FeatureCostConfig: Defines internal credit cost per feature
 - PlanPricingRule: Defines pricing multipliers, credit allocations, and rate limits per plan
 """
@@ -125,3 +124,4 @@ class PlanPricingRule(BaseModel):
     __table_args__ = (
         UniqueConstraint("plan_id", name="uq_plan_pricing_rules_plan_id"),
     )
+

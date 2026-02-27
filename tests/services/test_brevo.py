@@ -1,7 +1,6 @@
 """
 Test suite for BrevoService email service.
 
-This module contains comprehensive tests for the Brevo email service including:
 - Client initialization and cleanup
 - Authentication and headers
 - Retry logic with exponential backoff
@@ -33,7 +32,6 @@ from app.core.exceptions.types import AppException
 
 
 class TestBrevoServiceInit:
-    """Test suite for BrevoService initialization and cleanup."""
 
     @pytest.fixture(autouse=True)
     async def cleanup(self):
@@ -42,14 +40,11 @@ class TestBrevoServiceInit:
         await BrevoService.aclose()
 
     def test_get_message_version_batch_size(self):
-        """Test getting message version batch size constant."""
         batch_size = BrevoService.get_message_version_batch_size()
         assert batch_size == 1000
         assert isinstance(batch_size, int)
 
     def test_init_client_creates_new_client(self):
-        """Test that _init_client creates a new httpx.AsyncClient."""
-        # Ensure client is None initially
         BrevoService._client = None
 
         BrevoService._init_client()
@@ -62,19 +57,16 @@ class TestBrevoServiceInit:
         ) == BrevoService._base_url.rstrip("/")
 
     def test_init_client_only_initializes_once(self):
-        """Test that _init_client doesn't reinitialize if client exists."""
         BrevoService._init_client()
         first_client = BrevoService._client
 
         BrevoService._init_client()
         second_client = BrevoService._client
 
-        # Should be the same instance
         assert first_client is second_client
 
     @pytest.mark.asyncio
     async def test_aclose_closes_client(self):
-        """Test that aclose properly closes the client."""
         BrevoService._init_client()
         assert BrevoService._client is not None
 
@@ -84,17 +76,14 @@ class TestBrevoServiceInit:
 
     @pytest.mark.asyncio
     async def test_aclose_when_client_is_none(self):
-        """Test that aclose handles None client gracefully."""
         BrevoService._client = None
 
-        # Should not raise any exception
         await BrevoService.aclose()
 
         assert BrevoService._client is None
 
     @pytest.mark.asyncio
     async def test_init_updates_configuration(self):
-        """Test that init updates service configuration."""
         original_api_key = BrevoService._api_key
         original_sender_email = BrevoService._sender_email
         original_sender_name = BrevoService._sender_name
@@ -121,7 +110,6 @@ class TestBrevoServiceInit:
 
     @pytest.mark.asyncio
     async def test_init_partial_update(self):
-        """Test that init only updates provided parameters."""
         original_api_key = BrevoService._api_key
         original_sender_email = BrevoService._sender_email
         original_sender_name = BrevoService._sender_name
@@ -139,10 +127,8 @@ class TestBrevoServiceInit:
 
 
 class TestBrevoServiceBackoff:
-    """Test suite for backoff calculation logic."""
 
     def test_compute_backoff_first_attempt(self):
-        """Test backoff calculation for first retry attempt."""
         backoff = BrevoService._compute_backoff(attempt=1, err_headers=None)
 
         # First attempt: base * jitter
@@ -152,7 +138,6 @@ class TestBrevoServiceBackoff:
         assert 2.4 <= backoff <= 3.6
 
     def test_compute_backoff_second_attempt(self):
-        """Test backoff calculation for second retry attempt."""
         backoff = BrevoService._compute_backoff(attempt=2, err_headers=None)
 
         # Second attempt: base = min(3.0 * 2^1, 60.0) = 6.0
@@ -160,7 +145,6 @@ class TestBrevoServiceBackoff:
         assert 4.8 <= backoff <= 7.2
 
     def test_compute_backoff_max_capped(self):
-        """Test that backoff is capped at maximum value."""
         # Large attempt number should hit the cap
         backoff = BrevoService._compute_backoff(attempt=10, err_headers=None)
 
@@ -169,7 +153,6 @@ class TestBrevoServiceBackoff:
         assert 48.0 <= backoff <= 72.0
 
     def test_compute_backoff_with_rate_limit_header(self):
-        """Test backoff uses rate limit header when available."""
         headers = httpx.Headers({"x-sib-ratelimit-reset": "15.5"})
 
         backoff = BrevoService._compute_backoff(attempt=1, err_headers=headers)
@@ -178,7 +161,6 @@ class TestBrevoServiceBackoff:
         assert backoff == 15.5
 
     def test_compute_backoff_with_invalid_header(self):
-        """Test backoff falls back to computed value with invalid header."""
         headers = httpx.Headers({"x-sib-ratelimit-reset": "invalid"})
 
         backoff = BrevoService._compute_backoff(attempt=1, err_headers=headers)
@@ -188,10 +170,8 @@ class TestBrevoServiceBackoff:
 
 
 class TestBrevoServiceAuthHeaders:
-    """Test suite for authentication headers generation."""
 
     def test_auth_headers_default(self):
-        """Test auth headers with no extra headers."""
         headers = BrevoService._auth_headers()
 
         assert headers["api-key"] == BrevoService._api_key
@@ -200,7 +180,6 @@ class TestBrevoServiceAuthHeaders:
         assert len(headers) == 3
 
     def test_auth_headers_with_extra(self):
-        """Test auth headers merge with extra headers."""
         extra = {"X-Custom-Header": "custom-value"}
 
         headers = BrevoService._auth_headers(extra)
@@ -212,7 +191,6 @@ class TestBrevoServiceAuthHeaders:
         assert len(headers) == 4
 
     def test_auth_headers_extra_overrides(self):
-        """Test that extra headers can override default headers."""
         extra = {"Content-Type": "text/plain"}
 
         headers = BrevoService._auth_headers(extra)
@@ -221,7 +199,6 @@ class TestBrevoServiceAuthHeaders:
 
 
 class TestBrevoServiceRequest:
-    """Test suite for HTTP request handling with retry logic."""
 
     @pytest.fixture(autouse=True)
     async def cleanup(self):
@@ -231,7 +208,6 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_successful(self):
-        """Test successful HTTP request."""
         mock_response = MagicMock()
         mock_response.json.return_value = {"messageId": "123"}
         mock_response.raise_for_status = MagicMock()
@@ -250,7 +226,6 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_initializes_client_if_none(self):
-        """Test that request initializes client if not already initialized."""
         # Store original and set to None
         original_client = BrevoService._client
         BrevoService._client = None
@@ -264,7 +239,6 @@ class TestBrevoServiceRequest:
             mock_client_instance.request = AsyncMock(return_value=mock_response)
 
             with patch.object(BrevoService, "_init_client") as mock_init:
-                # Set up mock to actually set the client
                 def init_side_effect():
                     BrevoService._client = mock_client_instance
 
@@ -278,7 +252,6 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_returns_text_when_json_fails(self):
-        """Test that request returns text when JSON parsing fails."""
         mock_response = MagicMock()
         mock_response.json.side_effect = ValueError("Not JSON")
         mock_response.text = "plain text response"
@@ -295,7 +268,6 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_retries_on_5xx_error(self):
-        """Test that request retries on 5xx server errors."""
         mock_response = MagicMock()
         mock_response.status_code = 503
         mock_response.json.return_value = {"error": "Service unavailable"}
@@ -318,7 +290,6 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_retries_on_429_rate_limit(self):
-        """Test that request retries on 429 rate limit errors."""
         mock_response = MagicMock()
         mock_response.status_code = 429
         mock_response.headers = httpx.Headers({})
@@ -342,7 +313,6 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_no_retry_on_4xx_client_error(self):
-        """Test that request doesn't retry on 4xx client errors."""
         mock_response = MagicMock()
         mock_response.status_code = 400
         mock_response.json.return_value = {"error": "Bad request"}
@@ -364,7 +334,6 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_retries_on_timeout(self):
-        """Test that request retries on timeout errors."""
         with patch.object(BrevoService, "_init_client"), patch.object(
             BrevoService, "_client"
         ) as mock_client, patch("asyncio.sleep", new_callable=AsyncMock):
@@ -383,7 +352,6 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_retries_on_transport_error(self):
-        """Test that request retries on transport errors."""
         with patch.object(BrevoService, "_init_client"), patch.object(
             BrevoService, "_client"
         ) as mock_client, patch("asyncio.sleep", new_callable=AsyncMock):
@@ -401,7 +369,6 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_uses_text_on_json_error_in_exception(self):
-        """Test that request uses text when JSON parsing fails in error response."""
         mock_response = MagicMock()
         mock_response.status_code = 500
         mock_response.json.side_effect = ValueError("Not JSON")
@@ -421,7 +388,6 @@ class TestBrevoServiceRequest:
 
 
 class TestBrevoServiceMessageVersions:
-    """Test suite for message version handling."""
 
     @pytest.fixture(autouse=True)
     async def cleanup(self):
@@ -431,7 +397,6 @@ class TestBrevoServiceMessageVersions:
 
     @pytest.mark.asyncio
     async def test_handle_message_versions_single_batch(self):
-        """Test handling message versions within single batch limit."""
         message_versions = ListMessageVersion(
             messageVersions=[
                 MessageVersion(
@@ -460,7 +425,6 @@ class TestBrevoServiceMessageVersions:
 
     @pytest.mark.asyncio
     async def test_handle_message_versions_multiple_batches(self):
-        """Test handling message versions split into multiple batches."""
         # Create 2500 message versions (will split into 3 batches: 1000, 1000, 500)
         message_versions = ListMessageVersion(
             messageVersions=[
@@ -489,7 +453,6 @@ class TestBrevoServiceMessageVersions:
 
     @pytest.mark.asyncio
     async def test_handle_message_versions_empty_list_raises_error(self):
-        """Test that empty message versions list raises ValueError."""
         message_versions = ListMessageVersion(messageVersions=[])
         payload = {"sender": {"email": "sender@example.com"}}
 
@@ -498,7 +461,6 @@ class TestBrevoServiceMessageVersions:
 
 
 class TestBrevoServiceSendTransactionalEmail:
-    """Test suite for sending transactional emails."""
 
     @pytest.fixture(autouse=True)
     async def cleanup(self):
@@ -508,7 +470,6 @@ class TestBrevoServiceSendTransactionalEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_with_html_content(self):
-        """Test sending email with HTML content."""
         with patch.object(
             BrevoService, "_request", new_callable=AsyncMock
         ) as mock_request:
@@ -523,7 +484,6 @@ class TestBrevoServiceSendTransactionalEmail:
             assert len(result) == 1
             assert result[0] == {"messageId": "test-123"}
 
-            # Verify request was called with correct payload
             mock_request.assert_called_once()
             call_args = mock_request.call_args
             # Access kwargs directly
@@ -536,7 +496,6 @@ class TestBrevoServiceSendTransactionalEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_with_text_content(self):
-        """Test sending email with text content."""
         with patch.object(
             BrevoService, "_request", new_callable=AsyncMock
         ) as mock_request:
@@ -554,7 +513,6 @@ class TestBrevoServiceSendTransactionalEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_with_custom_sender(self):
-        """Test sending email with custom sender."""
         custom_sender = Contact(email="custom@example.com", name="Custom Sender")
 
         with patch.object(
@@ -575,7 +533,6 @@ class TestBrevoServiceSendTransactionalEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_uses_default_sender(self):
-        """Test that email uses default sender when not provided."""
         with patch.object(
             BrevoService, "_request", new_callable=AsyncMock
         ) as mock_request:
@@ -593,7 +550,6 @@ class TestBrevoServiceSendTransactionalEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_with_message_versions(self):
-        """Test sending email with message versions."""
         message_versions = ListMessageVersion(
             messageVersions=[
                 MessageVersion(
@@ -623,7 +579,6 @@ class TestBrevoServiceSendTransactionalEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_raises_error_without_content(self):
-        """Test that sending email without content raises ValueError."""
         with pytest.raises(
             ValueError, match="Either htmlContent or textContent must be provided"
         ):
@@ -634,7 +589,6 @@ class TestBrevoServiceSendTransactionalEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_raises_error_without_recipients(self):
-        """Test that sending email without recipients raises ValueError."""
         with pytest.raises(
             ValueError, match="Either 'to' or 'messageVersions' must be provided"
         ):
@@ -644,7 +598,6 @@ class TestBrevoServiceSendTransactionalEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_with_both_html_and_text(self):
-        """Test sending email with both HTML and text content."""
         with patch.object(
             BrevoService, "_request", new_callable=AsyncMock
         ) as mock_request:
@@ -663,24 +616,20 @@ class TestBrevoServiceSendTransactionalEmail:
 
 
 class TestBrevoServiceModels:
-    """Test suite for Pydantic models."""
 
     def test_contact_model_with_name(self):
-        """Test Contact model with name."""
         contact = Contact(email="test@example.com", name="Test User")
 
         assert contact.email == "test@example.com"
         assert contact.name == "Test User"
 
     def test_contact_model_without_name(self):
-        """Test Contact model without name (optional)."""
         contact = Contact(email="test@example.com")
 
         assert contact.email == "test@example.com"
         assert contact.name is None
 
     def test_list_contact_model(self):
-        """Test ListContact model."""
         contacts = ListContact(
             to=[
                 Contact(email="user1@example.com", name="User 1"),
@@ -693,7 +642,6 @@ class TestBrevoServiceModels:
         assert contacts.to[1].name is None
 
     def test_message_version_model_full(self):
-        """Test MessageVersion model with all fields."""
         message = MessageVersion(
             to=[Contact(email="test@example.com")],
             htmlContent="<p>Test</p>",
@@ -709,7 +657,6 @@ class TestBrevoServiceModels:
         assert message.params == {"key": "value"}
 
     def test_message_version_model_minimal(self):
-        """Test MessageVersion model with minimal fields."""
         message = MessageVersion(to=[Contact(email="test@example.com")])
 
         assert len(message.to) == 1
@@ -719,7 +666,6 @@ class TestBrevoServiceModels:
         assert message.params is None
 
     def test_list_message_version_model(self):
-        """Test ListMessageVersion model."""
         list_mv = ListMessageVersion(
             messageVersions=[
                 MessageVersion(to=[Contact(email="user1@example.com")]),
@@ -728,3 +674,4 @@ class TestBrevoServiceModels:
         )
 
         assert len(list_mv.messageVersions) == 2
+

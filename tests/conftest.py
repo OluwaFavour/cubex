@@ -23,11 +23,6 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy import select
 
 
-# ============================================================================
-# Test Utilities
-# ============================================================================
-
-
 def create_test_access_token(user) -> str:
     """Create a test access token for a user."""
     from app.core.utils import create_jwt_token
@@ -40,11 +35,6 @@ def create_test_access_token(user) -> str:
         },
         expires_delta=timedelta(minutes=15),
     )
-
-
-# ============================================================================
-# Pytest Configuration
-# ============================================================================
 
 
 def pytest_configure(config):
@@ -60,11 +50,6 @@ def pytest_configure(config):
         "markers",
         "integration: marks tests as integration tests (require real database)",
     )
-
-
-# ============================================================================
-# Session-Scoped Database Setup (runs once per test session)
-# ============================================================================
 
 
 @pytest.fixture(scope="session")
@@ -100,7 +85,6 @@ def setup_test_database(event_loop_policy):
     # Save the original DATABASE_URL to restore later
     original_database_url = os.environ.get("DATABASE_URL")
 
-    # Set the database URL for alembic to use
     os.environ["DATABASE_URL"] = settings.TEST_DATABASE_URL
 
     try:
@@ -180,11 +164,6 @@ def setup_test_database(event_loop_policy):
             print("[TEST] Removed temporary DATABASE_URL")
 
 
-# ============================================================================
-# Database Fixtures (all function-scoped for isolation)
-# ============================================================================
-
-
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a test database session with transaction rollback.
@@ -207,20 +186,17 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     if not settings.TEST_DATABASE_URL:
         pytest.skip("TEST_DATABASE_URL not configured")
 
-    # Create a fresh engine for this test
     engine = create_async_engine(
         settings.TEST_DATABASE_URL,
         echo=False,
         pool_pre_ping=True,
     )
 
-    # Create connection
     connection = await engine.connect()
 
     # Start outer transaction for final rollback
     outer_transaction = await connection.begin()
 
-    # Create session bound to this connection
     # autobegin=True so test fixtures can use session without manual begin()
     session = AsyncSession(
         bind=connection,
@@ -247,11 +223,6 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         await outer_transaction.rollback()
         await connection.close()
         await engine.dispose()
-
-
-# ============================================================================
-# Application Fixtures
-# ============================================================================
 
 
 @pytest.fixture
@@ -288,11 +259,6 @@ async def client(app, db_session: AsyncSession) -> AsyncGenerator[AsyncClient, N
         app.dependency_overrides.pop(get_async_session, None)
 
 
-# ============================================================================
-# Stripe Mock Fixtures
-# ============================================================================
-
-
 @pytest.fixture(autouse=True)
 def mock_stripe():
     """Auto-mock Stripe API calls to prevent real HTTP requests.
@@ -305,7 +271,6 @@ def mock_stripe():
     We mock at the service layer to avoid Pydantic validation complexity.
     """
 
-    # Create a mock that returns the subscription model unchanged
     async def mock_cancel_subscription(subscription_id, **kwargs):
         """Mock cancel_subscription that doesn't call Stripe."""
         return AsyncMock(
@@ -371,14 +336,8 @@ def mock_email_service():
         yield
 
 
-# ============================================================================
-# User Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 async def test_user(db_session: AsyncSession):
-    """Create a test user in the database."""
     from app.core.db.models import User
 
     user = User(
@@ -396,7 +355,6 @@ async def test_user(db_session: AsyncSession):
 
 @pytest.fixture
 async def test_user_unverified(db_session: AsyncSession):
-    """Create an unverified test user."""
     from app.core.db.models import User
 
     user = User(
@@ -438,11 +396,6 @@ async def authenticated_client(
     """Provide authenticated async client."""
     client.headers.update(auth_headers)
     return client
-
-
-# ============================================================================
-# Plan Fixtures
-# ============================================================================
 
 
 @pytest.fixture
@@ -495,14 +448,12 @@ async def basic_api_plan_pricing_rule(db_session: AsyncSession, basic_api_plan):
 
     from app.core.db.models import PlanPricingRule
 
-    # Check if pricing rule already exists
     result = await db_session.execute(
         select(PlanPricingRule).where(PlanPricingRule.plan_id == basic_api_plan.id)
     )
     pricing_rule = result.scalar_one_or_none()
 
     if pricing_rule is None:
-        # Create pricing rule for the plan
         pricing_rule = PlanPricingRule(
             id=uuid4(),
             plan_id=basic_api_plan.id,
@@ -530,7 +481,6 @@ async def benchmark_plan_pricing_rule(
 
     from app.apps.cubex_api.db.models import PlanPricingRule
 
-    # Check if pricing rule already exists
     result = await db_session.execute(
         select(PlanPricingRule).where(PlanPricingRule.plan_id == basic_api_plan.id)
     )
@@ -539,7 +489,6 @@ async def benchmark_plan_pricing_rule(
     high_rate_limit = 1000
 
     if pricing_rule is None:
-        # Create pricing rule with high rate limit
         pricing_rule = PlanPricingRule(
             id=uuid4(),
             plan_id=basic_api_plan.id,
@@ -549,7 +498,6 @@ async def benchmark_plan_pricing_rule(
         )
         db_session.add(pricing_rule)
     else:
-        # Update existing rule to have high rate limit
         pricing_rule.rate_limit_per_minute = high_rate_limit
 
     await db_session.flush()
@@ -637,14 +585,8 @@ async def pro_career_plan(db_session: AsyncSession):
     return plan
 
 
-# ============================================================================
-# Workspace Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 async def test_workspace(db_session: AsyncSession, test_user):
-    """Create a test workspace owned by test_user."""
     from app.core.db.models import Workspace, WorkspaceMember
     from app.core.enums import MemberRole, MemberStatus, WorkspaceStatus
 
@@ -711,7 +653,6 @@ async def personal_workspace(db_session: AsyncSession, test_user, free_api_plan)
     db_session.add(member)
     await db_session.flush()
 
-    # Create subscription for personal workspace
     subscription = Subscription(
         id=uuid4(),
         plan_id=free_api_plan.id,
@@ -736,7 +677,6 @@ async def personal_workspace(db_session: AsyncSession, test_user, free_api_plan)
 
 @pytest.fixture
 async def test_workspace_member(db_session: AsyncSession, test_workspace):
-    """Create another user who is a member of test_workspace."""
     from app.core.db.models import User, WorkspaceMember
     from app.core.enums import MemberRole, MemberStatus
 
@@ -767,7 +707,6 @@ async def test_workspace_member(db_session: AsyncSession, test_workspace):
 
 @pytest.fixture
 async def test_workspace_admin(db_session: AsyncSession, test_workspace):
-    """Create another user who is an admin of test_workspace."""
     from app.core.db.models import User, WorkspaceMember
     from app.core.enums import MemberRole, MemberStatus
 
@@ -796,14 +735,8 @@ async def test_workspace_admin(db_session: AsyncSession, test_workspace):
     return user, member
 
 
-# ============================================================================
-# Subscription Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 async def test_subscription(db_session: AsyncSession, test_workspace, basic_api_plan):
-    """Create a test subscription for the workspace."""
     from app.core.db.models import APISubscriptionContext, Subscription
     from app.core.enums import SubscriptionStatus
 
@@ -893,17 +826,8 @@ async def paid_career_subscription(
     return subscription
 
 
-# ============================================================================
-# Invitation Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 async def test_invitation(db_session: AsyncSession, test_workspace, test_user):
-    """Create a test workspace invitation.
-
-    Returns a tuple of (invitation, raw_token) so tests can use the raw token.
-    """
     import secrets
 
     from app.core.config import settings
@@ -945,7 +869,6 @@ async def expired_invitation(db_session: AsyncSession, test_workspace, test_user
     from app.core.enums import InvitationStatus, MemberRole
     from app.core.utils import hmac_hash_otp
 
-    # Generate raw token and its hash
     raw_token = secrets.token_urlsafe(32)
     token_hash = hmac_hash_otp(raw_token, settings.OTP_HMAC_SECRET)
 
@@ -966,11 +889,6 @@ async def expired_invitation(db_session: AsyncSession, test_workspace, test_user
     return invitation, raw_token
 
 
-# ============================================================================
-# Path Fixtures
-# ============================================================================
-
-
 @pytest.fixture(scope="session")
 def project_root() -> Path:
     """Return the project root directory."""
@@ -981,11 +899,6 @@ def project_root() -> Path:
 def app_root(project_root: Path) -> Path:
     """Return the app root directory."""
     return project_root / "app"
-
-
-# ============================================================================
-# Mock Settings Fixture
-# ============================================================================
 
 
 @pytest.fixture
@@ -1001,11 +914,6 @@ def mock_settings():
     settings.DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
     return settings
-
-
-# ============================================================================
-# Redis Testcontainer Fixtures
-# ============================================================================
 
 
 @pytest.fixture(scope="session")
@@ -1049,7 +957,6 @@ async def setup_redis_service(redis_url):
     """
     from app.core.services.redis_service import RedisService
 
-    # Initialize with testcontainer URL
     await RedisService.init(redis_url)
 
     yield
@@ -1057,11 +964,6 @@ async def setup_redis_service(redis_url):
     # Flush the Redis database after each test for isolation
     if RedisService._client is not None:
         await RedisService._client.flushdb()
-
-
-# ============================================================================
-# API Key Fixtures
-# ============================================================================
 
 
 def make_client_id(workspace) -> str:
@@ -1079,7 +981,6 @@ async def live_api_key(db_session: AsyncSession, test_workspace, test_subscripti
     from app.apps.cubex_api.db.models import APIKey
     from app.apps.cubex_api.services.quota import quota_service
 
-    # Generate key using the service's method
     raw_key, key_hash, key_prefix = quota_service._generate_api_key(is_test_key=False)
 
     api_key = APIKey(
@@ -1099,15 +1000,9 @@ async def live_api_key(db_session: AsyncSession, test_workspace, test_subscripti
 
 @pytest.fixture
 async def test_api_key(db_session: AsyncSession, test_workspace, test_subscription):
-    """Create a test API key for test_workspace (cbx_test_ prefix).
-
-    Returns:
-        Tuple of (raw_key, APIKey model instance)
-    """
     from app.apps.cubex_api.db.models import APIKey
     from app.apps.cubex_api.services.quota import quota_service
 
-    # Generate test key using the service's method
     raw_key, key_hash, key_prefix = quota_service._generate_api_key(is_test_key=True)
 
     api_key = APIKey(
@@ -1181,11 +1076,6 @@ async def revoked_api_key(db_session: AsyncSession, test_workspace, test_subscri
     return raw_key, api_key
 
 
-# ============================================================================
-# Quota Edge Case Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 async def other_workspace(db_session: AsyncSession, test_user, basic_api_plan):
     """Create a second workspace for mismatch tests.
@@ -1228,7 +1118,6 @@ async def other_workspace(db_session: AsyncSession, test_user, basic_api_plan):
     db_session.add(member)
     await db_session.flush()
 
-    # Create subscription
     subscription = Subscription(
         id=uuid4(),
         plan_id=basic_api_plan.id,
@@ -1281,7 +1170,6 @@ async def workspace_quota_exhausted(
     # Use the pricing rule from fixture
     credits_allocation = basic_api_plan_pricing_rule.credits_allocation
 
-    # Create workspace
     workspace = Workspace(
         id=uuid4(),
         display_name="Exhausted Quota Workspace",
@@ -1304,7 +1192,6 @@ async def workspace_quota_exhausted(
     db_session.add(member)
     await db_session.flush()
 
-    # Create subscription
     subscription = Subscription(
         id=uuid4(),
         plan_id=basic_api_plan.id,
@@ -1318,7 +1205,6 @@ async def workspace_quota_exhausted(
     db_session.add(subscription)
     await db_session.flush()
 
-    # Create context with exhausted credits
     context = APISubscriptionContext(
         id=uuid4(),
         subscription_id=subscription.id,
@@ -1366,11 +1252,6 @@ async def api_key_for_exhausted_workspace(
 async def test_api_key_for_exhausted_workspace(
     db_session: AsyncSession, workspace_quota_exhausted
 ):
-    """Create a test API key for the exhausted quota workspace.
-
-    Returns:
-        Tuple of (raw_key, APIKey model instance, workspace, subscription, credits_allocation)
-    """
     from app.apps.cubex_api.db.models import APIKey
     from app.apps.cubex_api.services.quota import quota_service
 
@@ -1391,3 +1272,4 @@ async def test_api_key_for_exhausted_workspace(
     await db_session.flush()
 
     return raw_key, api_key, workspace, subscription, credits_allocation
+

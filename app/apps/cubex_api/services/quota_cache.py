@@ -2,9 +2,6 @@ from app.core.services import QuotaCacheService, RedisService
 
 
 class APIQuotaCacheService(QuotaCacheService):
-    # =========================================================================
-    # API Key Caching (for hot path optimization)
-    # =========================================================================
 
     # Cache key prefix and TTL for API keys
     API_KEY_CACHE_PREFIX = "api_key:"
@@ -69,3 +66,4 @@ class APIQuotaCacheService(QuotaCacheService):
 
 
 api_quota_cache_service = APIQuotaCacheService()
+

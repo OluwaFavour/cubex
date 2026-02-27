@@ -1,7 +1,6 @@
 """
 Test suite for CareerQuotaService.
 
-This module contains comprehensive tests for the Career quota system:
 - RateLimitInfo dataclass
 - CareerQuotaService initialization and methods
 - Billing period calculation
@@ -33,22 +32,14 @@ from pydantic import ValidationError
 from app.core.enums import AccessStatus, FailureType, FeatureKey
 
 
-# ============================================================================
-# RateLimitInfo Dataclass Tests
-# ============================================================================
-
-
 class TestRateLimitInfoDataclass:
-    """Test suite for Career RateLimitInfo dataclass."""
 
     def test_rate_limit_info_import(self):
-        """Test that RateLimitInfo can be imported."""
         from app.apps.cubex_career.services.quota import RateLimitInfo
 
         assert RateLimitInfo is not None
 
     def test_rate_limit_info_creation_with_all_fields(self):
-        """Test RateLimitInfo creation with all fields."""
         from app.apps.cubex_career.services.quota import RateLimitInfo
 
         info = RateLimitInfo(
@@ -71,7 +62,6 @@ class TestRateLimitInfoDataclass:
         assert info.exceeded_window is None
 
     def test_rate_limit_info_defaults(self):
-        """Test that is_exceeded defaults to False and exceeded_window to None."""
         from app.apps.cubex_career.services.quota import RateLimitInfo
 
         info = RateLimitInfo(
@@ -86,7 +76,6 @@ class TestRateLimitInfoDataclass:
         assert info.exceeded_window is None
 
     def test_rate_limit_info_exceeded_minute(self):
-        """Test RateLimitInfo with minute window exceeded."""
         from app.apps.cubex_career.services.quota import RateLimitInfo
 
         info = RateLimitInfo(
@@ -104,7 +93,6 @@ class TestRateLimitInfoDataclass:
         assert info.remaining_per_minute == 0
 
     def test_rate_limit_info_exceeded_day(self):
-        """Test RateLimitInfo with day window exceeded."""
         from app.apps.cubex_career.services.quota import RateLimitInfo
 
         info = RateLimitInfo(
@@ -122,28 +110,19 @@ class TestRateLimitInfoDataclass:
         assert info.remaining_per_day == 0
 
 
-# ============================================================================
-# CareerQuotaService Initialization Tests
-# ============================================================================
-
-
 class TestCareerQuotaServiceInit:
-    """Test suite for CareerQuotaService initialization."""
 
     def test_service_import(self):
-        """Test that CareerQuotaService can be imported."""
         from app.apps.cubex_career.services.quota import CareerQuotaService
 
         assert CareerQuotaService is not None
 
     def test_service_singleton_exists(self):
-        """Test that career_quota_service singleton is accessible."""
         from app.apps.cubex_career.services.quota import career_quota_service
 
         assert career_quota_service is not None
 
     def test_service_exports_from_init(self):
-        """Test that services are exported from __init__."""
         from app.apps.cubex_career.services import (
             CareerQuotaService,
             career_quota_service,
@@ -154,7 +133,6 @@ class TestCareerQuotaServiceInit:
 
 
 class TestCareerQuotaServiceMethods:
-    """Test suite for CareerQuotaService method signatures."""
 
     @pytest.fixture
     def service(self):
@@ -164,37 +142,30 @@ class TestCareerQuotaServiceMethods:
         return CareerQuotaService()
 
     def test_has_validate_and_log_usage_method(self, service):
-        """Test that validate_and_log_usage method exists."""
         assert hasattr(service, "validate_and_log_usage")
         assert callable(service.validate_and_log_usage)
 
     def test_has_commit_usage_method(self, service):
-        """Test that commit_usage method exists."""
         assert hasattr(service, "commit_usage")
         assert callable(service.commit_usage)
 
     def test_has_check_rate_limit_method(self, service):
-        """Test that _check_rate_limit method exists."""
         assert hasattr(service, "_check_rate_limit")
         assert callable(service._check_rate_limit)
 
     def test_has_check_idempotency_method(self, service):
-        """Test that _check_idempotency method exists."""
         assert hasattr(service, "_check_idempotency")
         assert callable(service._check_idempotency)
 
     def test_has_check_quota_method(self, service):
-        """Test that _check_quota method exists."""
         assert hasattr(service, "_check_quota")
         assert callable(service._check_quota)
 
     def test_has_calculate_billing_period_method(self, service):
-        """Test that _calculate_billing_period method exists."""
         assert hasattr(service, "_calculate_billing_period")
         assert callable(service._calculate_billing_period)
 
     def test_validate_and_log_usage_signature(self, service):
-        """Test validate_and_log_usage has correct parameters."""
         import inspect
 
         sig = inspect.signature(service.validate_and_log_usage)
@@ -211,7 +182,6 @@ class TestCareerQuotaServiceMethods:
         assert "payload_hash" in params
 
     def test_commit_usage_signature(self, service):
-        """Test commit_usage has correct parameters."""
         import inspect
 
         sig = inspect.signature(service.commit_usage)
@@ -225,13 +195,7 @@ class TestCareerQuotaServiceMethods:
         assert "failure" in params
 
 
-# ============================================================================
-# Billing Period Calculation Tests
-# ============================================================================
-
-
 class TestBillingPeriodCalculation:
-    """Test suite for _calculate_billing_period helper."""
 
     @pytest.fixture
     def service(self):
@@ -240,7 +204,6 @@ class TestBillingPeriodCalculation:
         return CareerQuotaService()
 
     def test_uses_subscription_period_when_available(self, service):
-        """Test that subscription period is used when both start/end are available."""
         sub_start = datetime(2026, 1, 15, 0, 0, 0, tzinfo=timezone.utc)
         sub_end = datetime(2026, 2, 15, 0, 0, 0, tzinfo=timezone.utc)
         user_created = datetime(2025, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
@@ -257,7 +220,6 @@ class TestBillingPeriodCalculation:
         assert period_end == sub_end
 
     def test_falls_back_to_user_created_when_no_subscription(self, service):
-        """Test 30-day rolling periods from user creation when no subscription."""
         user_created = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
         # 45 days after creation = period 1 (days 30-60)
         now = datetime(2026, 2, 15, 0, 0, 0, tzinfo=timezone.utc)
@@ -276,7 +238,6 @@ class TestBillingPeriodCalculation:
         assert period_end == expected_end
 
     def test_first_period_is_user_creation_date(self, service):
-        """Test that first period starts at user creation."""
         user_created = datetime(2026, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
         now = datetime(2026, 1, 25, 0, 0, 0, tzinfo=timezone.utc)
 
@@ -291,7 +252,6 @@ class TestBillingPeriodCalculation:
         assert period_end == user_created + timedelta(days=30)
 
     def test_handles_naive_datetime(self, service):
-        """Test that naive datetimes are handled correctly."""
         user_created = datetime(2026, 1, 1, 0, 0, 0)  # naive
         now = datetime(2026, 1, 15, 0, 0, 0, tzinfo=timezone.utc)
 
@@ -306,7 +266,6 @@ class TestBillingPeriodCalculation:
         assert period_end.tzinfo == timezone.utc
 
     def test_partial_subscription_period_falls_back(self, service):
-        """Test that partial subscription period (only start) uses user-based fallback."""
         user_created = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
         now = datetime(2026, 1, 15, 0, 0, 0, tzinfo=timezone.utc)
 
@@ -323,7 +282,6 @@ class TestBillingPeriodCalculation:
         assert period_end == user_created + timedelta(days=30)
 
     def test_multiple_periods_elapsed(self, service):
-        """Test billing period calculation after several 30-day periods."""
         user_created = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
         now = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)  # ~365 days
 
@@ -342,13 +300,7 @@ class TestBillingPeriodCalculation:
         assert period_end == expected_end
 
 
-# ============================================================================
-# Rate Limiting Tests
-# ============================================================================
-
-
 class TestCheckRateLimit:
-    """Test suite for CareerQuotaService._check_rate_limit."""
 
     @pytest.fixture
     def service(self):
@@ -358,7 +310,6 @@ class TestCheckRateLimit:
 
     @pytest.mark.asyncio
     async def test_returns_rate_limit_info(self, service):
-        """Test that _check_rate_limit returns RateLimitInfo."""
         from app.apps.cubex_career.services.quota import RateLimitInfo
 
         user_id = uuid4()
@@ -390,7 +341,6 @@ class TestCheckRateLimit:
 
     @pytest.mark.asyncio
     async def test_remaining_decrements_correctly(self, service):
-        """Test that remaining counters decrement properly."""
         user_id = uuid4()
 
         with (
@@ -417,7 +367,6 @@ class TestCheckRateLimit:
 
     @pytest.mark.asyncio
     async def test_minute_limit_exceeded(self, service):
-        """Test detection of per-minute limit exceeded."""
         user_id = uuid4()
 
         with (
@@ -445,7 +394,6 @@ class TestCheckRateLimit:
 
     @pytest.mark.asyncio
     async def test_day_limit_exceeded(self, service):
-        """Test detection of per-day limit exceeded."""
         user_id = uuid4()
 
         with (
@@ -472,7 +420,6 @@ class TestCheckRateLimit:
 
     @pytest.mark.asyncio
     async def test_redis_unavailable_allows_request(self, service):
-        """Test that Redis failure gracefully allows request."""
         user_id = uuid4()
 
         with (
@@ -500,7 +447,6 @@ class TestCheckRateLimit:
 
     @pytest.mark.asyncio
     async def test_minute_exceeded_takes_priority_over_day(self, service):
-        """Test that minute exceeded window takes priority when both are exceeded."""
         user_id = uuid4()
 
         with (
@@ -527,7 +473,6 @@ class TestCheckRateLimit:
 
     @pytest.mark.asyncio
     async def test_negative_ttl_defaults_to_window_size(self, service):
-        """Test that negative TTL defaults to the expected window size."""
         user_id = uuid4()
 
         with (
@@ -554,13 +499,7 @@ class TestCheckRateLimit:
         assert result.limit_per_minute == 20
 
 
-# ============================================================================
-# Schema Validation Tests
-# ============================================================================
-
-
 class TestUsageEstimateValidation:
-    """Test suite for Career UsageEstimate schema validation."""
 
     def test_valid_usage_estimate_with_all_fields(self):
         from app.apps.cubex_career.schemas.internal import UsageEstimate
@@ -604,7 +543,6 @@ class TestUsageEstimateValidation:
 
 
 class TestUsageValidateRequestSchema:
-    """Test suite for UsageValidateRequest schema."""
 
     def test_valid_request(self):
         from app.apps.cubex_career.schemas.internal import UsageValidateRequest
@@ -696,7 +634,6 @@ class TestUsageValidateRequestSchema:
 
 
 class TestUsageCommitRequestSchema:
-    """Test suite for UsageCommitRequest schema."""
 
     def test_success_without_metrics(self):
         from app.apps.cubex_career.schemas.internal import UsageCommitRequest
@@ -758,7 +695,6 @@ class TestUsageCommitRequestSchema:
         assert request.failure.failure_type == FailureType.TIMEOUT
 
     def test_has_user_id_not_api_key(self):
-        """Verify career commit uses user_id (not api_key like API product)."""
         from app.apps.cubex_career.schemas.internal import UsageCommitRequest
 
         request = UsageCommitRequest(
@@ -771,7 +707,6 @@ class TestUsageCommitRequestSchema:
 
 
 class TestUsageValidateResponseSchema:
-    """Test suite for UsageValidateResponse schema."""
 
     def test_granted_response(self):
         from app.apps.cubex_career.schemas.internal import UsageValidateResponse
@@ -798,7 +733,6 @@ class TestUsageValidateResponseSchema:
         assert response.usage_id is None
 
     def test_has_user_id_not_is_test_key(self):
-        """Verify career response uses user_id (not is_test_key like API product)."""
         from app.apps.cubex_career.schemas.internal import UsageValidateResponse
 
         response = UsageValidateResponse(
@@ -812,7 +746,6 @@ class TestUsageValidateResponseSchema:
 
 
 class TestUsageMetricsSchema:
-    """Test suite for UsageMetrics schema."""
 
     def test_all_fields(self):
         from app.apps.cubex_career.schemas.internal import UsageMetrics
@@ -847,7 +780,6 @@ class TestUsageMetricsSchema:
 
 
 class TestFailureDetailsSchema:
-    """Test suite for FailureDetails schema."""
 
     def test_valid_failure_details(self):
         from app.apps.cubex_career.schemas.internal import FailureDetails
@@ -884,13 +816,7 @@ class TestFailureDetailsSchema:
             FailureDetails(failure_type=FailureType.TIMEOUT, reason="a" * 1001)
 
 
-# ============================================================================
-# Model and CRUD Integration Tests
-# ============================================================================
-
-
 class TestCareerUsageLogModel:
-    """Test suite for CareerUsageLog model integration."""
 
     def test_model_import(self):
         from app.apps.cubex_career.db.models.usage_log import CareerUsageLog
@@ -914,7 +840,6 @@ class TestCareerUsageLogModel:
 
 
 class TestCareerUsageLogCRUD:
-    """Test suite for CareerUsageLogDB CRUD integration."""
 
     def test_crud_import(self):
         from app.apps.cubex_career.db.crud.usage_log import career_usage_log_db
@@ -963,7 +888,6 @@ class TestCareerUsageLogCRUD:
         assert callable(career_usage_log_db.sum_credits_for_period)
 
     def test_sum_credits_method_signature(self):
-        """Verify sum_credits_for_period is user-scoped (not workspace-scoped)."""
         import inspect
 
         from app.apps.cubex_career.db.crud.usage_log import career_usage_log_db
@@ -976,7 +900,6 @@ class TestCareerUsageLogCRUD:
 
 
 class TestCareerSubscriptionContextCRUD:
-    """Test suite for CareerSubscriptionContextDB methods."""
 
     def test_crud_import(self):
         from app.core.db.crud import career_subscription_context_db
@@ -1002,7 +925,6 @@ class TestCareerSubscriptionContextCRUD:
         assert callable(career_subscription_context_db.get_by_user)
 
     def test_reset_credits_no_billing_period_param(self):
-        """Verify reset_credits_used does NOT take billing_period_start param."""
         import inspect
 
         from app.core.db.crud import career_subscription_context_db
@@ -1015,13 +937,7 @@ class TestCareerSubscriptionContextCRUD:
         assert "context_id" in params
 
 
-# ============================================================================
-# Quota Checking Tests (with mocks)
-# ============================================================================
-
-
 class TestCheckQuota:
-    """Test suite for CareerQuotaService._check_quota."""
 
     @pytest.fixture
     def service(self):
@@ -1031,7 +947,6 @@ class TestCheckQuota:
 
     @pytest.mark.asyncio
     async def test_quota_granted_within_limits(self, service):
-        """Test quota granted when usage is within limits."""
         mock_session = AsyncMock()
         mock_context = AsyncMock()
         mock_context.credits_used = Decimal("50.00")
@@ -1057,7 +972,6 @@ class TestCheckQuota:
 
     @pytest.mark.asyncio
     async def test_quota_denied_when_exceeded(self, service):
-        """Test quota denied when usage exceeds limit."""
         mock_session = AsyncMock()
         mock_context = AsyncMock()
         mock_context.credits_used = Decimal("99.00")
@@ -1084,7 +998,6 @@ class TestCheckQuota:
 
     @pytest.mark.asyncio
     async def test_quota_granted_at_exact_boundary(self, service):
-        """Test quota granted when usage exactly equals limit."""
         mock_session = AsyncMock()
         mock_context = AsyncMock()
         mock_context.credits_used = Decimal("98.50")
@@ -1110,7 +1023,6 @@ class TestCheckQuota:
 
     @pytest.mark.asyncio
     async def test_quota_check_no_context_defaults_to_zero(self, service):
-        """Test that missing context defaults credits_used to 0."""
         mock_session = AsyncMock()
 
         with (
@@ -1133,13 +1045,7 @@ class TestCheckQuota:
         assert status_code == 200
 
 
-# ============================================================================
-# Validate and Log Usage Integration Tests (with mocks)
-# ============================================================================
-
-
 class TestValidateAndLogUsage:
-    """Test suite for CareerQuotaService.validate_and_log_usage."""
 
     @pytest.fixture
     def service(self):
@@ -1149,7 +1055,6 @@ class TestValidateAndLogUsage:
 
     @pytest.mark.asyncio
     async def test_returns_six_tuple(self, service):
-        """Test that validate_and_log_usage returns a 6-tuple."""
         from app.apps.cubex_career.services.quota import RateLimitInfo
 
         mock_session = AsyncMock()
@@ -1207,7 +1112,6 @@ class TestValidateAndLogUsage:
 
     @pytest.mark.asyncio
     async def test_rate_limit_exceeded_returns_denied(self, service):
-        """Test that rate limit exceeded returns DENIED without creating log."""
         from app.apps.cubex_career.services.quota import RateLimitInfo
 
         mock_session = AsyncMock()
@@ -1248,7 +1152,6 @@ class TestValidateAndLogUsage:
 
     @pytest.mark.asyncio
     async def test_idempotent_request_returns_cached_result(self, service):
-        """Test that duplicate request returns cached result."""
         mock_session = AsyncMock()
         cached_usage_id = uuid4()
 
@@ -1283,13 +1186,7 @@ class TestValidateAndLogUsage:
         assert "idempotent" in message
 
 
-# ============================================================================
-# Commit Usage Tests (with mocks)
-# ============================================================================
-
-
 class TestCommitUsage:
-    """Test suite for CareerQuotaService.commit_usage."""
 
     @pytest.fixture
     def service(self):
@@ -1299,7 +1196,6 @@ class TestCommitUsage:
 
     @pytest.mark.asyncio
     async def test_successful_commit_increments_credits(self, service):
-        """Test that a successful commit increments credits_used."""
         user_id = uuid4()
         usage_id = uuid4()
         context_id = uuid4()
@@ -1351,7 +1247,6 @@ class TestCommitUsage:
 
     @pytest.mark.asyncio
     async def test_failed_commit_does_not_increment_credits(self, service):
-        """Test that a failed commit does NOT increment credits_used."""
         user_id = uuid4()
         usage_id = uuid4()
 
@@ -1400,7 +1295,6 @@ class TestCommitUsage:
 
     @pytest.mark.asyncio
     async def test_commit_not_found_is_idempotent(self, service):
-        """Test that committing a non-existent log returns success (idempotent)."""
         mock_session = AsyncMock()
 
         with patch(
@@ -1417,7 +1311,6 @@ class TestCommitUsage:
 
     @pytest.mark.asyncio
     async def test_commit_ownership_mismatch_fails(self, service):
-        """Test that committing another user's log fails."""
         owner_id = uuid4()
         attacker_id = uuid4()
         usage_id = uuid4()
@@ -1441,7 +1334,6 @@ class TestCommitUsage:
 
     @pytest.mark.asyncio
     async def test_commit_deleted_log_is_idempotent(self, service):
-        """Test that committing a deleted log returns success (idempotent)."""
         mock_session = AsyncMock()
         mock_log = AsyncMock()
         mock_log.is_deleted = True
@@ -1459,13 +1351,7 @@ class TestCommitUsage:
         assert "idempotent" in msg
 
 
-# ============================================================================
-# Router Integration Tests
-# ============================================================================
-
-
 class TestCareerInternalRouterRegistration:
-    """Test Career internal router is registered correctly."""
 
     def test_internal_router_import(self):
         from app.apps.cubex_career.routers.internal import router
@@ -1483,7 +1369,6 @@ class TestCareerInternalRouterRegistration:
         assert "Career - Internal API" in router.tags
 
     def test_internal_router_in_app(self):
-        """Test that career internal routes are registered in the FastAPI app."""
         from app.main import app
 
         routes = [r.path for r in app.routes if hasattr(r, "path")]
@@ -1492,7 +1377,6 @@ class TestCareerInternalRouterRegistration:
 
 
 class TestCareerInternalRouterEndpoints:
-    """Test that Career internal router has the expected endpoints."""
 
     def test_has_validate_endpoint(self):
         from app.apps.cubex_career.routers.internal import router
@@ -1507,13 +1391,7 @@ class TestCareerInternalRouterEndpoints:
         assert "/internal/usage/commit" in paths
 
 
-# ============================================================================
-# Scheduler Integration Tests
-# ============================================================================
-
-
 class TestCareerSchedulerJob:
-    """Test that the career usage log expiration job is registered."""
 
     def test_expire_job_function_exists(self):
         from app.infrastructure.scheduler.jobs import (
@@ -1532,13 +1410,7 @@ class TestCareerSchedulerJob:
         assert callable(schedule_expire_pending_career_usage_logs_job)
 
 
-# ============================================================================
-# Feature Key Enum Tests (Career-specific)
-# ============================================================================
-
-
 class TestCareerFeatureKeys:
-    """Test that Career feature keys exist in the FeatureKey enum."""
 
     def test_career_career_path(self):
         assert FeatureKey.CAREER_CAREER_PATH.value == "career.career_path"
@@ -1561,10 +1433,10 @@ class TestCareerFeatureKeys:
         assert FeatureKey.CAREER_REFRAME_FEEDBACK.value == "career.reframe_feedback"
 
     def test_career_keys_are_distinct_from_api_keys(self):
-        """Ensure career keys don't overlap with API keys."""
         career_keys = [k for k in FeatureKey if k.value.startswith("career.")]
         api_keys = [k for k in FeatureKey if k.value.startswith("api.")]
 
         assert len(career_keys) > 0
         assert len(api_keys) > 0
         assert set(career_keys).isdisjoint(set(api_keys))
+

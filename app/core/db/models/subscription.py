@@ -1,9 +1,6 @@
 """
 Subscription model for tracking billing across products.
 
-This module provides the Subscription model for managing Stripe
-subscriptions. Product-specific context (workspace for API, user for
-Career) is handled via context tables linked through relationships.
 """
 
 from datetime import datetime
@@ -216,11 +213,6 @@ class Subscription(BaseModel):
         )
 
 
-# ============================================================================
-# Stripe Event Log (for deduplication)
-# ============================================================================
-
-
 class StripeEventLog(BaseModel):
     """
     Model for tracking processed Stripe webhook events.
@@ -256,3 +248,4 @@ class StripeEventLog(BaseModel):
 
 
 __all__ = ["Subscription", "StripeEventLog"]
+

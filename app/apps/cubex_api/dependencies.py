@@ -1,7 +1,6 @@
 """
 Workspace access dependencies for cubex_api.
 
-This module provides FastAPI dependency injection functions for:
 - Verifying workspace membership
 - Checking admin/owner permissions
 - Validating workspace status (active/frozen)
@@ -51,11 +50,6 @@ from app.core.exceptions.types import (
 )
 
 
-# ============================================================================
-# Exceptions
-# ============================================================================
-
-
 class WorkspaceAccessDeniedException(NotFoundException):
     """Raised when user is not a member of the workspace."""
 
@@ -94,11 +88,6 @@ class WorkspaceFrozenException(ForbiddenException):
         if workspace_id:
             msg = f"Workspace {workspace_id} is frozen. Please renew subscription."
         super().__init__(msg)
-
-
-# ============================================================================
-# Dependency Functions
-# ============================================================================
 
 
 async def get_workspace_member(
@@ -313,10 +302,6 @@ async def get_active_workspace_owner(
     return member, workspace
 
 
-# ============================================================================
-# Type Aliases
-# ============================================================================
-
 # Basic workspace access
 WorkspaceMemberDep = Annotated[WorkspaceMember, Depends(get_workspace_member)]
 WorkspaceAdminDep = Annotated[WorkspaceMember, Depends(get_workspace_admin)]
@@ -353,3 +338,4 @@ __all__ = [
     "OwnerPermissionRequiredException",
     "WorkspaceFrozenException",
 ]
+

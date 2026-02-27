@@ -1,7 +1,6 @@
 """
 Utility functions for the application.
 
-This module provides reusable utility functions including:
 - Secure password hashing using bcrypt
 - Password verification against hashed values
 - JWT token creation and decoding
@@ -62,7 +61,6 @@ def hash_password(password: str | None) -> str:
         raise ValueError("Password cannot be None")
 
     try:
-        # Convert password to bytes
         password_bytes = password.encode("utf-8")
 
         # Bcrypt has a 72-byte limit, truncate if necessary
@@ -73,7 +71,6 @@ def hash_password(password: str | None) -> str:
             )
             password_bytes = password_bytes[:72]
 
-        # Generate salt and hash password
         # bcrypt.gensalt() uses a default of 12 rounds which is secure and performant
         salt = bcrypt.gensalt()
         hashed = bcrypt.hashpw(password_bytes, salt)
@@ -117,7 +114,6 @@ def verify_password(password: str | None, hashed_password: str | None) -> bool:
         - Handles invalid inputs gracefully without raising exceptions
         - Case-sensitive comparison
     """
-    # Handle None values gracefully
     if password is None or hashed_password is None:
         utils_logger.warning(
             "Password verification attempted with None value(s): "
@@ -127,7 +123,6 @@ def verify_password(password: str | None, hashed_password: str | None) -> bool:
         return False
 
     try:
-        # Convert inputs to bytes
         password_bytes = password.encode("utf-8")
         hashed_bytes = hashed_password.encode("utf-8")
 
@@ -206,10 +201,8 @@ def create_jwt_token(
         raise ValueError("Data cannot be None")
 
     try:
-        # Create a copy to avoid modifying the original data
         to_encode = data.copy()
 
-        # Set expiration time
         if expires_delta is None:
             expires_delta = timedelta(minutes=15)
 
@@ -219,7 +212,6 @@ def create_jwt_token(
         # Add issued-at time for token uniqueness (important for token rotation)
         to_encode["iat"] = datetime.now(timezone.utc)
 
-        # Add unique JWT ID for token rotation and revocation tracking
         to_encode["jti"] = str(uuid.uuid4())
 
         # Encode the JWT token
@@ -269,7 +261,6 @@ def decode_jwt_token(token: str | None) -> dict[str, Any] | None:
         - Constant-time signature verification
         - Resistant to timing attacks
     """
-    # Handle None or empty token gracefully
     if not token:
         utils_logger.warning(
             f"JWT token decoding attempted with invalid token: "
@@ -337,7 +328,6 @@ def generate_otp_code(length: int = 6) -> str:
         A string representing the numeric OTP code.
     """
 
-    # Generate a cryptographically secure random number
     # Use secrets module for security-sensitive random numbers
     otp = "".join(secrets.choice("0123456789") for _ in range(length))
 
@@ -410,7 +400,6 @@ def hmac_hash_otp(otp: str | None, secret: str | None) -> str:
         raise ValueError("Secret cannot be None or empty")
 
     try:
-        # Create HMAC-SHA256 hash
         otp_bytes = otp.encode("utf-8")
         secret_bytes = secret.encode("utf-8")
 
@@ -457,7 +446,6 @@ def hmac_verify_otp(
         - Safe against timing attacks
         - Handles invalid inputs gracefully without raising exceptions
     """
-    # Handle None or empty values gracefully
     if not otp or not hashed_otp or not secret:
         utils_logger.warning(
             "OTP verification attempted with invalid value(s): "
@@ -468,14 +456,12 @@ def hmac_verify_otp(
         return False
 
     try:
-        # Validate that hashed_otp is valid hexadecimal
         try:
             int(hashed_otp, 16)
         except ValueError:
             utils_logger.warning("OTP verification failed: invalid hash format")
             return False
 
-        # Compute hash of provided OTP
         computed_hash = hmac_hash_otp(otp, secret)
 
         # Use constant-time comparison to prevent timing attacks
@@ -535,7 +521,6 @@ def create_request_fingerprint(
         - JSON serialization is sorted for deterministic output
         - Same inputs always produce the same fingerprint
     """
-    # Build canonical data structure
     data = {
         "endpoint": endpoint.lower().strip(),
         "method": method.upper().strip(),
@@ -663,3 +648,4 @@ async def write_to_file_async(file_path: str, data: str) -> None:
             f"Failed to write data to file {file_path}: {type(e).__name__} - {str(e)}"
         )
         raise
+

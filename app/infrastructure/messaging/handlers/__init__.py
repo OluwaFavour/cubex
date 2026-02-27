@@ -1,7 +1,6 @@
 """
 Message handlers for the messaging infrastructure.
 
-This module contains handlers for processing messages from various queues:
 - email_handler: Handles OTP and other email sending tasks
 - stripe: Handles Stripe webhook events (checkout, subscription changes, etc.)
 - usage_handler: Handles API usage commit messages
@@ -31,3 +30,4 @@ __all__ = [
     "handle_stripe_payment_failed",
     "handle_career_usage_commit",
 ]
+

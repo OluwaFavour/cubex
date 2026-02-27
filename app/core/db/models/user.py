@@ -115,3 +115,4 @@ class OAuthAccount(BaseModel):
         "User",
         back_populates="oauth_accounts",
     )
+

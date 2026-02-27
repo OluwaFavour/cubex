@@ -8,3 +8,4 @@ __all__ = [
     "cleanup_soft_deleted_users",
     "initialize_scheduler",
 ]
+

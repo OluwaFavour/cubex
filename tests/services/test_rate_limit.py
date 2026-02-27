@@ -1,8 +1,6 @@
 """
 Unit tests for rate limiting service.
 
-This module provides comprehensive test coverage for the rate limiting
-service including memory and Redis backends, and stackable dependencies.
 """
 
 import asyncio
@@ -13,16 +11,9 @@ import pytest
 from fastapi import Request
 
 
-# ============================================================================
-# Tests for RateLimitResult
-# ============================================================================
-
-
 class TestRateLimitResult:
-    """Test suite for RateLimitResult dataclass."""
 
     def test_rate_limit_result_allowed(self):
-        """Test RateLimitResult when request is allowed."""
         from app.core.services.rate_limit import RateLimitResult
 
         result = RateLimitResult(
@@ -38,7 +29,6 @@ class TestRateLimitResult:
         assert result.reset_at is not None
 
     def test_rate_limit_result_denied(self):
-        """Test RateLimitResult when request is denied."""
         from app.core.services.rate_limit import RateLimitResult
 
         result = RateLimitResult(
@@ -54,17 +44,10 @@ class TestRateLimitResult:
         assert result.retry_after == 30
 
 
-# ============================================================================
-# Tests for MemoryBackend
-# ============================================================================
-
-
 class TestMemoryBackend:
-    """Test suite for MemoryBackend."""
 
     @pytest.mark.asyncio
     async def test_memory_backend_first_request(self):
-        """Test first request creates new entry."""
         from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
@@ -76,7 +59,6 @@ class TestMemoryBackend:
 
     @pytest.mark.asyncio
     async def test_memory_backend_increment(self):
-        """Test incrementing request count."""
         from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
@@ -91,7 +73,6 @@ class TestMemoryBackend:
 
     @pytest.mark.asyncio
     async def test_memory_backend_limit_exceeded(self):
-        """Test rate limit exceeded."""
         from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
@@ -109,7 +90,6 @@ class TestMemoryBackend:
 
     @pytest.mark.asyncio
     async def test_memory_backend_window_reset(self):
-        """Test window reset after expiry."""
         from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
@@ -120,7 +100,6 @@ class TestMemoryBackend:
         # Wait for window to expire
         await asyncio.sleep(0.15)
 
-        # Should be allowed again
         result = await backend.check("test_key", limit=1, window=0.1)
 
         assert result.allowed is True
@@ -128,7 +107,6 @@ class TestMemoryBackend:
 
     @pytest.mark.asyncio
     async def test_memory_backend_reset(self):
-        """Test resetting a key."""
         from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
@@ -140,14 +118,12 @@ class TestMemoryBackend:
         # Reset
         await backend.reset("test_key")
 
-        # Should start fresh
         result = await backend.check("test_key", limit=10, window=60)
 
         assert result.remaining == 9
 
     @pytest.mark.asyncio
     async def test_memory_backend_get_remaining(self):
-        """Test getting remaining requests."""
         from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
@@ -162,7 +138,6 @@ class TestMemoryBackend:
 
     @pytest.mark.asyncio
     async def test_memory_backend_get_remaining_no_key(self):
-        """Test getting remaining when key doesn't exist."""
         from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
@@ -172,12 +147,10 @@ class TestMemoryBackend:
 
     @pytest.mark.asyncio
     async def test_memory_backend_cleanup_expired(self):
-        """Test that expired entries are cleaned up."""
         from app.core.services.rate_limit import MemoryBackend
 
         backend = MemoryBackend()
 
-        # Create entry with short window
         await backend.check("test_key", limit=10, window=0.1)
 
         # Wait for expiry
@@ -186,21 +159,13 @@ class TestMemoryBackend:
         # Make another request (should trigger cleanup)
         await backend.check("test_key", limit=10, window=0.1)
 
-        # Check internal state - old entry should be replaced
         assert "test_key" in backend._store
 
 
-# ============================================================================
-# Tests for RedisBackend
-# ============================================================================
-
-
 class TestRedisBackend:
-    """Test suite for RedisBackend."""
 
     @pytest.mark.asyncio
     async def test_redis_backend_first_request(self):
-        """Test first request creates new entry."""
         from app.core.services.rate_limit import RedisBackend
 
         with patch("app.core.services.rate_limit.RedisService") as mock_redis:
@@ -218,7 +183,6 @@ class TestRedisBackend:
 
     @pytest.mark.asyncio
     async def test_redis_backend_limit_exceeded(self):
-        """Test rate limit exceeded."""
         from app.core.services.rate_limit import RedisBackend
 
         with patch("app.core.services.rate_limit.RedisService") as mock_redis:
@@ -234,7 +198,6 @@ class TestRedisBackend:
 
     @pytest.mark.asyncio
     async def test_redis_backend_reset(self):
-        """Test resetting a key."""
         from app.core.services.rate_limit import RedisBackend
 
         with patch("app.core.services.rate_limit.RedisService") as mock_redis:
@@ -247,7 +210,6 @@ class TestRedisBackend:
 
     @pytest.mark.asyncio
     async def test_redis_backend_get_remaining(self):
-        """Test getting remaining requests."""
         from app.core.services.rate_limit import RedisBackend
 
         with patch("app.core.services.rate_limit.RedisService") as mock_redis:
@@ -260,7 +222,6 @@ class TestRedisBackend:
 
     @pytest.mark.asyncio
     async def test_redis_backend_get_remaining_no_key(self):
-        """Test getting remaining when key doesn't exist."""
         from app.core.services.rate_limit import RedisBackend
 
         with patch("app.core.services.rate_limit.RedisService") as mock_redis:
@@ -272,17 +233,10 @@ class TestRedisBackend:
             assert remaining == 10
 
 
-# ============================================================================
-# Tests for RateLimiter
-# ============================================================================
-
-
 class TestRateLimiter:
-    """Test suite for RateLimiter class."""
 
     @pytest.mark.asyncio
     async def test_rate_limiter_memory_backend(self):
-        """Test RateLimiter with memory backend."""
         from app.core.services.rate_limit import RateLimiter
 
         limiter = RateLimiter(backend="memory")
@@ -292,7 +246,6 @@ class TestRateLimiter:
 
     @pytest.mark.asyncio
     async def test_rate_limiter_redis_backend(self):
-        """Test RateLimiter with redis backend."""
         from app.core.services.rate_limit import RateLimiter
 
         with patch("app.core.services.rate_limit.RedisService") as mock_redis:
@@ -307,7 +260,6 @@ class TestRateLimiter:
 
     @pytest.mark.asyncio
     async def test_rate_limiter_default_backend_from_settings(self):
-        """Test RateLimiter uses settings for default backend."""
         from app.core.services.rate_limit import RateLimiter
 
         with patch("app.core.services.rate_limit.settings") as mock_settings:
@@ -319,13 +271,7 @@ class TestRateLimiter:
             assert result.allowed is True
 
 
-# ============================================================================
-# Tests for Rate Limit Dependencies
-# ============================================================================
-
-
 class TestRateLimitDependencies:
-    """Test suite for rate limit FastAPI dependencies."""
 
     @pytest.fixture
     def mock_request(self):
@@ -338,7 +284,6 @@ class TestRateLimitDependencies:
 
     @pytest.mark.asyncio
     async def test_rate_limit_by_ip(self, mock_request):
-        """Test rate_limit_by_ip dependency."""
         from app.core.services.rate_limit import rate_limit_by_ip
 
         with patch("app.core.services.rate_limit.RateLimiter") as mock_limiter_class:
@@ -358,7 +303,6 @@ class TestRateLimitDependencies:
 
     @pytest.mark.asyncio
     async def test_rate_limit_by_ip_exceeded(self, mock_request):
-        """Test rate_limit_by_ip when limit exceeded."""
         from app.core.services.rate_limit import rate_limit_by_ip
         from app.core.exceptions.types import RateLimitExceededException
 
@@ -380,7 +324,6 @@ class TestRateLimitDependencies:
 
     @pytest.mark.asyncio
     async def test_rate_limit_by_endpoint(self, mock_request):
-        """Test rate_limit_by_endpoint dependency."""
         from app.core.services.rate_limit import rate_limit_by_endpoint
 
         with patch("app.core.services.rate_limit.RateLimiter") as mock_limiter_class:
@@ -399,7 +342,6 @@ class TestRateLimitDependencies:
 
     @pytest.mark.asyncio
     async def test_rate_limit_by_user(self):
-        """Test rate_limit_by_user dependency."""
         from app.core.services.rate_limit import rate_limit_by_user
 
         mock_request = MagicMock(spec=Request)
@@ -421,7 +363,6 @@ class TestRateLimitDependencies:
 
     @pytest.mark.asyncio
     async def test_rate_limit_by_user_no_user(self):
-        """Test rate_limit_by_user when no user_id provided."""
         from app.core.services.rate_limit import rate_limit_by_user
         from app.core.exceptions.types import AuthenticationException
 
@@ -433,47 +374,31 @@ class TestRateLimitDependencies:
             await dependency(mock_request, user_id=None)
 
 
-# ============================================================================
-# Tests for Key Format
-# ============================================================================
-
-
 class TestKeyFormat:
-    """Test suite for rate limit key formatting."""
 
     def test_key_format_ip(self):
-        """Test IP-based key format."""
         from app.core.services.rate_limit import format_rate_limit_key
 
         key = format_rate_limit_key("ip", "192.168.1.1", "/api/test")
         assert key == "rate_limit:ip:192.168.1.1:/api/test"
 
     def test_key_format_user(self):
-        """Test user-based key format."""
         from app.core.services.rate_limit import format_rate_limit_key
 
         key = format_rate_limit_key("user", "user-123", "/api/test")
         assert key == "rate_limit:user:user-123:/api/test"
 
     def test_key_format_endpoint(self):
-        """Test endpoint-based key format."""
         from app.core.services.rate_limit import format_rate_limit_key
 
         key = format_rate_limit_key("endpoint", "/api/test", "/api/test")
         assert key == "rate_limit:endpoint:/api/test:/api/test"
 
 
-# ============================================================================
-# Tests for Stacking Rate Limiters
-# ============================================================================
-
-
 class TestStackingRateLimiters:
-    """Test suite for stacking multiple rate limiters."""
 
     @pytest.mark.asyncio
     async def test_stacking_ip_and_endpoint(self):
-        """Test stacking IP and endpoint rate limiters."""
         from app.core.services.rate_limit import (
             rate_limit_by_ip,
             rate_limit_by_endpoint,
@@ -500,3 +425,4 @@ class TestStackingRateLimiters:
             assert ip_result.allowed is True
             assert endpoint_result.allowed is True
             assert mock_limiter.check.call_count == 2
+

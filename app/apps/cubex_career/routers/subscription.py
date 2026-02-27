@@ -1,7 +1,6 @@
 """
 Career Subscription router for cubex_career.
 
-This module provides endpoints for:
 - Viewing Career plans
 - Managing Career subscriptions
 - Checkout sessions
@@ -41,11 +40,6 @@ from app.core.db.models import Plan, Subscription
 
 
 router = APIRouter(prefix="/subscriptions")
-
-
-# ============================================================================
-# Helper Functions
-# ============================================================================
 
 
 def _build_plan_response(plan: Plan) -> PlanResponse:
@@ -90,11 +84,6 @@ def _build_subscription_response(
         canceled_at=subscription.canceled_at,
         plan=_build_plan_response(subscription.plan) if subscription.plan else None,
     )
-
-
-# ============================================================================
-# Plan Endpoints
-# ============================================================================
 
 
 @router.get(
@@ -192,11 +181,6 @@ async def get_career_plan(
     async with session.begin():
         plan = await career_subscription_service.get_plan(session, plan_id)
         return _build_plan_response(plan)
-
-
-# ============================================================================
-# Subscription Endpoints
-# ============================================================================
 
 
 @router.get(
@@ -398,26 +382,22 @@ async def preview_career_upgrade(
         f"new_plan={request_data.new_plan_id}"
     )
     async with session.begin():
-        # Get current subscription for plan name
         current_sub = await career_subscription_service.get_subscription(
             session, current_user.id
         )
         if not current_sub:
             raise CareerSubscriptionNotFoundException()
 
-        # Get new plan for name
         new_plan = await career_subscription_service.get_plan(
             session, request_data.new_plan_id
         )
 
-        # Get preview from Stripe
         invoice = await career_subscription_service.preview_upgrade(
             session=session,
             user_id=current_user.id,
             new_plan_id=request_data.new_plan_id,
         )
 
-        # Convert cents to dollars for response
         total_due = Decimal(invoice.amount_due) / Decimal(100)
 
         return CareerUpgradePreviewResponse(
@@ -598,11 +578,6 @@ async def cancel_career_subscription(
         return CareerMessageResponse(message=message, success=True)
 
 
-# ============================================================================
-# Manual Activation Endpoint
-# ============================================================================
-
-
 @router.post(
     "/activate",
     response_model=CareerSubscriptionResponse,
@@ -664,3 +639,4 @@ async def activate_career_subscription(
 
 
 __all__ = ["router"]
+

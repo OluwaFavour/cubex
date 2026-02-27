@@ -1,9 +1,6 @@
 """
 Refresh Token model for persistent session management.
 
-This module provides the RefreshToken model for storing long-lived
-refresh tokens that enable "remember me" functionality and multi-device
-session management.
 """
 
 from datetime import datetime, timezone
@@ -96,3 +93,4 @@ class RefreshToken(BaseModel):
         """Check if the token is still valid (not expired and not revoked)."""
         now = datetime.now(timezone.utc)
         return self.revoked_at is None and self.expires_at > now and not self.is_deleted
+

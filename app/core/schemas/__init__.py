@@ -1,8 +1,6 @@
 """
 Shared schemas for API request validation and response serialization.
 
-This module exports all core Pydantic schemas used across
-multiple application modules.
 """
 
 from app.core.schemas.auth import (
@@ -66,3 +64,4 @@ __all__ = [
     "ActiveSessionResponse",
     "ActiveSessionsResponse",
 ]
+

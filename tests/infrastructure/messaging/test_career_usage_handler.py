@@ -19,13 +19,7 @@ from uuid import uuid4
 import pytest
 
 
-# ============================================================================
-# Import / Export Tests
-# ============================================================================
-
-
 class TestCareerUsageHandlerImports:
-    """Test that the career handler module exports correctly."""
 
     def test_handle_career_usage_commit_import(self):
         from app.infrastructure.messaging.handlers.career_usage_handler import (
@@ -62,17 +56,10 @@ class TestCareerUsageHandlerImports:
         assert config.retry_ttl == 30_000
 
 
-# ============================================================================
-# Validation Error Tests
-# ============================================================================
-
-
 class TestCareerUsageHandlerValidation:
-    """Test payload validation and alert behavior."""
 
     @pytest.mark.asyncio
     async def test_invalid_payload_sends_alert_and_returns(self):
-        """Invalid payload sends email alert and does NOT raise (no retry)."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -92,7 +79,6 @@ class TestCareerUsageHandlerValidation:
 
     @pytest.mark.asyncio
     async def test_missing_user_id_sends_alert(self):
-        """Missing user_id field sends alert."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -111,7 +97,6 @@ class TestCareerUsageHandlerValidation:
 
     @pytest.mark.asyncio
     async def test_missing_usage_id_sends_alert(self):
-        """Missing usage_id field sends alert."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -130,7 +115,6 @@ class TestCareerUsageHandlerValidation:
 
     @pytest.mark.asyncio
     async def test_failure_without_details_sends_alert(self):
-        """success=False without failure details sends alert."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -151,7 +135,6 @@ class TestCareerUsageHandlerValidation:
 
     @pytest.mark.asyncio
     async def test_invalid_user_id_format_sends_alert(self):
-        """Non-UUID user_id sends alert."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -171,7 +154,6 @@ class TestCareerUsageHandlerValidation:
 
     @pytest.mark.asyncio
     async def test_empty_event_sends_alert(self):
-        """Empty event dict sends alert."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -184,17 +166,10 @@ class TestCareerUsageHandlerValidation:
             mock_alert.assert_called_once()
 
 
-# ============================================================================
-# Successful Processing Tests
-# ============================================================================
-
-
 class TestCareerUsageHandlerProcessing:
-    """Test successful career message processing."""
 
     @pytest.mark.asyncio
     async def test_valid_success_commit_calls_service(self):
-        """Valid success commit calls career_quota_service.commit_usage correctly."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -237,7 +212,6 @@ class TestCareerUsageHandlerProcessing:
 
     @pytest.mark.asyncio
     async def test_valid_success_with_metrics(self):
-        """Valid success commit with metrics extracts them correctly."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -284,7 +258,6 @@ class TestCareerUsageHandlerProcessing:
 
     @pytest.mark.asyncio
     async def test_valid_failure_with_details(self):
-        """Valid failure commit with details extracts them correctly."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -329,7 +302,6 @@ class TestCareerUsageHandlerProcessing:
 
     @pytest.mark.asyncio
     async def test_commit_rejected_does_not_raise(self):
-        """When commit_usage returns success=False (rejected), handler doesn't raise."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -361,7 +333,6 @@ class TestCareerUsageHandlerProcessing:
 
     @pytest.mark.asyncio
     async def test_success_commit_with_partial_metrics(self):
-        """Valid commit with only some metrics fields set."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -400,17 +371,10 @@ class TestCareerUsageHandlerProcessing:
             assert call_kwargs["metrics"]["latency_ms"] is None
 
 
-# ============================================================================
-# Error Handling Tests
-# ============================================================================
-
-
 class TestCareerUsageHandlerErrorHandling:
-    """Test error handling and retry behavior."""
 
     @pytest.mark.asyncio
     async def test_processing_error_raises_for_retry(self):
-        """Processing error re-raises exception to trigger queue retry."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -442,7 +406,6 @@ class TestCareerUsageHandlerErrorHandling:
 
     @pytest.mark.asyncio
     async def test_session_creation_error_raises_for_retry(self):
-        """Session creation error re-raises exception to trigger queue retry."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -468,7 +431,6 @@ class TestCareerUsageHandlerErrorHandling:
 
     @pytest.mark.asyncio
     async def test_different_failure_types_accepted(self):
-        """All FailureType enum values are accepted in failure details."""
         from app.infrastructure.messaging.handlers.career_usage_handler import (
             handle_career_usage_commit,
         )
@@ -510,5 +472,5 @@ class TestCareerUsageHandlerErrorHandling:
                     return_value=(True, "Usage committed as FAILED."),
                 ),
             ):
-                # Should not raise for any valid failure_type
                 await handle_career_usage_commit(event)
+

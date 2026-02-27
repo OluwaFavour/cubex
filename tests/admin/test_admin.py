@@ -14,10 +14,8 @@ import pytest
 
 
 class TestAdminModuleImports:
-    """Test that admin module imports correctly."""
 
     def test_admin_module_imports(self):
-        """Test that admin module can be imported."""
         from app.admin import init_admin
 
         # admin is None until init_admin is called
@@ -25,7 +23,6 @@ class TestAdminModuleImports:
         assert callable(init_admin)
 
     def test_admin_views_import(self):
-        """Test that all admin views can be imported."""
         from app.admin.views import (
             FeatureCostConfigAdmin,
             PlanAdmin,
@@ -45,14 +42,12 @@ class TestAdminModuleImports:
         assert SubscriptionAdmin is not None
 
     def test_admin_auth_import(self):
-        """Test that auth backend can be imported."""
         from app.admin.auth import AdminAuth, admin_auth
 
         assert AdminAuth is not None
         assert admin_auth is not None
 
     def test_admin_setup_import(self):
-        """Test that setup module can be imported."""
         from app.admin.setup import init_admin
 
         # admin is None until init_admin is called
@@ -61,7 +56,6 @@ class TestAdminModuleImports:
 
 
 class TestAdminAuthBackend:
-    """Test suite for AdminAuth authentication backend."""
 
     @pytest.fixture
     def auth_backend(self):
@@ -80,7 +74,6 @@ class TestAdminAuthBackend:
 
     @pytest.mark.asyncio
     async def test_login_success(self, auth_backend, mock_request):
-        """Test successful login with correct credentials."""
         from app.admin.auth import AdminAuth
         from app.core.config import settings
 
@@ -103,7 +96,6 @@ class TestAdminAuthBackend:
 
     @pytest.mark.asyncio
     async def test_login_failure_wrong_username(self, auth_backend, mock_request):
-        """Test login failure with wrong username."""
         from app.core.config import settings
 
         mock_request.form = AsyncMock(
@@ -120,7 +112,6 @@ class TestAdminAuthBackend:
 
     @pytest.mark.asyncio
     async def test_login_failure_wrong_password(self, auth_backend, mock_request):
-        """Test login failure with wrong password."""
         from app.core.config import settings
 
         mock_request.form = AsyncMock(
@@ -137,7 +128,6 @@ class TestAdminAuthBackend:
 
     @pytest.mark.asyncio
     async def test_login_failure_empty_credentials(self, auth_backend, mock_request):
-        """Test login failure with empty credentials."""
         mock_request.form = AsyncMock(return_value={"username": "", "password": ""})
 
         result = await auth_backend.login(mock_request)
@@ -147,7 +137,6 @@ class TestAdminAuthBackend:
 
     @pytest.mark.asyncio
     async def test_login_failure_none_credentials(self, auth_backend, mock_request):
-        """Test login failure with None credentials."""
         mock_request.form = AsyncMock(return_value={})
 
         result = await auth_backend.login(mock_request)
@@ -157,7 +146,6 @@ class TestAdminAuthBackend:
 
     @pytest.mark.asyncio
     async def test_logout_clears_session(self, auth_backend, mock_request):
-        """Test that logout clears the session."""
         # Setup: add a token to the session
         mock_request.session["admin_token"] = "some_token"
         mock_request.session["other_data"] = "should_be_cleared"
@@ -169,11 +157,9 @@ class TestAdminAuthBackend:
 
     @pytest.mark.asyncio
     async def test_authenticate_with_valid_token(self, auth_backend, mock_request):
-        """Test authentication succeeds with valid HMAC token in session."""
         from app.admin.auth import AdminAuth
         from app.core.config import settings
 
-        # Generate a valid HMAC token
         token = AdminAuth._create_token(settings.SESSION_SECRET_KEY)
         mock_request.session["admin_token"] = token
 
@@ -185,7 +171,6 @@ class TestAdminAuthBackend:
     async def test_authenticate_without_token_redirects(
         self, auth_backend, mock_request
     ):
-        """Test authentication redirects when no token in session."""
         from starlette.responses import RedirectResponse
 
         mock_request.session = {}
@@ -200,7 +185,6 @@ class TestAdminAuthBackend:
     async def test_authenticate_with_invalid_token_redirects(
         self, auth_backend, mock_request
     ):
-        """Test authentication redirects when token has invalid signature."""
         from starlette.responses import RedirectResponse
 
         # Token exists in session but is not a valid HMAC token
@@ -218,7 +202,6 @@ class TestAdminAuthBackend:
     async def test_authenticate_with_expired_token_redirects(
         self, auth_backend, mock_request
     ):
-        """Test authentication redirects when token is expired."""
         import base64
         import hashlib
         import hmac
@@ -251,14 +234,12 @@ class TestAdminAuthBackend:
     async def test_authenticate_with_tampered_token_redirects(
         self, auth_backend, mock_request
     ):
-        """Test authentication redirects when token signature is tampered."""
         import base64
 
         from starlette.responses import RedirectResponse
 
         from app.admin.auth import AdminAuth
 
-        # Create a token with wrong signature
         timestamp = int(time.time())
         credentials_hash = AdminAuth._get_credentials_hash()
         message = f"{credentials_hash}:{timestamp}"
@@ -277,10 +258,8 @@ class TestAdminAuthBackend:
 
 
 class TestAdminViewConfigurations:
-    """Test suite for admin view configurations."""
 
     def test_plan_admin_configuration(self):
-        """Test PlanAdmin view configuration."""
         from app.admin.views import PlanAdmin
 
         assert PlanAdmin.name == "Plan"
@@ -292,7 +271,6 @@ class TestAdminViewConfigurations:
         assert PlanAdmin.can_export is True
 
     def test_endpoint_cost_config_admin_configuration(self):
-        """Test FeatureCostConfigAdmin view configuration."""
         from app.admin.views import FeatureCostConfigAdmin
 
         assert FeatureCostConfigAdmin.name == "Feature Cost"
@@ -302,7 +280,6 @@ class TestAdminViewConfigurations:
         assert FeatureCostConfigAdmin.can_delete is True
 
     def test_plan_pricing_rule_admin_configuration(self):
-        """Test PlanPricingRuleAdmin view configuration."""
         from app.admin.views import PlanPricingRuleAdmin
 
         assert PlanPricingRuleAdmin.name == "Plan Pricing Rule"
@@ -312,7 +289,6 @@ class TestAdminViewConfigurations:
         assert PlanPricingRuleAdmin.can_delete is True
 
     def test_user_admin_is_read_only(self):
-        """Test UserAdmin view is read-only."""
         from app.admin.views import UserAdmin
 
         assert UserAdmin.name == "User"
@@ -324,7 +300,6 @@ class TestAdminViewConfigurations:
         assert UserAdmin.can_export is True
 
     def test_workspace_admin_is_read_only(self):
-        """Test WorkspaceAdmin view is read-only."""
         from app.admin.views import WorkspaceAdmin
 
         assert WorkspaceAdmin.name == "Workspace"
@@ -335,7 +310,6 @@ class TestAdminViewConfigurations:
         assert WorkspaceAdmin.can_view_details is True
 
     def test_workspace_member_admin_is_read_only(self):
-        """Test WorkspaceMemberAdmin view is read-only."""
         from app.admin.views import WorkspaceMemberAdmin
 
         assert WorkspaceMemberAdmin.name == "Workspace Member"
@@ -345,7 +319,6 @@ class TestAdminViewConfigurations:
         assert WorkspaceMemberAdmin.can_delete is False
 
     def test_subscription_admin_limited_edit(self):
-        """Test SubscriptionAdmin allows limited editing."""
         from app.admin.views import SubscriptionAdmin
 
         assert SubscriptionAdmin.name == "Subscription"
@@ -357,10 +330,8 @@ class TestAdminViewConfigurations:
 
 
 class TestAdminSetup:
-    """Test suite for admin setup and initialization."""
 
     def test_init_admin_creates_instance(self):
-        """Test that init_admin creates and registers admin views."""
         from unittest.mock import MagicMock
 
         from app.admin.setup import init_admin
@@ -368,7 +339,6 @@ class TestAdminSetup:
         mock_app = MagicMock()
         init_admin(mock_app)
 
-        # Verify admin was created
         from app.admin.setup import admin
 
         assert admin is not None
@@ -376,13 +346,11 @@ class TestAdminSetup:
         assert admin.title == "CueBX Admin"
 
     def test_admin_has_authentication(self):
-        """Test that admin has authentication backend configured."""
         from unittest.mock import MagicMock
 
         from app.admin.auth import admin_auth
         from app.admin.setup import admin, init_admin
 
-        # Initialize if not already done
         if admin is None:
             mock_app = MagicMock()
             init_admin(mock_app)
@@ -394,17 +362,14 @@ class TestAdminSetup:
 
 
 class TestAdminSettingsConfiguration:
-    """Test suite for admin settings in config."""
 
     def test_admin_settings_exist(self):
-        """Test that admin settings are defined in config."""
         from app.core.config import settings
 
         assert hasattr(settings, "ADMIN_USERNAME")
         assert hasattr(settings, "ADMIN_PASSWORD")
 
     def test_admin_settings_have_defaults(self):
-        """Test that admin settings have default values."""
         from app.core.config import settings
 
         # These should have defaults (for development)
@@ -412,3 +377,4 @@ class TestAdminSettingsConfiguration:
         assert settings.ADMIN_PASSWORD is not None
         assert len(settings.ADMIN_USERNAME) > 0
         assert len(settings.ADMIN_PASSWORD) > 0
+

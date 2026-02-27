@@ -1,10 +1,6 @@
 """
 Stripe webhook message handlers for async event processing.
 
-This module contains handlers for processing Stripe webhook events from queues.
-Events are processed asynchronously with retry capabilities and Redis-based
-idempotency to prevent duplicate processing.
-
 Supports both API (workspace-based) and Career (user-based) subscriptions.
 """
 
@@ -39,11 +35,6 @@ STRIPE_EVENT_KEY_PREFIX = "stripe_event:"
 STRIPE_EVENT_TTL = 48 * 3600
 
 
-# =============================================================================
-# Idempotency Helpers
-# =============================================================================
-
-
 async def _is_event_already_processed(event_id: str) -> bool:
     """Check if a Stripe event has already been processed using Redis."""
     key = f"{STRIPE_EVENT_KEY_PREFIX}{event_id}"
@@ -54,11 +45,6 @@ async def _mark_event_as_processed(event_id: str) -> None:
     """Mark a Stripe event as successfully processed in Redis."""
     key = f"{STRIPE_EVENT_KEY_PREFIX}{event_id}"
     await RedisService.set_if_not_exists(key, "1", ttl=STRIPE_EVENT_TTL)
-
-
-# =============================================================================
-# Email Notification Helpers
-# =============================================================================
 
 
 async def _get_career_user_email_info(
@@ -213,11 +199,6 @@ async def _send_payment_failed_email(
             )
 
 
-# =============================================================================
-# Checkout Processing Helpers
-# =============================================================================
-
-
 async def _process_career_checkout(
     stripe_subscription_id: str,
     stripe_customer_id: str,
@@ -270,11 +251,6 @@ async def _process_api_checkout(
     )
 
 
-# =============================================================================
-# Subscription Update/Delete Helpers
-# =============================================================================
-
-
 async def _process_subscription_update(stripe_subscription_id: str) -> None:
     """Process subscription update event."""
     stripe_logger.info(f"Processing subscription updated: {stripe_subscription_id}")
@@ -308,7 +284,6 @@ async def _process_subscription_update(stripe_subscription_id: str) -> None:
             )
             stripe_logger.info(f"API subscription updated: {stripe_subscription_id}")
 
-        # Send email if plan changed
         if updated and updated.plan_id != old_plan_id:
             await _send_subscription_activated_email(session, updated, old_plan_name)
 
@@ -346,7 +321,6 @@ async def _process_subscription_deletion(stripe_subscription_id: str) -> None:
             )
             stripe_logger.info(f"API subscription deleted: {stripe_subscription_id}")
 
-        # Send cancellation email
         await _send_subscription_canceled_email(session, subscription, plan_name)
 
 
@@ -370,11 +344,6 @@ async def _process_payment_failure(
         amount_str = f"${amount_due / 100:.2f}" if amount_due else None
 
         await _send_payment_failed_email(session, subscription, plan_name, amount_str)
-
-
-# =============================================================================
-# Main Event Handlers
-# =============================================================================
 
 
 async def handle_stripe_checkout_completed(event: dict[str, Any]) -> None:
@@ -506,3 +475,4 @@ __all__ = [
     "handle_stripe_subscription_deleted",
     "handle_stripe_payment_failed",
 ]
+

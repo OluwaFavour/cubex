@@ -1,8 +1,6 @@
 """
 CRUD operations for subscription context models.
 
-This module provides database operations for managing the context tables
-that link subscriptions to workspaces (API) or users (Career).
 """
 
 from decimal import Decimal
@@ -240,3 +238,4 @@ class CareerSubscriptionContextDB(BaseDB[CareerSubscriptionContext]):
 
 
 __all__ = ["APISubscriptionContextDB", "CareerSubscriptionContextDB"]
+

@@ -1,10 +1,6 @@
 """
 Messaging Module for CubeX Application.
 
-This module provides the RabbitMQ-based message consumer for processing
-background jobs. It can be run standalone via Docker or integrated
-into the FastAPI lifespan.
-
 Standalone Usage:
     python -m app.infrastructure.messaging.main
 
@@ -135,17 +131,14 @@ async def main() -> None:
     rabbitmq_logger.info("Starting standalone message consumer...")
 
     try:
-        # Initialize database
         rabbitmq_logger.info("Initializing database...")
         await init_db()
         rabbitmq_logger.info("Database initialized successfully.")
 
-        # Initialize Redis service
         rabbitmq_logger.info("Initializing Redis service...")
         await RedisService.init(settings.REDIS_URL)
         rabbitmq_logger.info("Redis service initialized successfully.")
 
-        # Initialize Brevo Service
         rabbitmq_logger.info("Initializing Brevo service...")
         await BrevoService.init(
             api_key=settings.BREVO_API_KEY,
@@ -154,7 +147,6 @@ async def main() -> None:
         )
         rabbitmq_logger.info("Brevo service initialized successfully.")
 
-        # Initialize template renderer
         rabbitmq_logger.info("Initializing template renderer...")
         Renderer.initialize("app/templates")
         rabbitmq_logger.info("Template renderer initialized successfully.")
@@ -174,7 +166,6 @@ async def main() -> None:
         raise
 
     finally:
-        # Cleanup
         rabbitmq_logger.info("Shutting down message consumer...")
 
         if conn:
@@ -195,3 +186,4 @@ async def main() -> None:
 # to process messages from those queues.
 if __name__ == "__main__":
     asyncio.run(main())
+

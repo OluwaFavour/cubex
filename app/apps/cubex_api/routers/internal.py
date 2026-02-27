@@ -1,7 +1,6 @@
 """
 Internal API router for external developer API communication.
 
-This module provides endpoints for:
 - Usage validation and logging (creates PENDING usage logs)
 - Usage committing (marks usage as SUCCESS or FAILED)
 
@@ -269,11 +268,9 @@ async def validate_usage(
     - 403: API key doesn't belong to workspace
     - 429: Quota exceeded
     """
-    # Extract client info if provided
     client_ip = request.client.ip if request.client else None
     client_user_agent = request.client.user_agent if request.client else None
 
-    # Extract usage estimate if provided
     usage_estimate = None
     if request.usage_estimate:
         usage_estimate = {
@@ -314,7 +311,6 @@ async def validate_usage(
         is_test_key=is_test_key,
     )
 
-    # Build response headers with rate limit info
     headers: dict[str, str] = {}
     if rate_limit_info is not None:
         headers["X-RateLimit-Limit"] = str(rate_limit_info.limit)
@@ -418,7 +414,6 @@ async def commit_usage(
     This is idempotent - if the log is already committed or doesn't exist,
     success is still returned.
     """
-    # Extract metrics if provided
     metrics = None
     if request.metrics:
         metrics = {
@@ -428,7 +423,6 @@ async def commit_usage(
             "latency_ms": request.metrics.latency_ms,
         }
 
-    # Extract failure details if provided
     failure = None
     if request.failure:
         failure = {
@@ -454,3 +448,4 @@ async def commit_usage(
 
 
 __all__ = ["router"]
+

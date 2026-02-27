@@ -1,7 +1,6 @@
 """
 Test suite for AuthService.
 
-This module contains comprehensive tests for the AuthService including:
 - Email signup with OTP verification
 - Email signin with password
 - OAuth authentication (Google, GitHub)
@@ -33,7 +32,6 @@ from app.core.exceptions.types import (
 
 
 class TestAuthServiceInit:
-    """Test suite for AuthService initialization."""
 
     @pytest.fixture(autouse=True)
     def reset_service(self):
@@ -44,7 +42,6 @@ class TestAuthServiceInit:
         AuthService._initialized = False
 
     def test_init_sets_initialized_flag(self):
-        """Test that init sets the initialized flag."""
         from app.core.services.auth import AuthService
 
         AuthService.init()
@@ -52,7 +49,6 @@ class TestAuthServiceInit:
         assert AuthService._initialized is True
 
     def test_init_is_idempotent(self):
-        """Test that init can be called multiple times safely."""
         from app.core.services.auth import AuthService
 
         AuthService.init()
@@ -61,7 +57,6 @@ class TestAuthServiceInit:
         assert AuthService._initialized is True
 
     def test_is_initialized_returns_correct_state(self):
-        """Test that is_initialized returns correct state."""
         from app.core.services.auth import AuthService
 
         assert AuthService.is_initialized() is False
@@ -72,17 +67,14 @@ class TestAuthServiceInit:
 
 
 class TestGenerateOTP:
-    """Test suite for OTP generation."""
 
     def test_generate_otp_returns_string(self):
-        """Test that generate_otp returns a string."""
         from app.core.services.auth import AuthService
 
         otp = AuthService.generate_otp()
         assert isinstance(otp, str)
 
     def test_generate_otp_default_length(self):
-        """Test that generate_otp uses default length from settings."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.settings") as mock_settings:
@@ -93,14 +85,12 @@ class TestGenerateOTP:
             assert len(otp) == 6
 
     def test_generate_otp_custom_length(self):
-        """Test that generate_otp respects custom length."""
         from app.core.services.auth import AuthService
 
         otp = AuthService.generate_otp(length=8)
         assert len(otp) == 8
 
     def test_generate_otp_only_digits(self):
-        """Test that generate_otp returns only digits."""
         from app.core.services.auth import AuthService
 
         for _ in range(100):
@@ -108,7 +98,6 @@ class TestGenerateOTP:
             assert otp.isdigit()
 
     def test_generate_otp_is_random(self):
-        """Test that generate_otp produces random values."""
         from app.core.services.auth import AuthService
 
         otps = [AuthService.generate_otp() for _ in range(100)]
@@ -117,17 +106,14 @@ class TestGenerateOTP:
 
 
 class TestHashPassword:
-    """Test suite for password hashing."""
 
     def test_hash_password_returns_string(self):
-        """Test that hash_password returns a string."""
         from app.core.services.auth import AuthService
 
         hashed = AuthService.hash_password("password123")
         assert isinstance(hashed, str)
 
     def test_hash_password_different_from_input(self):
-        """Test that hashed password differs from input."""
         from app.core.services.auth import AuthService
 
         password = "password123"
@@ -135,7 +121,6 @@ class TestHashPassword:
         assert hashed != password
 
     def test_hash_password_different_for_same_input(self):
-        """Test that same password produces different hashes (salt)."""
         from app.core.services.auth import AuthService
 
         password = "password123"
@@ -145,10 +130,8 @@ class TestHashPassword:
 
 
 class TestVerifyPassword:
-    """Test suite for password verification."""
 
     def test_verify_password_correct(self):
-        """Test that verify_password returns True for correct password."""
         from app.core.services.auth import AuthService
 
         password = "password123"
@@ -157,7 +140,6 @@ class TestVerifyPassword:
         assert AuthService.verify_password(password, hashed) is True
 
     def test_verify_password_incorrect(self):
-        """Test that verify_password returns False for incorrect password."""
         from app.core.services.auth import AuthService
 
         password = "password123"
@@ -166,7 +148,6 @@ class TestVerifyPassword:
         assert AuthService.verify_password("wrongpassword", hashed) is False
 
     def test_verify_password_empty(self):
-        """Test that verify_password handles empty password."""
         from app.core.services.auth import AuthService
 
         hashed = AuthService.hash_password("password123")
@@ -174,7 +155,6 @@ class TestVerifyPassword:
 
 
 class TestSendOTP:
-    """Test suite for OTP sending."""
 
     @pytest.fixture
     def mock_session(self):
@@ -186,7 +166,6 @@ class TestSendOTP:
 
     @pytest.mark.asyncio
     async def test_send_otp_creates_token(self, mock_session):
-        """Test that send_otp creates an OTP token."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
@@ -210,7 +189,6 @@ class TestSendOTP:
 
     @pytest.mark.asyncio
     async def test_send_otp_invalidates_previous_tokens(self, mock_session):
-        """Test that send_otp invalidates previous tokens."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
@@ -236,7 +214,6 @@ class TestSendOTP:
 
     @pytest.mark.asyncio
     async def test_send_otp_publishes_email_event(self, mock_session):
-        """Test that send_otp publishes email event to message queue."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
@@ -264,7 +241,6 @@ class TestSendOTP:
 
     @pytest.mark.asyncio
     async def test_send_otp_with_user_id(self, mock_session):
-        """Test that send_otp associates token with user_id."""
         from app.core.services.auth import AuthService
 
         user_id = uuid4()
@@ -289,7 +265,6 @@ class TestSendOTP:
 
 
 class TestVerifyOTP:
-    """Test suite for OTP verification."""
 
     @pytest.fixture
     def mock_session(self):
@@ -311,7 +286,6 @@ class TestVerifyOTP:
 
     @pytest.mark.asyncio
     async def test_verify_otp_success(self, mock_session, valid_token):
-        """Test successful OTP verification."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
@@ -334,7 +308,6 @@ class TestVerifyOTP:
 
     @pytest.mark.asyncio
     async def test_verify_otp_invalid_code(self, mock_session):
-        """Test OTP verification with invalid code."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
@@ -354,7 +327,6 @@ class TestVerifyOTP:
 
     @pytest.mark.asyncio
     async def test_verify_otp_too_many_attempts(self, mock_session, valid_token):
-        """Test OTP verification with too many attempts."""
         from app.core.services.auth import AuthService
 
         valid_token.attempts = 5  # Max attempts reached
@@ -377,7 +349,6 @@ class TestVerifyOTP:
 
 
 class TestEmailSignup:
-    """Test suite for email signup."""
 
     @pytest.fixture
     def mock_session(self):
@@ -387,7 +358,6 @@ class TestEmailSignup:
 
     @pytest.mark.asyncio
     async def test_email_signup_creates_user(self, mock_session):
-        """Test that email_signup creates a new user."""
         from app.core.services.auth import AuthService
 
         new_user = MagicMock()
@@ -416,7 +386,6 @@ class TestEmailSignup:
 
     @pytest.mark.asyncio
     async def test_email_signup_existing_user_raises(self, mock_session):
-        """Test that email_signup raises for existing user."""
         from app.core.services.auth import AuthService
 
         existing_user = MagicMock()
@@ -438,7 +407,6 @@ class TestEmailSignup:
 
     @pytest.mark.asyncio
     async def test_email_signup_hashes_password(self, mock_session):
-        """Test that email_signup hashes the password."""
         from app.core.services.auth import AuthService
 
         new_user = MagicMock()
@@ -466,7 +434,6 @@ class TestEmailSignup:
 
 
 class TestEmailSignin:
-    """Test suite for email signin."""
 
     @pytest.fixture
     def mock_session(self):
@@ -487,7 +454,6 @@ class TestEmailSignin:
 
     @pytest.mark.asyncio
     async def test_email_signin_success(self, mock_session, valid_user):
-        """Test successful email signin."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.user_db") as mock_user_db, patch(
@@ -509,7 +475,6 @@ class TestEmailSignin:
 
     @pytest.mark.asyncio
     async def test_email_signin_user_not_found(self, mock_session):
-        """Test email signin with non-existent user."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.user_db") as mock_user_db:
@@ -526,7 +491,6 @@ class TestEmailSignin:
 
     @pytest.mark.asyncio
     async def test_email_signin_wrong_password(self, mock_session, valid_user):
-        """Test email signin with wrong password."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.user_db") as mock_user_db, patch(
@@ -547,7 +511,6 @@ class TestEmailSignin:
 
     @pytest.mark.asyncio
     async def test_email_signin_inactive_user(self, mock_session, valid_user):
-        """Test email signin with inactive user."""
         from app.core.services.auth import AuthService
 
         valid_user.is_active = False
@@ -572,7 +535,6 @@ class TestEmailSignin:
 
     @pytest.mark.asyncio
     async def test_email_signin_no_password_set(self, mock_session, valid_user):
-        """Test email signin for OAuth-only user (no password)."""
         from app.core.services.auth import AuthService
 
         valid_user.password_hash = None
@@ -593,7 +555,6 @@ class TestEmailSignin:
 
 
 class TestOAuthAuthenticate:
-    """Test suite for OAuth authentication."""
 
     @pytest.fixture
     def mock_session(self):
@@ -617,7 +578,6 @@ class TestOAuthAuthenticate:
 
     @pytest.mark.asyncio
     async def test_oauth_authenticate_new_user(self, mock_session, oauth_user_info):
-        """Test OAuth authentication creates new user."""
         from app.core.services.auth import AuthService
 
         new_user = MagicMock()
@@ -652,7 +612,6 @@ class TestOAuthAuthenticate:
     async def test_oauth_authenticate_existing_user_new_provider(
         self, mock_session, oauth_user_info
     ):
-        """Test OAuth adds new provider to existing user."""
         from app.core.services.auth import AuthService
 
         existing_user = MagicMock()
@@ -688,7 +647,6 @@ class TestOAuthAuthenticate:
     async def test_oauth_authenticate_existing_oauth_account(
         self, mock_session, oauth_user_info
     ):
-        """Test OAuth with existing OAuth account."""
         from app.core.services.auth import AuthService
 
         existing_user = MagicMock()
@@ -728,7 +686,6 @@ class TestOAuthAuthenticate:
     async def test_oauth_authenticate_updates_user_info(
         self, mock_session, oauth_user_info
     ):
-        """Test OAuth updates user info from provider."""
         from app.core.services.auth import AuthService
 
         existing_user = MagicMock()
@@ -765,10 +722,8 @@ class TestOAuthAuthenticate:
 
 
 class TestGetOAuthProvider:
-    """Test suite for OAuth provider retrieval."""
 
     def test_get_oauth_provider_google(self):
-        """Test getting Google OAuth provider."""
         from app.core.services.auth import AuthService
         from app.core.services.oauth import GoogleOAuthService
 
@@ -776,7 +731,6 @@ class TestGetOAuthProvider:
         assert provider == GoogleOAuthService
 
     def test_get_oauth_provider_github(self):
-        """Test getting GitHub OAuth provider."""
         from app.core.services.auth import AuthService
         from app.core.services.oauth import GitHubOAuthService
 
@@ -784,7 +738,6 @@ class TestGetOAuthProvider:
         assert provider == GitHubOAuthService
 
     def test_get_oauth_provider_invalid(self):
-        """Test getting invalid OAuth provider."""
         from app.core.services.auth import AuthService
 
         with pytest.raises(OAuthException):
@@ -792,7 +745,6 @@ class TestGetOAuthProvider:
 
 
 class TestPasswordReset:
-    """Test suite for password reset flow."""
 
     @pytest.fixture
     def mock_session(self):
@@ -812,7 +764,6 @@ class TestPasswordReset:
 
     @pytest.mark.asyncio
     async def test_reset_password_success(self, mock_session, valid_user):
-        """Test successful password reset."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.user_db") as mock_user_db, patch(
@@ -840,7 +791,6 @@ class TestPasswordReset:
     async def test_reset_password_publishes_confirmation_email_event(
         self, mock_session, valid_user
     ):
-        """Test that password reset publishes confirmation email event."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.user_db") as mock_user_db, patch(
@@ -866,7 +816,6 @@ class TestPasswordReset:
 
     @pytest.mark.asyncio
     async def test_reset_password_user_not_found(self, mock_session):
-        """Test password reset for non-existent user."""
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.user_db") as mock_user_db:
@@ -883,11 +832,10 @@ class TestPasswordReset:
 
 
 class TestModuleExports:
-    """Test suite for module exports."""
 
     def test_all_exports(self):
-        """Test that __all__ contains expected exports."""
         from app.core.services import auth
 
         assert hasattr(auth, "__all__")
         assert "AuthService" in auth.__all__
+

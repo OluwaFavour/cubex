@@ -139,7 +139,6 @@ class CloudinaryService:
 
             timestamp = int(time.time())
 
-            # Build parameters to sign
             params_to_sign: dict[str, Any] = {
                 "timestamp": timestamp,
             }
@@ -151,15 +150,12 @@ class CloudinaryService:
             if eager:
                 params_to_sign["eager"] = eager
 
-            # Add any additional kwargs to params
             params_to_sign.update(kwargs)
 
-            # Generate signature
             signature = cloudinary.utils.api_sign_request(
                 params_to_sign, cls.api_secret
             )
 
-            # Build upload URL
             upload_url = f"https://api.cloudinary.com/v1_1/{cls.cloud_name}/{resource_type}/upload"
 
             cloudinary_logger.info(
@@ -344,3 +340,4 @@ class CloudinaryService:
                 message=f"Please, try again. Files deletion failed on Cloudinary: {str(e)}",
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             ) from e
+

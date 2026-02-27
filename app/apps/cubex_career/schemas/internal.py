@@ -13,10 +13,6 @@ from pydantic import (
 
 from app.core.enums import AccessStatus, FailureType, FeatureKey
 
-# ============================================================================
-# Usage Validation Schemas (Internal API)
-# ============================================================================
-
 
 class ClientInfo(BaseModel):
     """Schema for client information in usage validation."""
@@ -298,3 +294,4 @@ __all__ = [
     "UsageMetrics",
     "FailureDetails",
 ]
+

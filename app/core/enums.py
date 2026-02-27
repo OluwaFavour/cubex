@@ -15,11 +15,6 @@ class OTPPurpose(str, Enum):
     PASSWORD_RESET = "password_reset"
 
 
-# ============================================================================
-# Subscription & Plan Enums
-# ============================================================================
-
-
 class ProductType(str, Enum):
     """Type of product for subscriptions."""
 
@@ -63,11 +58,6 @@ class SubscriptionStatus(str, Enum):
     PAUSED = "paused"
 
 
-# ============================================================================
-# Workspace Enums
-# ============================================================================
-
-
 class WorkspaceStatus(str, Enum):
     """Status of a workspace."""
 
@@ -100,22 +90,12 @@ class InvitationStatus(str, Enum):
     REVOKED = "revoked"
 
 
-# ============================================================================
-# Support Enums
-# ============================================================================
-
-
 class SalesRequestStatus(str, Enum):
     """Status of a sales request."""
 
     PENDING = "pending"  # Not yet contacted
     CONTACTED = "contacted"  # Sales team has reached out
     CLOSED = "closed"  # Request resolved/closed
-
-
-# ============================================================================
-# API Usage Enums
-# ============================================================================
 
 
 class AccessStatus(str, Enum):
@@ -192,3 +172,4 @@ __all__ = [
     "WorkspaceStatus",
     "FeatureKey",
 ]
+

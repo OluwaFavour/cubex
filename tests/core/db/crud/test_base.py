@@ -1,9 +1,6 @@
 """
 Test suite for BaseDB CRUD operations.
 
-This module contains unit tests for the BaseDB generic CRUD class.
-Tests cover upsert operations using PostgreSQL's INSERT ... ON CONFLICT.
-
 Run all tests:
     pytest tests/core/db/crud/test_base.py -v
 
@@ -23,11 +20,9 @@ from app.core.exceptions.types import DatabaseException
 
 
 class TestBaseDBUpsert:
-    """Test suite for BaseDB upsert method."""
 
     @pytest.mark.asyncio
     async def test_upsert_raises_error_for_missing_unique_field(self):
-        """Test that upsert raises ValueError when unique field is missing."""
         mock_session = AsyncMock()
 
         # Data missing 'product_type' which is a unique field
@@ -50,7 +45,6 @@ class TestBaseDBUpsert:
 
     @pytest.mark.asyncio
     async def test_upsert_validates_all_unique_fields(self):
-        """Test that upsert validates all unique fields are present."""
         mock_session = AsyncMock()
 
         # Data missing 'name' which is a unique field
@@ -70,7 +64,6 @@ class TestBaseDBUpsert:
 
     @pytest.mark.asyncio
     async def test_upsert_returns_tuple(self):
-        """Test that upsert returns a tuple of (instance, created)."""
         mock_session = AsyncMock()
         mock_result = MagicMock()
         mock_plan = MagicMock()
@@ -100,14 +93,12 @@ class TestBaseDBUpsert:
 
     @pytest.mark.asyncio
     async def test_upsert_excludes_specified_fields_from_update(self):
-        """Test that upsert excludes specified fields from update."""
         mock_session = AsyncMock()
         mock_result = MagicMock()
         mock_plan = MagicMock()
         mock_result.scalar_one.return_value = mock_plan
         mock_session.execute.return_value = mock_result
 
-        # Verify that exclude_from_update is accepted
         with patch.object(plan_db, "upsert") as mock_upsert:
             mock_upsert.return_value = (mock_plan, False)
 
@@ -124,27 +115,22 @@ class TestBaseDBUpsert:
                 exclude_from_update=["description"],  # Don't update description
             )
 
-            # Verify it was called with the exclude parameter
             mock_upsert.assert_called_once()
             call_kwargs = mock_upsert.call_args.kwargs
             assert call_kwargs["exclude_from_update"] == ["description"]
 
 
 class TestBaseDBUpsertIntegration:
-    """Integration-style tests for BaseDB upsert using mocked PostgreSQL dialect."""
 
     @pytest.mark.asyncio
     async def test_upsert_uses_on_conflict_do_update(self):
-        """Test that upsert uses PostgreSQL's ON CONFLICT DO UPDATE."""
         # This is a structural test to ensure we're using the right SQLAlchemy construct
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-        # Verify pg_insert is imported and available
         assert pg_insert is not None
 
     @pytest.mark.asyncio
     async def test_upsert_handles_database_error(self):
-        """Test that upsert wraps database errors in DatabaseException."""
         from sqlalchemy.exc import SQLAlchemyError
 
         mock_session = AsyncMock()
@@ -168,11 +154,9 @@ class TestBaseDBUpsertIntegration:
 
 
 class TestBaseDBUpsertTimestamps:
-    """Test suite for BaseDB upsert timestamp handling."""
 
     @pytest.mark.asyncio
     async def test_upsert_sets_created_at_for_new_records(self):
-        """Test that upsert sets created_at for new records."""
         mock_session = AsyncMock()
         now = datetime.now(timezone.utc)
 
@@ -202,7 +186,6 @@ class TestBaseDBUpsertTimestamps:
 
     @pytest.mark.asyncio
     async def test_upsert_updates_updated_at_for_existing_records(self):
-        """Test that upsert updates updated_at for existing records."""
         mock_session = AsyncMock()
         created_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
         updated_time = datetime.now(timezone.utc)
@@ -230,3 +213,4 @@ class TestBaseDBUpsertTimestamps:
 
             assert created is False
             assert plan.updated_at > plan.created_at
+

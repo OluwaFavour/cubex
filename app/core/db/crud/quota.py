@@ -1,8 +1,6 @@
 """
 CRUD operations for Quota models.
 
-This module provides database operations for feature cost configurations
-and plan pricing rules.
 """
 
 from decimal import Decimal
@@ -236,3 +234,4 @@ __all__ = [
     "feature_cost_config_db",
     "plan_pricing_rule_db",
 ]
+

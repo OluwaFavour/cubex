@@ -137,7 +137,6 @@ class TestInternalAPIKeyAuthentication:
             headers=internal_api_headers,
         )
 
-        # Should not be 403 Forbidden - could be 404 or other error
         assert response.status_code != 403
 
 
@@ -155,7 +154,6 @@ class TestUsageValidateEndpoint:
             headers=internal_api_headers,
         )
 
-        # Should return DENIED access
         data = response.json()
         assert data["access"] == AccessStatus.DENIED.value
 
@@ -170,7 +168,6 @@ class TestUsageValidateEndpoint:
             headers=internal_api_headers,
         )
 
-        # Should return 422 due to pydantic validation
         assert response.status_code == 422
 
     @pytest.mark.asyncio
@@ -494,11 +491,6 @@ class TestResponseFormat:
         data = response.json()
         assert "success" in data
         assert isinstance(data["success"], bool)
-
-
-# ============================================================================
-# E2E Tests for validate_usage with Real Database and Redis
-# ============================================================================
 
 
 class TestValidateUsageE2E:
@@ -840,7 +832,6 @@ class TestValidateUsageE2E:
         raw_key, api_key = test_api_key
         client_id = make_client_id(test_workspace)
 
-        # Get rate limit from pricing rule fixture
         rate_limit = basic_api_plan_pricing_rule.rate_limit_per_minute
 
         # Freeze time to ensure all requests are in the same window
@@ -874,7 +865,6 @@ class TestValidateUsageE2E:
             data = response.json()
             assert data["access"] == AccessStatus.DENIED.value
             assert "rate limit" in data["message"].lower()
-            # Should have Retry-After header
             assert "Retry-After" in response.headers
 
     @pytest.mark.asyncio
@@ -994,7 +984,6 @@ class TestValidateUsageE2E:
                 ), f"Request {i+1} got {response.status_code}: {response.json()}"
                 latencies.append(elapsed)
 
-        # Calculate statistics
         avg_latency = mean(latencies)
         min_latency = min(latencies)
         max_latency = max(latencies)
@@ -1017,3 +1006,4 @@ class TestValidateUsageE2E:
         print("=" * 60)
 
         assert avg_latency > 0
+

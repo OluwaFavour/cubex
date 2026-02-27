@@ -1,8 +1,6 @@
 """
 CRUD operations for Workspace models.
 
-This module provides database operations for managing workspaces,
-members, and invitations.
 """
 
 import re
@@ -45,7 +43,6 @@ def slugify(text: str) -> str:
     Returns:
         URL-friendly slug (lowercase, alphanumeric + hyphens).
     """
-    # Convert to lowercase
     slug = text.lower()
     # Replace spaces and underscores with hyphens
     slug = re.sub(r"[\s_]+", "-", slug)
@@ -1032,3 +1029,4 @@ __all__ = [
     "usage_log_db",
     "slugify",
 ]
+

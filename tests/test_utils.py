@@ -1,7 +1,6 @@
 """
 Unit tests for utility functions in app.core.utils module.
 
-This module provides comprehensive test coverage for:
 - Password hashing and verification (bcrypt)
 - JWT token creation and decoding
 - Unix timestamp conversion
@@ -32,11 +31,6 @@ from app.core.utils import (
     generate_openapi_json,
     write_to_file_async,
 )
-
-
-# ============================================================================
-# Fixtures
-# ============================================================================
 
 
 @pytest.fixture
@@ -90,20 +84,12 @@ def temp_file():
     temp_path = temp.name
     temp.close()
     yield temp_path
-    # Cleanup
     Path(temp_path).unlink(missing_ok=True)
 
 
-# ============================================================================
-# Tests for hash_password
-# ============================================================================
-
-
 class TestHashPassword:
-    """Test suite for hash_password function."""
 
     def test_hash_password_success(self, sample_password):
-        """Test successful password hashing."""
         hashed = hash_password(sample_password)
 
         assert hashed is not None
@@ -112,19 +98,16 @@ class TestHashPassword:
         assert hashed.startswith("$2b$")  # bcrypt format
 
     def test_hash_password_none(self):
-        """Test that hashing None password raises ValueError."""
         with pytest.raises(ValueError, match="Password cannot be None"):
             hash_password(None)
 
     def test_hash_password_unique_salts(self, sample_password):
-        """Test that same password produces different hashes (unique salts)."""
         hash1 = hash_password(sample_password)
         hash2 = hash_password(sample_password)
 
         assert hash1 != hash2  # Different salts should produce different hashes
 
     def test_hash_password_empty_string(self):
-        """Test hashing empty string password."""
         hashed = hash_password("")
 
         assert hashed is not None
@@ -132,7 +115,6 @@ class TestHashPassword:
         assert len(hashed) == 60
 
     def test_hash_password_long_password(self):
-        """Test hashing password longer than 72 bytes (bcrypt limit)."""
         long_password = "a" * 100  # 100 characters
         hashed = hash_password(long_password)
 
@@ -141,7 +123,6 @@ class TestHashPassword:
         assert len(hashed) == 60
 
     def test_hash_password_unicode(self):
-        """Test hashing password with unicode characters."""
         unicode_password = "пароль123密码🔐"
         hashed = hash_password(unicode_password)
 
@@ -150,73 +131,51 @@ class TestHashPassword:
         assert len(hashed) == 60
 
 
-# ============================================================================
-# Tests for verify_password
-# ============================================================================
-
-
 class TestVerifyPassword:
-    """Test suite for verify_password function."""
 
     def test_verify_password_correct(self, sample_password, sample_hashed_password):
-        """Test verification with correct password."""
         result = verify_password(sample_password, sample_hashed_password)
         assert result is True
 
     def test_verify_password_incorrect(self, sample_hashed_password):
-        """Test verification with incorrect password."""
         result = verify_password("WrongPassword123", sample_hashed_password)
         assert result is False
 
     def test_verify_password_none_password(self, sample_hashed_password):
-        """Test verification with None password."""
         result = verify_password(None, sample_hashed_password)
         assert result is False
 
     def test_verify_password_none_hash(self, sample_password):
-        """Test verification with None hash."""
         result = verify_password(sample_password, None)
         assert result is False
 
     def test_verify_password_both_none(self):
-        """Test verification with both None values."""
         result = verify_password(None, None)
         assert result is False
 
     def test_verify_password_empty_string(self):
-        """Test verification with empty string password."""
         hashed = hash_password("")
         result = verify_password("", hashed)
         assert result is True
 
     def test_verify_password_invalid_hash_format(self, sample_password):
-        """Test verification with invalid hash format."""
         result = verify_password(sample_password, "invalid_hash_format")
         assert result is False
 
     def test_verify_password_case_sensitive(self, sample_hashed_password):
-        """Test that password verification is case-sensitive."""
         result = verify_password("mysecurepassword123!", sample_hashed_password)
         assert result is False
 
     def test_verify_password_long_password(self):
-        """Test verification with password longer than 72 bytes."""
         long_password = "a" * 100
         hashed = hash_password(long_password)
         result = verify_password(long_password, hashed)
         assert result is True
 
 
-# ============================================================================
-# Tests for create_jwt_token
-# ============================================================================
-
-
 class TestCreateJwtToken:
-    """Test suite for create_jwt_token function."""
 
     def test_create_jwt_token_success(self, sample_jwt_data):
-        """Test successful JWT token creation."""
         token = create_jwt_token(sample_jwt_data)
 
         assert token is not None
@@ -224,12 +183,10 @@ class TestCreateJwtToken:
         assert len(token.split(".")) == 3  # JWT format: header.payload.signature
 
     def test_create_jwt_token_none_data(self):
-        """Test that creating token with None data raises ValueError."""
         with pytest.raises(ValueError, match="Data cannot be None"):
             create_jwt_token(None)
 
     def test_create_jwt_token_custom_expiration(self, sample_jwt_data):
-        """Test token creation with custom expiration time."""
         custom_delta = timedelta(hours=2)
         token = create_jwt_token(sample_jwt_data, expires_delta=custom_delta)
 
@@ -237,14 +194,12 @@ class TestCreateJwtToken:
         decoded = decode_jwt_token(token)
         assert decoded is not None
 
-        # Check that expiration is approximately correct
         exp_time = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc)
         expected_time = datetime.now(timezone.utc) + custom_delta
         time_diff = abs((exp_time - expected_time).total_seconds())
         assert time_diff < 5  # Allow 5 seconds tolerance
 
     def test_create_jwt_token_contains_original_data(self, sample_jwt_data):
-        """Test that token contains all original data."""
         token = create_jwt_token(sample_jwt_data)
         decoded = decode_jwt_token(token)
 
@@ -253,7 +208,6 @@ class TestCreateJwtToken:
             assert decoded[key] == value
 
     def test_create_jwt_token_includes_exp_claim(self, sample_jwt_data):
-        """Test that token includes expiration claim."""
         token = create_jwt_token(sample_jwt_data)
         decoded = decode_jwt_token(token)
 
@@ -262,7 +216,6 @@ class TestCreateJwtToken:
         assert isinstance(decoded["exp"], int)
 
     def test_create_jwt_token_includes_iat_claim(self, sample_jwt_data):
-        """Test that token includes issued-at claim."""
         token = create_jwt_token(sample_jwt_data)
         decoded = decode_jwt_token(token)
 
@@ -271,7 +224,6 @@ class TestCreateJwtToken:
         assert isinstance(decoded["iat"], int)
 
     def test_create_jwt_token_includes_jti_claim(self, sample_jwt_data):
-        """Test that token includes JWT ID claim."""
         token = create_jwt_token(sample_jwt_data)
         decoded = decode_jwt_token(token)
 
@@ -280,7 +232,6 @@ class TestCreateJwtToken:
         assert isinstance(decoded["jti"], str)
 
     def test_create_jwt_token_unique_jti(self, sample_jwt_data):
-        """Test that each token has a unique JWT ID."""
         token1 = create_jwt_token(sample_jwt_data)
         token2 = create_jwt_token(sample_jwt_data)
 
@@ -290,7 +241,6 @@ class TestCreateJwtToken:
         assert decoded1["jti"] != decoded2["jti"]
 
     def test_create_jwt_token_empty_data(self):
-        """Test creating token with empty dictionary."""
         token = create_jwt_token({})
 
         assert token is not None
@@ -299,16 +249,9 @@ class TestCreateJwtToken:
         assert "exp" in decoded
 
 
-# ============================================================================
-# Tests for decode_jwt_token
-# ============================================================================
-
-
 class TestDecodeJwtToken:
-    """Test suite for decode_jwt_token function."""
 
     def test_decode_jwt_token_success(self, sample_jwt_token, sample_jwt_data):
-        """Test successful JWT token decoding."""
         decoded = decode_jwt_token(sample_jwt_token)
 
         assert decoded is not None
@@ -317,23 +260,18 @@ class TestDecodeJwtToken:
             assert decoded[key] == value
 
     def test_decode_jwt_token_none(self):
-        """Test decoding None token."""
         result = decode_jwt_token(None)
         assert result is None
 
     def test_decode_jwt_token_empty_string(self):
-        """Test decoding empty string token."""
         result = decode_jwt_token("")
         assert result is None
 
     def test_decode_jwt_token_invalid_format(self):
-        """Test decoding token with invalid format."""
         result = decode_jwt_token("invalid.token.format")
         assert result is None
 
     def test_decode_jwt_token_expired(self, sample_jwt_data):
-        """Test decoding expired token."""
-        # Create token that expires immediately
         expired_token = create_jwt_token(
             sample_jwt_data, expires_delta=timedelta(seconds=-1)
         )
@@ -347,7 +285,6 @@ class TestDecodeJwtToken:
         assert result is None
 
     def test_decode_jwt_token_tampered(self, sample_jwt_token):
-        """Test decoding tampered token."""
         # Split the token into header, payload, and signature
         parts = sample_jwt_token.split(".")
         assert len(parts) == 3, "JWT should have 3 parts"
@@ -356,7 +293,6 @@ class TestDecodeJwtToken:
         # This guarantees signature mismatch since we keep original signature
         import base64
 
-        # Create a different payload
         tampered_payload = (
             base64.urlsafe_b64encode(b'{"user_id":"hacked","exp":9999999999}')
             .rstrip(b"=")
@@ -370,8 +306,6 @@ class TestDecodeJwtToken:
         assert result is None
 
     def test_decode_jwt_token_wrong_secret(self, sample_jwt_data):
-        """Test decoding token with wrong secret key."""
-        # Create token with original secret
         token = create_jwt_token(sample_jwt_data)
 
         # Temporarily change the secret key for decoding
@@ -387,16 +321,9 @@ class TestDecodeJwtToken:
         # In a real scenario with proper mocking, this should return None
 
 
-# ============================================================================
-# Tests for convert_unix_timestamp_to_datetime
-# ============================================================================
-
-
 class TestConvertUnixTimestampToDatetime:
-    """Test suite for convert_unix_timestamp_to_datetime function."""
 
     def test_convert_unix_timestamp_success(self):
-        """Test successful conversion of Unix timestamp."""
         timestamp = 1700000000  # November 14, 2023, 22:13:20 UTC
         result = convert_unix_timestamp_to_datetime(timestamp)
 
@@ -408,12 +335,10 @@ class TestConvertUnixTimestampToDatetime:
         assert result.tzinfo == timezone.utc
 
     def test_convert_unix_timestamp_none(self):
-        """Test conversion of None timestamp."""
         result = convert_unix_timestamp_to_datetime(None)
         assert result is None
 
     def test_convert_unix_timestamp_zero(self):
-        """Test conversion of zero timestamp (epoch)."""
         result = convert_unix_timestamp_to_datetime(0)
 
         assert result is not None
@@ -422,7 +347,6 @@ class TestConvertUnixTimestampToDatetime:
         assert result.day == 1
 
     def test_convert_unix_timestamp_timezone_aware(self):
-        """Test that result is timezone-aware."""
         timestamp = 1700000000
         result = convert_unix_timestamp_to_datetime(timestamp)
 
@@ -431,7 +355,6 @@ class TestConvertUnixTimestampToDatetime:
         assert result.tzinfo == timezone.utc
 
     def test_convert_unix_timestamp_recent(self):
-        """Test conversion of recent timestamp."""
         # January 1, 2026, 00:00:00 UTC
         timestamp = 1767225600
         result = convert_unix_timestamp_to_datetime(timestamp)
@@ -442,16 +365,9 @@ class TestConvertUnixTimestampToDatetime:
         assert result.day == 1
 
 
-# ============================================================================
-# Tests for generate_otp_code
-# ============================================================================
-
-
 class TestGenerateOtpCode:
-    """Test suite for generate_otp_code function."""
 
     def test_generate_otp_code_default_length(self):
-        """Test OTP generation with default length."""
         otp = generate_otp_code()
 
         assert otp is not None
@@ -460,7 +376,6 @@ class TestGenerateOtpCode:
         assert otp.isdigit()
 
     def test_generate_otp_code_custom_length(self):
-        """Test OTP generation with custom length."""
         for length in [4, 6, 8, 10]:
             otp = generate_otp_code(length=length)
 
@@ -470,62 +385,47 @@ class TestGenerateOtpCode:
             assert otp.isdigit()
 
     def test_generate_otp_code_uniqueness(self):
-        """Test that generated OTPs are (likely) unique."""
         otps = {generate_otp_code() for _ in range(100)}
 
         # With 6-digit OTPs, we should get many unique values
         assert len(otps) > 90  # Allow some collisions but expect mostly unique
 
     def test_generate_otp_code_all_digits(self):
-        """Test that OTP contains only digits."""
         otp = generate_otp_code()
 
         for char in otp:
             assert char in "0123456789"
 
     def test_generate_otp_code_short_length(self):
-        """Test OTP generation with very short length."""
         otp = generate_otp_code(length=1)
 
         assert len(otp) == 1
         assert otp.isdigit()
 
 
-# ============================================================================
-# Tests for mask_otp
-# ============================================================================
-
-
 class TestMaskOtp:
-    """Test suite for mask_otp function."""
 
     def test_mask_otp_standard(self):
-        """Test masking standard 6-digit OTP."""
         result = mask_otp("123456")
         assert result == "1****6"
 
     def test_mask_otp_four_digits(self):
-        """Test masking 4-digit OTP."""
         result = mask_otp("1234")
         assert result == "1**4"
 
     def test_mask_otp_two_digits(self):
-        """Test masking 2-digit OTP (no masking)."""
         result = mask_otp("12")
         assert result == "12"
 
     def test_mask_otp_one_digit(self):
-        """Test masking 1-digit OTP (no masking)."""
         result = mask_otp("1")
         assert result == "1"
 
     def test_mask_otp_eight_digits(self):
-        """Test masking 8-digit OTP."""
         result = mask_otp("12345678")
         assert result == "1******8"
 
     def test_mask_otp_preserves_first_last(self):
-        """Test that masking preserves first and last characters."""
         otp = "987654"
         result = mask_otp(otp)
 
@@ -534,26 +434,17 @@ class TestMaskOtp:
         assert "8" not in result[1:-1]  # Middle digits should be masked
 
 
-# ============================================================================
-# Tests for get_device_info
-# ============================================================================
-
-
 class TestGetDeviceInfo:
-    """Test suite for get_device_info function."""
 
     def test_get_device_info_none(self):
-        """Test parsing None user agent."""
         result = get_device_info(None)
         assert result is None
 
     def test_get_device_info_empty_string(self):
-        """Test parsing empty string user agent."""
         result = get_device_info("")
         assert result is None
 
     def test_get_device_info_windows_chrome(self):
-        """Test parsing Windows Chrome user agent."""
         ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         result = get_device_info(ua)
 
@@ -562,7 +453,6 @@ class TestGetDeviceInfo:
         assert "Chrome" in result
 
     def test_get_device_info_macos_safari(self):
-        """Test parsing macOS Safari user agent."""
         ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15"
         result = get_device_info(ua)
 
@@ -571,7 +461,6 @@ class TestGetDeviceInfo:
         assert "Safari" in result
 
     def test_get_device_info_linux_firefox(self):
-        """Test parsing Linux Firefox user agent."""
         ua = "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0"
         result = get_device_info(ua)
 
@@ -580,7 +469,6 @@ class TestGetDeviceInfo:
         assert "Firefox" in result
 
     def test_get_device_info_android_chrome(self):
-        """Test parsing Android Chrome user agent."""
         ua = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36"
         result = get_device_info(ua)
 
@@ -588,7 +476,6 @@ class TestGetDeviceInfo:
         assert "Android" in result
 
     def test_get_device_info_ios_safari(self):
-        """Test parsing iOS Safari user agent."""
         ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1"
         result = get_device_info(ua)
 
@@ -597,7 +484,6 @@ class TestGetDeviceInfo:
         assert "iOS" in result or "iPhone" in ua
 
     def test_get_device_info_edge(self):
-        """Test parsing Edge user agent."""
         ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
         result = get_device_info(ua)
 
@@ -606,7 +492,6 @@ class TestGetDeviceInfo:
         assert "Edge" in result
 
     def test_get_device_info_truncates_long_ua(self):
-        """Test that very long user agent strings are truncated."""
         ua = "X" * 200  # Very long user agent
         result = get_device_info(ua)
 
@@ -614,50 +499,38 @@ class TestGetDeviceInfo:
         assert len(result) <= 100
 
 
-# ============================================================================
-# Tests for generate_openapi_json
-# ============================================================================
-
-
 class TestGenerateOpenapiJson:
-    """Test suite for generate_openapi_json function."""
 
     def test_generate_openapi_json_success(self, fastapi_app):
-        """Test successful OpenAPI JSON generation."""
         result = generate_openapi_json(fastapi_app)
 
         assert result is not None
         assert isinstance(result, str)
 
-        # Validate it's valid JSON
         parsed = json.loads(result)
         assert "openapi" in parsed
         assert "info" in parsed
         assert "paths" in parsed
 
     def test_generate_openapi_json_contains_title(self, fastapi_app):
-        """Test that generated JSON contains app title."""
         result = generate_openapi_json(fastapi_app)
         parsed = json.loads(result)
 
         assert parsed["info"]["title"] == "Test API"
 
     def test_generate_openapi_json_contains_version(self, fastapi_app):
-        """Test that generated JSON contains app version."""
         result = generate_openapi_json(fastapi_app)
         parsed = json.loads(result)
 
         assert parsed["info"]["version"] == "1.0.0"
 
     def test_generate_openapi_json_contains_paths(self, fastapi_app):
-        """Test that generated JSON contains API paths."""
         result = generate_openapi_json(fastapi_app)
         parsed = json.loads(result)
 
         assert "/test" in parsed["paths"]
 
     def test_generate_openapi_json_formatted(self, fastapi_app):
-        """Test that generated JSON is formatted (indented)."""
         result = generate_openapi_json(fastapi_app)
 
         # Check for indentation (formatted JSON has newlines and spaces)
@@ -665,22 +538,14 @@ class TestGenerateOpenapiJson:
         assert "    " in result  # 4-space indentation
 
 
-# ============================================================================
-# Tests for write_to_file_async
-# ============================================================================
-
-
 class TestWriteToFileAsync:
-    """Test suite for write_to_file_async function."""
 
     @pytest.mark.asyncio
     async def test_write_to_file_async_success(self, temp_file):
-        """Test successful async file writing."""
         test_data = "Hello, World! This is test data."
 
         await write_to_file_async(temp_file, test_data)
 
-        # Verify file contents
         with open(temp_file, "r") as f:
             content = f.read()
 
@@ -688,7 +553,6 @@ class TestWriteToFileAsync:
 
     @pytest.mark.asyncio
     async def test_write_to_file_async_overwrites(self, temp_file):
-        """Test that writing overwrites existing content."""
         # Write initial data
         initial_data = "Initial content"
         await write_to_file_async(temp_file, initial_data)
@@ -697,7 +561,6 @@ class TestWriteToFileAsync:
         new_data = "New content"
         await write_to_file_async(temp_file, new_data)
 
-        # Verify only new data exists
         with open(temp_file, "r") as f:
             content = f.read()
 
@@ -706,7 +569,6 @@ class TestWriteToFileAsync:
 
     @pytest.mark.asyncio
     async def test_write_to_file_async_empty_string(self, temp_file):
-        """Test writing empty string."""
         await write_to_file_async(temp_file, "")
 
         with open(temp_file, "r") as f:
@@ -716,7 +578,6 @@ class TestWriteToFileAsync:
 
     @pytest.mark.asyncio
     async def test_write_to_file_async_multiline(self, temp_file):
-        """Test writing multiline content."""
         multiline_data = "Line 1\nLine 2\nLine 3\n"
 
         await write_to_file_async(temp_file, multiline_data)
@@ -729,11 +590,9 @@ class TestWriteToFileAsync:
 
     @pytest.mark.asyncio
     async def test_write_to_file_async_unicode(self):
-        """Test writing unicode content."""
         import tempfile
         from pathlib import Path
 
-        # Create a temporary file with proper UTF-8 encoding
         with tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", delete=False, suffix=".txt"
         ) as temp:
@@ -749,12 +608,10 @@ class TestWriteToFileAsync:
 
             assert content == unicode_data
         finally:
-            # Cleanup
             Path(temp_path).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
     async def test_write_to_file_async_large_content(self, temp_file):
-        """Test writing large content."""
         large_data = "A" * 10000  # 10KB of data
 
         await write_to_file_async(temp_file, large_data)
@@ -767,23 +624,15 @@ class TestWriteToFileAsync:
 
     @pytest.mark.asyncio
     async def test_write_to_file_async_invalid_path(self):
-        """Test writing to invalid file path raises exception."""
         invalid_path = "/invalid/nonexistent/directory/file.txt"
 
         with pytest.raises(Exception):
             await write_to_file_async(invalid_path, "test data")
 
 
-# ============================================================================
-# Additional Edge Case Tests for Coverage
-# ============================================================================
-
-
 class TestHashPasswordEdgeCases:
-    """Additional tests to cover exception handling in hash_password."""
 
     def test_hash_password_bcrypt_exception(self):
-        """Test exception handling when bcrypt fails unexpectedly."""
         with patch("app.core.utils.bcrypt.hashpw") as mock_hashpw:
             mock_hashpw.side_effect = RuntimeError("Simulated bcrypt failure")
 
@@ -792,25 +641,19 @@ class TestHashPasswordEdgeCases:
 
 
 class TestVerifyPasswordEdgeCases:
-    """Additional tests to cover exception handling in verify_password."""
 
     def test_verify_password_unexpected_exception(self):
-        """Test handling of unexpected exceptions during verification."""
         with patch("app.core.utils.bcrypt.checkpw") as mock_checkpw:
             mock_checkpw.side_effect = RuntimeError("Simulated unexpected error")
 
-            # Should return False instead of crashing
             result = verify_password("password", "$2b$12$somehash")
             assert result is False
 
 
 class TestCreateJwtTokenEdgeCases:
-    """Additional tests to cover exception handling in create_jwt_token."""
 
     def test_create_jwt_token_encoding_exception(self):
-        """Test exception handling when JWT encoding fails."""
 
-        # Create data with non-serializable object
         class NonSerializable:
             pass
 
@@ -821,33 +664,26 @@ class TestCreateJwtTokenEdgeCases:
 
 
 class TestDecodeJwtTokenEdgeCases:
-    """Additional tests to cover exception handling in decode_jwt_token."""
 
     def test_decode_jwt_token_unexpected_exception(self):
-        """Test handling of unexpected exceptions during decoding."""
         with patch("app.core.utils.jwt.decode") as mock_decode:
             mock_decode.side_effect = RuntimeError("Simulated unexpected error")
 
-            # Should return None instead of crashing
             result = decode_jwt_token("some.valid.token")
             assert result is None
 
 
 class TestGetDeviceInfoEdgeCases:
-    """Additional tests to cover edge cases in get_device_info."""
 
     def test_get_device_info_unknown_device(self):
-        """Test parsing user agent with no recognizable OS or browser."""
         # User agent with no recognizable OS or browser
         ua = "UnknownBot/1.0 (Compatible; MSIE 9.0; Bot)"
         result = get_device_info(ua)
 
-        # Should return the truncated user agent string
         assert result is not None
         assert len(result) <= 100
 
     def test_get_device_info_very_short_unknown_ua(self):
-        """Test parsing very short unknown user agent."""
         # User agent with absolutely no recognizable patterns
         ua = "CustomBot/1.0"
         result = get_device_info(ua)
@@ -856,18 +692,15 @@ class TestGetDeviceInfoEdgeCases:
         assert result == ua
 
     def test_get_device_info_ipad(self):
-        """Test parsing iPad/iOS user agent (hits line 404 - iOS detection)."""
         # User agent with iOS/iPad but without "Mac OS X" or "Macintosh"
         # This specifically targets the iOS elif condition on line 404
         ua = "Mozilla/5.0 (iPad; CPU iPhone OS 12_0 like Mac) AppleWebKit/605.1.15"
         result = get_device_info(ua)
 
         assert result is not None
-        # Should detect iOS
         assert "iOS" in result
 
     def test_get_device_info_completely_unknown_short(self):
-        """Test parsing completely unknown short user agent (hits fallback line 404)."""
         # User agent with no OS or browser keywords at all
         ua = "MyCustomClient/2.5"
         result = get_device_info(ua)
@@ -876,16 +709,9 @@ class TestGetDeviceInfoEdgeCases:
         assert result == ua
 
 
-# ============================================================================
-# Tests for HMAC OTP Hashing
-# ============================================================================
-
-
 class TestHmacHashOtp:
-    """Test suite for hmac_hash_otp function."""
 
     def test_hmac_hash_otp_success(self):
-        """Test successful HMAC hashing of OTP."""
         from app.core.utils import hmac_hash_otp
 
         otp = "123456"
@@ -897,7 +723,6 @@ class TestHmacHashOtp:
         assert len(result) == 64  # SHA256 produces 64 hex characters
 
     def test_hmac_hash_otp_deterministic(self):
-        """Test that same OTP and secret produce same hash."""
         from app.core.utils import hmac_hash_otp
 
         otp = "123456"
@@ -909,7 +734,6 @@ class TestHmacHashOtp:
         assert hash1 == hash2
 
     def test_hmac_hash_otp_different_otp(self):
-        """Test that different OTPs produce different hashes."""
         from app.core.utils import hmac_hash_otp
 
         secret = "test_secret_key"
@@ -919,7 +743,6 @@ class TestHmacHashOtp:
         assert hash1 != hash2
 
     def test_hmac_hash_otp_different_secret(self):
-        """Test that different secrets produce different hashes."""
         from app.core.utils import hmac_hash_otp
 
         otp = "123456"
@@ -929,48 +752,40 @@ class TestHmacHashOtp:
         assert hash1 != hash2
 
     def test_hmac_hash_otp_none_otp(self):
-        """Test that hashing None OTP raises ValueError."""
         from app.core.utils import hmac_hash_otp
 
         with pytest.raises(ValueError, match="OTP cannot be None or empty"):
             hmac_hash_otp(None, "secret")
 
     def test_hmac_hash_otp_empty_otp(self):
-        """Test that hashing empty OTP raises ValueError."""
         from app.core.utils import hmac_hash_otp
 
         with pytest.raises(ValueError, match="OTP cannot be None or empty"):
             hmac_hash_otp("", "secret")
 
     def test_hmac_hash_otp_none_secret(self):
-        """Test that hashing with None secret raises ValueError."""
         from app.core.utils import hmac_hash_otp
 
         with pytest.raises(ValueError, match="Secret cannot be None or empty"):
             hmac_hash_otp("123456", None)
 
     def test_hmac_hash_otp_empty_secret(self):
-        """Test that hashing with empty secret raises ValueError."""
         from app.core.utils import hmac_hash_otp
 
         with pytest.raises(ValueError, match="Secret cannot be None or empty"):
             hmac_hash_otp("123456", "")
 
     def test_hmac_hash_otp_hex_format(self):
-        """Test that result is valid hexadecimal string."""
         from app.core.utils import hmac_hash_otp
 
         result = hmac_hash_otp("123456", "secret")
 
-        # Should only contain hex characters
         assert all(c in "0123456789abcdef" for c in result)
 
 
 class TestHmacVerifyOtp:
-    """Test suite for hmac_verify_otp function."""
 
     def test_hmac_verify_otp_success(self):
-        """Test successful HMAC verification of OTP."""
         from app.core.utils import hmac_hash_otp, hmac_verify_otp
 
         otp = "123456"
@@ -981,7 +796,6 @@ class TestHmacVerifyOtp:
         assert result is True
 
     def test_hmac_verify_otp_wrong_otp(self):
-        """Test verification with wrong OTP."""
         from app.core.utils import hmac_hash_otp, hmac_verify_otp
 
         secret = "test_secret_key"
@@ -991,7 +805,6 @@ class TestHmacVerifyOtp:
         assert result is False
 
     def test_hmac_verify_otp_wrong_secret(self):
-        """Test verification with wrong secret."""
         from app.core.utils import hmac_hash_otp, hmac_verify_otp
 
         otp = "123456"
@@ -1001,7 +814,6 @@ class TestHmacVerifyOtp:
         assert result is False
 
     def test_hmac_verify_otp_tampered_hash(self):
-        """Test verification with tampered hash."""
         from app.core.utils import hmac_hash_otp, hmac_verify_otp
 
         otp = "123456"
@@ -1015,49 +827,42 @@ class TestHmacVerifyOtp:
         assert result is False
 
     def test_hmac_verify_otp_none_otp(self):
-        """Test verification with None OTP returns False."""
         from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp(None, "somehash", "secret")
         assert result is False
 
     def test_hmac_verify_otp_empty_otp(self):
-        """Test verification with empty OTP returns False."""
         from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp("", "somehash", "secret")
         assert result is False
 
     def test_hmac_verify_otp_none_hashed(self):
-        """Test verification with None hash returns False."""
         from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp("123456", None, "secret")
         assert result is False
 
     def test_hmac_verify_otp_empty_hashed(self):
-        """Test verification with empty hash returns False."""
         from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp("123456", "", "secret")
         assert result is False
 
     def test_hmac_verify_otp_none_secret(self):
-        """Test verification with None secret returns False."""
         from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp("123456", "somehash", None)
         assert result is False
 
     def test_hmac_verify_otp_empty_secret(self):
-        """Test verification with empty secret returns False."""
         from app.core.utils import hmac_verify_otp
 
         result = hmac_verify_otp("123456", "somehash", "")
         assert result is False
 
     def test_hmac_verify_otp_invalid_hash_format(self):
-        """Test verification with invalid hash format returns False."""
         from app.core.utils import hmac_verify_otp
 
         # Non-hex characters in hash
@@ -1065,7 +870,6 @@ class TestHmacVerifyOtp:
         assert result is False
 
     def test_hmac_verify_otp_constant_time(self):
-        """Test that verification uses constant-time comparison."""
         from app.core.utils import hmac_hash_otp, hmac_verify_otp
         import time
 
@@ -1096,10 +900,8 @@ class TestHmacVerifyOtp:
 
 
 class TestCreateRequestFingerprint:
-    """Test suite for create_request_fingerprint function."""
 
     def test_deterministic_output(self):
-        """Test that same inputs always produce the same hash."""
         from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
@@ -1121,7 +923,6 @@ class TestCreateRequestFingerprint:
         assert result1 == result2
 
     def test_different_endpoints_different_hashes(self):
-        """Test that different endpoints produce different hashes."""
         from app.core.utils import create_request_fingerprint
 
         payload_hash = "b" * 64
@@ -1138,7 +939,6 @@ class TestCreateRequestFingerprint:
         assert result1 != result2
 
     def test_different_methods_different_hashes(self):
-        """Test that different methods produce different hashes."""
         from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/resource"
@@ -1155,7 +955,6 @@ class TestCreateRequestFingerprint:
         assert result1 != result2
 
     def test_different_payload_hashes_different_results(self):
-        """Test that different payload hashes produce different fingerprints."""
         from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
@@ -1168,7 +967,6 @@ class TestCreateRequestFingerprint:
         assert result1 != result2
 
     def test_different_usage_estimates_different_hashes(self):
-        """Test that different usage estimates produce different hashes."""
         from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
@@ -1191,7 +989,6 @@ class TestCreateRequestFingerprint:
         assert result1 != result2
 
     def test_output_is_64_char_hex(self):
-        """Test that output is a 64-character hexadecimal string (SHA-256)."""
         from app.core.utils import create_request_fingerprint
 
         result = create_request_fingerprint(
@@ -1205,7 +1002,6 @@ class TestCreateRequestFingerprint:
         assert all(c in "0123456789abcdef" for c in result)
 
     def test_method_normalization_to_uppercase(self):
-        """Test that method is normalized to uppercase."""
         from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/resource"
@@ -1223,7 +1019,6 @@ class TestCreateRequestFingerprint:
         assert result_upper == result_lower
 
     def test_endpoint_normalization_to_lowercase(self):
-        """Test that endpoint is normalized to lowercase."""
         from app.core.utils import create_request_fingerprint
 
         method = "POST"
@@ -1241,7 +1036,6 @@ class TestCreateRequestFingerprint:
         assert result1 == result2
 
     def test_with_none_usage_estimate(self):
-        """Test fingerprint generation with None usage_estimate."""
         from app.core.utils import create_request_fingerprint
 
         result = create_request_fingerprint("/api/v1/test", "GET", "b2" * 32, None)
@@ -1250,7 +1044,6 @@ class TestCreateRequestFingerprint:
         assert all(c in "0123456789abcdef" for c in result)
 
     def test_none_usage_vs_empty_dict_different(self):
-        """Test that None usage_estimate differs from empty dict."""
         from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/test"
@@ -1265,7 +1058,6 @@ class TestCreateRequestFingerprint:
         assert result_none == result_empty
 
     def test_endpoint_whitespace_is_stripped(self):
-        """Test that whitespace in endpoint is stripped."""
         from app.core.utils import create_request_fingerprint
 
         method = "POST"
@@ -1283,7 +1075,6 @@ class TestCreateRequestFingerprint:
         assert result1 == result2
 
     def test_empty_strings_produce_valid_hash(self):
-        """Test that empty strings still produce a valid hash."""
         from app.core.utils import create_request_fingerprint
 
         result = create_request_fingerprint("", "", "", None)
@@ -1292,7 +1083,6 @@ class TestCreateRequestFingerprint:
         assert all(c in "0123456789abcdef" for c in result)
 
     def test_special_characters_in_endpoint(self):
-        """Test endpoints with special characters."""
         from app.core.utils import create_request_fingerprint
 
         endpoint_with_params = "/api/v1/analyze?key=value&foo=bar"
@@ -1308,7 +1098,6 @@ class TestCreateRequestFingerprint:
         assert all(c in "0123456789abcdef" for c in result)
 
     def test_unicode_in_endpoint(self):
-        """Test endpoints with unicode characters."""
         from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze/日本語"
@@ -1324,7 +1113,6 @@ class TestCreateRequestFingerprint:
         assert all(c in "0123456789abcdef" for c in result)
 
     def test_different_models_different_hashes(self):
-        """Test that different model names produce different hashes."""
         from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
@@ -1347,7 +1135,6 @@ class TestCreateRequestFingerprint:
         assert result1 != result2
 
     def test_different_max_output_tokens_different_hashes(self):
-        """Test that different max_output_tokens produce different hashes."""
         from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
@@ -1370,7 +1157,6 @@ class TestCreateRequestFingerprint:
         assert result1 != result2
 
     def test_partial_usage_estimate_with_missing_keys(self):
-        """Test usage estimate with only some keys provided."""
         from app.core.utils import create_request_fingerprint
 
         endpoint = "/api/v1/analyze"
@@ -1384,3 +1170,4 @@ class TestCreateRequestFingerprint:
 
         assert len(result) == 64
         assert all(c in "0123456789abcdef" for c in result)
+

@@ -1,7 +1,6 @@
 """
 Schemas for support-related endpoints.
 
-This module provides Pydantic models for support request/response validation.
 """
 
 from typing import Annotated
@@ -71,3 +70,4 @@ __all__ = [
     "ContactSalesRequest",
     "ContactSalesResponse",
 ]
+

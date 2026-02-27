@@ -28,10 +28,6 @@ import pytest
 from app.core.enums import ProductType
 
 
-# ============================================================================
-# Module Helpers
-# ============================================================================
-
 HANDLER_MODULE = "app.infrastructure.messaging.handlers.stripe"
 
 
@@ -60,13 +56,7 @@ def _make_subscription(
     return sub
 
 
-# ============================================================================
-# Import / Export Tests
-# ============================================================================
-
-
 class TestStripeHandlerImports:
-    """Test that the handler module exports correctly."""
 
     def test_handle_checkout_completed_import(self):
         from app.infrastructure.messaging.handlers.stripe import (
@@ -120,17 +110,10 @@ class TestStripeHandlerImports:
         assert "stripe_payment_failed" in queue_names
 
 
-# ============================================================================
-# Idempotency Tests
-# ============================================================================
-
-
 class TestIdempotency:
-    """Test Redis-based event deduplication for all handlers."""
 
     @pytest.mark.asyncio
     async def test_checkout_completed_skips_duplicate(self):
-        """Already-processed checkout event is skipped."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_checkout_completed,
         )
@@ -160,7 +143,6 @@ class TestIdempotency:
 
     @pytest.mark.asyncio
     async def test_subscription_updated_skips_duplicate(self):
-        """Already-processed subscription updated event is skipped."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_subscription_updated,
         )
@@ -185,7 +167,6 @@ class TestIdempotency:
 
     @pytest.mark.asyncio
     async def test_subscription_deleted_skips_duplicate(self):
-        """Already-processed subscription deleted event is skipped."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_subscription_deleted,
         )
@@ -210,7 +191,6 @@ class TestIdempotency:
 
     @pytest.mark.asyncio
     async def test_payment_failed_skips_duplicate(self):
-        """Already-processed payment failed event is skipped."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_payment_failed,
         )
@@ -236,17 +216,10 @@ class TestIdempotency:
             mock_process.assert_not_called()
 
 
-# ============================================================================
-# Checkout Completed Handler Tests
-# ============================================================================
-
-
 class TestHandleCheckoutCompleted:
-    """Tests for handle_stripe_checkout_completed."""
 
     @pytest.mark.asyncio
     async def test_routes_to_api_checkout(self):
-        """API product_type routes to _process_api_checkout."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_checkout_completed,
         )
@@ -291,7 +264,6 @@ class TestHandleCheckoutCompleted:
 
     @pytest.mark.asyncio
     async def test_routes_to_career_checkout(self):
-        """Career product_type routes to _process_career_checkout."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_checkout_completed,
         )
@@ -335,7 +307,6 @@ class TestHandleCheckoutCompleted:
 
     @pytest.mark.asyncio
     async def test_defaults_to_api_when_product_type_missing(self):
-        """Missing product_type defaults to API."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_checkout_completed,
         )
@@ -365,7 +336,6 @@ class TestHandleCheckoutCompleted:
 
     @pytest.mark.asyncio
     async def test_error_propagates_without_marking_processed(self):
-        """On error, event is NOT marked as processed (allows retry)."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_checkout_completed,
         )
@@ -398,17 +368,10 @@ class TestHandleCheckoutCompleted:
             mock_mark.assert_not_called()
 
 
-# ============================================================================
-# Subscription Updated Handler Tests
-# ============================================================================
-
-
 class TestHandleSubscriptionUpdated:
-    """Tests for handle_stripe_subscription_updated."""
 
     @pytest.mark.asyncio
     async def test_processes_and_marks_done(self):
-        """Successful update processes and marks event as done."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_subscription_updated,
         )
@@ -436,7 +399,6 @@ class TestHandleSubscriptionUpdated:
 
     @pytest.mark.asyncio
     async def test_error_propagates_without_marking_processed(self):
-        """On error, event is NOT marked as processed (allows retry)."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_subscription_updated,
         )
@@ -464,17 +426,10 @@ class TestHandleSubscriptionUpdated:
             mock_mark.assert_not_called()
 
 
-# ============================================================================
-# Subscription Deleted Handler Tests
-# ============================================================================
-
-
 class TestHandleSubscriptionDeleted:
-    """Tests for handle_stripe_subscription_deleted."""
 
     @pytest.mark.asyncio
     async def test_processes_and_marks_done(self):
-        """Successful deletion processes and marks event as done."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_subscription_deleted,
         )
@@ -502,7 +457,6 @@ class TestHandleSubscriptionDeleted:
 
     @pytest.mark.asyncio
     async def test_error_propagates_without_marking_processed(self):
-        """On error, event is NOT marked as processed."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_subscription_deleted,
         )
@@ -530,17 +484,10 @@ class TestHandleSubscriptionDeleted:
             mock_mark.assert_not_called()
 
 
-# ============================================================================
-# Payment Failed Handler Tests
-# ============================================================================
-
-
 class TestHandlePaymentFailed:
-    """Tests for handle_stripe_payment_failed."""
 
     @pytest.mark.asyncio
     async def test_processes_and_marks_done(self):
-        """Successful payment failure handling marks event as done."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_payment_failed,
         )
@@ -570,7 +517,6 @@ class TestHandlePaymentFailed:
 
     @pytest.mark.asyncio
     async def test_marks_done_even_on_email_error(self):
-        """Payment failed event is marked done even when email fails."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_payment_failed,
         )
@@ -594,14 +540,12 @@ class TestHandlePaymentFailed:
             f"{HANDLER_MODULE}._mark_event_as_processed",
             new_callable=AsyncMock,
         ) as mock_mark:
-            # Should NOT raise - payment_failed swallows email errors
             await handle_stripe_payment_failed(event)
 
             mock_mark.assert_called_once_with("evt_pf_email_err")
 
     @pytest.mark.asyncio
     async def test_handles_none_amount_due(self):
-        """Handler works when amount_due is None."""
         from app.infrastructure.messaging.handlers.stripe import (
             handle_stripe_payment_failed,
         )
@@ -628,17 +572,10 @@ class TestHandlePaymentFailed:
             mock_process.assert_called_once_with("sub_pf_123", None)
 
 
-# ============================================================================
-# _process_subscription_update Routing Tests
-# ============================================================================
-
-
 class TestProcessSubscriptionUpdate:
-    """Tests for _process_subscription_update internal routing."""
 
     @pytest.mark.asyncio
     async def test_routes_to_career_service(self):
-        """Career subscription routes to career_subscription_service."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_subscription_update,
         )
@@ -676,7 +613,6 @@ class TestProcessSubscriptionUpdate:
 
     @pytest.mark.asyncio
     async def test_routes_to_api_service(self):
-        """API subscription routes to api_subscription_service."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_subscription_update,
         )
@@ -714,7 +650,6 @@ class TestProcessSubscriptionUpdate:
 
     @pytest.mark.asyncio
     async def test_skips_when_subscription_not_found(self):
-        """Returns early when subscription not found in DB."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_subscription_update,
         )
@@ -745,7 +680,6 @@ class TestProcessSubscriptionUpdate:
 
     @pytest.mark.asyncio
     async def test_sends_email_on_plan_change(self):
-        """Email is sent when plan_id changes after update."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_subscription_update,
         )
@@ -785,7 +719,6 @@ class TestProcessSubscriptionUpdate:
 
     @pytest.mark.asyncio
     async def test_no_email_when_plan_unchanged(self):
-        """No email sent when plan_id remains the same."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_subscription_update,
         )
@@ -822,17 +755,10 @@ class TestProcessSubscriptionUpdate:
             mock_email.assert_not_called()
 
 
-# ============================================================================
-# _process_subscription_deletion Routing Tests
-# ============================================================================
-
-
 class TestProcessSubscriptionDeletion:
-    """Tests for _process_subscription_deletion internal routing."""
 
     @pytest.mark.asyncio
     async def test_routes_to_career_service(self):
-        """Career subscription deletion routes to career service."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_subscription_deletion,
         )
@@ -877,7 +803,6 @@ class TestProcessSubscriptionDeletion:
 
     @pytest.mark.asyncio
     async def test_routes_to_api_service(self):
-        """API subscription deletion routes to api service."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_subscription_deletion,
         )
@@ -922,7 +847,6 @@ class TestProcessSubscriptionDeletion:
 
     @pytest.mark.asyncio
     async def test_skips_when_subscription_not_found(self):
-        """Returns early when subscription not found in DB."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_subscription_deletion,
         )
@@ -948,7 +872,6 @@ class TestProcessSubscriptionDeletion:
 
     @pytest.mark.asyncio
     async def test_sends_cancellation_email(self):
-        """Cancellation email is sent after successful deletion."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_subscription_deletion,
         )
@@ -984,17 +907,10 @@ class TestProcessSubscriptionDeletion:
             mock_email.assert_called_once_with(mock_session, sub, "Professional")
 
 
-# ============================================================================
-# _process_payment_failure Tests
-# ============================================================================
-
-
 class TestProcessPaymentFailure:
-    """Tests for _process_payment_failure internal function."""
 
     @pytest.mark.asyncio
     async def test_returns_early_when_no_subscription_id(self):
-        """Returns immediately when stripe_subscription_id is None."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_payment_failure,
         )
@@ -1007,7 +923,6 @@ class TestProcessPaymentFailure:
 
     @pytest.mark.asyncio
     async def test_returns_early_when_subscription_not_found(self):
-        """Returns when subscription not in DB."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_payment_failure,
         )
@@ -1033,7 +948,6 @@ class TestProcessPaymentFailure:
 
     @pytest.mark.asyncio
     async def test_formats_amount_and_sends_email(self):
-        """Formats amount_due as dollar string and sends email."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_payment_failure,
         )
@@ -1069,7 +983,6 @@ class TestProcessPaymentFailure:
 
     @pytest.mark.asyncio
     async def test_none_amount_passes_none_string(self):
-        """When amount_due is None, amount_str is None."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_payment_failure,
         )
@@ -1102,17 +1015,10 @@ class TestProcessPaymentFailure:
             mock_email.assert_called_once_with(mock_session, sub, "Plus", None)
 
 
-# ============================================================================
-# _process_career_checkout / _process_api_checkout Tests
-# ============================================================================
-
-
 class TestProcessCheckoutHelpers:
-    """Tests for checkout processing helper functions."""
 
     @pytest.mark.asyncio
     async def test_process_career_checkout_calls_service(self):
-        """_process_career_checkout routes to career service."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_career_checkout,
         )
@@ -1147,7 +1053,6 @@ class TestProcessCheckoutHelpers:
 
     @pytest.mark.asyncio
     async def test_process_api_checkout_calls_service(self):
-        """_process_api_checkout routes to API service."""
         from app.infrastructure.messaging.handlers.stripe import (
             _process_api_checkout,
         )
@@ -1180,17 +1085,10 @@ class TestProcessCheckoutHelpers:
             )
 
 
-# ============================================================================
-# Email Helper Tests
-# ============================================================================
-
-
 class TestEmailHelpers:
-    """Tests for email notification helper functions."""
 
     @pytest.mark.asyncio
     async def test_send_activated_email_career(self):
-        """Sends career activation email via publish_event."""
         from app.infrastructure.messaging.handlers.stripe import (
             _send_subscription_activated_email,
         )
@@ -1229,7 +1127,6 @@ class TestEmailHelpers:
 
     @pytest.mark.asyncio
     async def test_send_activated_email_api(self):
-        """Sends API activation email via publish_event."""
         from app.infrastructure.messaging.handlers.stripe import (
             _send_subscription_activated_email,
         )
@@ -1272,7 +1169,6 @@ class TestEmailHelpers:
 
     @pytest.mark.asyncio
     async def test_send_canceled_email_career(self):
-        """Sends career cancellation email via publish_event."""
         from app.infrastructure.messaging.handlers.stripe import (
             _send_subscription_canceled_email,
         )
@@ -1312,7 +1208,6 @@ class TestEmailHelpers:
 
     @pytest.mark.asyncio
     async def test_send_canceled_email_api(self):
-        """Sends API cancellation email via publish_event."""
         from app.infrastructure.messaging.handlers.stripe import (
             _send_subscription_canceled_email,
         )
@@ -1355,7 +1250,6 @@ class TestEmailHelpers:
 
     @pytest.mark.asyncio
     async def test_send_payment_failed_email_career(self):
-        """Sends career payment failure email via publish_event."""
         from app.infrastructure.messaging.handlers.stripe import (
             _send_payment_failed_email,
         )
@@ -1394,7 +1288,6 @@ class TestEmailHelpers:
 
     @pytest.mark.asyncio
     async def test_send_payment_failed_email_api(self):
-        """Sends API payment failure email via publish_event."""
         from app.infrastructure.messaging.handlers.stripe import (
             _send_payment_failed_email,
         )
@@ -1439,7 +1332,6 @@ class TestEmailHelpers:
 
     @pytest.mark.asyncio
     async def test_email_skipped_when_no_context(self):
-        """Email is not sent when context record is missing."""
         from app.infrastructure.messaging.handlers.stripe import (
             _send_subscription_activated_email,
         )
@@ -1461,7 +1353,6 @@ class TestEmailHelpers:
 
     @pytest.mark.asyncio
     async def test_email_skipped_when_no_user(self):
-        """Email is not sent when user is not found."""
         from app.infrastructure.messaging.handlers.stripe import (
             _send_subscription_activated_email,
         )
@@ -1490,7 +1381,6 @@ class TestEmailHelpers:
 
     @pytest.mark.asyncio
     async def test_email_skipped_when_no_workspace_owner(self):
-        """API email skipped when workspace has no owner."""
         from app.infrastructure.messaging.handlers.stripe import (
             _send_subscription_activated_email,
         )
@@ -1519,3 +1409,4 @@ class TestEmailHelpers:
             await _send_subscription_activated_email(mock_session, sub, "Free")
 
             mock_publish.assert_not_called()
+

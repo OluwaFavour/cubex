@@ -1,7 +1,6 @@
 """
 CRUD operations for RefreshToken model.
 
-This module provides database operations for managing refresh tokens including:
 - Creating new tokens
 - Looking up tokens by hash
 - Revoking single tokens
@@ -266,3 +265,4 @@ class RefreshTokenDB(BaseDB[RefreshToken]):
             session=session,
             conditions=conditions,
         )
+

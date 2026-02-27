@@ -22,11 +22,6 @@ import pytest
 from app.core.enums import ProductType, SubscriptionStatus
 
 
-# ============================================================================
-# Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 def career_service():
     """Get CareerSubscriptionService instance."""
@@ -105,13 +100,7 @@ def mock_stripe_sub_new_period():
     return stripe_sub
 
 
-# ============================================================================
-# Billing Period Change — Credits Reset Tests
-# ============================================================================
-
-
 class TestHandleSubscriptionUpdatedCreditsReset:
-    """Test that billing period changes correctly reset credits_used."""
 
     @pytest.mark.asyncio
     async def test_billing_period_changed_resets_credits(
@@ -120,7 +109,6 @@ class TestHandleSubscriptionUpdatedCreditsReset:
         mock_career_subscription,
         mock_stripe_sub_new_period,
     ):
-        """When billing period changes, credits_used is reset to 0."""
         mock_context = MagicMock()
         mock_context.id = uuid4()
 
@@ -160,7 +148,6 @@ class TestHandleSubscriptionUpdatedCreditsReset:
         mock_career_subscription,
         mock_stripe_sub_same_period,
     ):
-        """When billing period is unchanged, credits_used is NOT reset."""
         with (
             patch(
                 "app.apps.cubex_career.services.subscription.subscription_db"
@@ -184,7 +171,6 @@ class TestHandleSubscriptionUpdatedCreditsReset:
                 stripe_subscription_id="sub_career_123",
             )
 
-            # Should NOT have looked up context or reset credits
             mock_ctx_db.get_by_subscription.assert_not_called()
             mock_ctx_db.reset_credits_used.assert_not_called()
 
@@ -195,7 +181,6 @@ class TestHandleSubscriptionUpdatedCreditsReset:
         mock_career_subscription,
         mock_stripe_sub_new_period,
     ):
-        """When billing period changes but no context exists, no reset occurs."""
         with (
             patch(
                 "app.apps.cubex_career.services.subscription.subscription_db"
@@ -230,8 +215,6 @@ class TestHandleSubscriptionUpdatedCreditsReset:
         mock_career_subscription,
         mock_stripe_sub_new_period,
     ):
-        """When new_period_start is None, credits are NOT reset."""
-        # Set the new period start to None
         mock_stripe_sub_new_period.items.data[0].current_period_start = None
 
         with (
@@ -265,7 +248,6 @@ class TestHandleSubscriptionUpdatedCreditsReset:
         self,
         career_service,
     ):
-        """When subscription is not found, returns None without resetting."""
         with patch(
             "app.apps.cubex_career.services.subscription.subscription_db"
         ) as mock_sub_db:
@@ -284,7 +266,6 @@ class TestHandleSubscriptionUpdatedCreditsReset:
         self,
         career_service,
     ):
-        """When subscription is not Career type, returns None without processing."""
         api_subscription = MagicMock()
         api_subscription.product_type = ProductType.API
 
@@ -309,7 +290,6 @@ class TestHandleSubscriptionUpdatedCreditsReset:
         career_service,
         mock_career_subscription,
     ):
-        """When Stripe subscription has no items, no reset occurs."""
         stripe_sub = MagicMock()
         stripe_sub.status = "active"
         stripe_sub.cancel_at_period_end = False
@@ -347,7 +327,6 @@ class TestHandleSubscriptionUpdatedCreditsReset:
         mock_career_subscription,
         mock_stripe_sub_new_period,
     ):
-        """After reset, subscription update includes new period start/end."""
         mock_context = MagicMock()
         mock_context.id = uuid4()
 
@@ -376,7 +355,6 @@ class TestHandleSubscriptionUpdatedCreditsReset:
                 stripe_subscription_id="sub_career_123",
             )
 
-            # Verify subscription update includes new period
             update_call = mock_sub_db.update.call_args
             updates = (
                 update_call.args[2]
@@ -387,13 +365,7 @@ class TestHandleSubscriptionUpdatedCreditsReset:
             assert updates["current_period_end"] == 1705356800
 
 
-# ============================================================================
-# Phase 3: handle_checkout_completed Business Logic Tests
-# ============================================================================
-
-
 class TestHandleCheckoutCompleted:
-    """Test suite for Career handle_checkout_completed business logic."""
 
     @pytest.fixture
     def career_service(self):
@@ -429,7 +401,6 @@ class TestHandleCheckoutCompleted:
     async def test_idempotency_returns_existing(
         self, career_service, mock_stripe_sub
     ):
-        """If subscription already exists, return it without creating."""
         existing = MagicMock(id=uuid4())
 
         with patch(
@@ -458,7 +429,6 @@ class TestHandleCheckoutCompleted:
     async def test_deactivates_existing_free_subscription(
         self, career_service, mock_stripe_sub
     ):
-        """Existing free subscription is marked CANCELED before creating new."""
         current_sub = MagicMock(id=uuid4())
         new_sub = MagicMock(id=uuid4())
         user_id = uuid4()
@@ -495,7 +465,6 @@ class TestHandleCheckoutCompleted:
                 plan_id=uuid4(),
             )
 
-            # Verify old sub was canceled
             cancel_call = mock_sub_db.update.call_args
             cancel_data = (
                 cancel_call.args[2]
@@ -508,7 +477,6 @@ class TestHandleCheckoutCompleted:
     async def test_creates_subscription_with_career_product_type(
         self, career_service, mock_stripe_sub
     ):
-        """New subscription has ProductType.CAREER and seat_count=1."""
         new_sub = MagicMock(id=uuid4())
         user_id = uuid4()
         plan_id = uuid4()
@@ -559,7 +527,6 @@ class TestHandleCheckoutCompleted:
     async def test_creates_new_context_when_none_exists(
         self, career_service, mock_stripe_sub
     ):
-        """New context is created when user has no previous context."""
         new_sub = MagicMock(id=uuid4())
         user_id = uuid4()
 
@@ -606,7 +573,6 @@ class TestHandleCheckoutCompleted:
 
     @pytest.mark.asyncio
     async def test_updates_existing_context(self, career_service, mock_stripe_sub):
-        """Existing context is updated to point to the new subscription."""
         new_sub = MagicMock(id=uuid4())
         existing_ctx = MagicMock(id=uuid4())
         user_id = uuid4()
@@ -653,7 +619,6 @@ class TestHandleCheckoutCompleted:
 
     @pytest.mark.asyncio
     async def test_sends_activation_email(self, career_service, mock_stripe_sub):
-        """Activation email is published for career user."""
         new_sub = MagicMock(id=uuid4())
         user = MagicMock(email="career@test.com", full_name="Career User")
         plan = MagicMock()
@@ -702,13 +667,7 @@ class TestHandleCheckoutCompleted:
             assert payload["product_name"] == "CueBX Career"
 
 
-# ============================================================================
-# Phase 4: handle_subscription_deleted Tests
-# ============================================================================
-
-
 class TestHandleSubscriptionDeleted:
-    """Test suite for Career handle_subscription_deleted."""
 
     @pytest.fixture
     def career_service(self):
@@ -720,7 +679,6 @@ class TestHandleSubscriptionDeleted:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_not_found(self, career_service):
-        """Returns None when subscription not found in DB."""
         with patch(
             "app.apps.cubex_career.services.subscription.subscription_db"
         ) as mock_sub_db:
@@ -735,7 +693,6 @@ class TestHandleSubscriptionDeleted:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_not_career_type(self, career_service):
-        """Returns None when subscription is not CAREER type."""
         sub = MagicMock(product_type=ProductType.API)
 
         with patch(
@@ -752,7 +709,6 @@ class TestHandleSubscriptionDeleted:
 
     @pytest.mark.asyncio
     async def test_downgrades_to_free_plan(self, career_service):
-        """Subscription is downgraded to free plan when deleted."""
         sub = MagicMock(id=uuid4(), product_type=ProductType.CAREER)
         free_plan = MagicMock(id=uuid4())
         updated_sub = MagicMock(id=sub.id)
@@ -789,7 +745,6 @@ class TestHandleSubscriptionDeleted:
 
     @pytest.mark.asyncio
     async def test_falls_back_to_canceled_when_no_free_plan(self, career_service):
-        """Falls back to CANCELED status when free plan is not found."""
         sub = MagicMock(id=uuid4(), product_type=ProductType.CAREER)
         updated_sub = MagicMock(id=sub.id)
 
@@ -822,7 +777,6 @@ class TestHandleSubscriptionDeleted:
 
     @pytest.mark.asyncio
     async def test_no_workspace_freeze_for_career(self, career_service):
-        """Career deletion does NOT freeze any workspace."""
         sub = MagicMock(id=uuid4(), product_type=ProductType.CAREER)
         free_plan = MagicMock(id=uuid4())
         updated_sub = MagicMock(id=sub.id)
@@ -850,13 +804,7 @@ class TestHandleSubscriptionDeleted:
             mock_sub_db.update.assert_called_once()
 
 
-# ============================================================================
-# Phase 5: handle_subscription_updated Extended Tests
-# ============================================================================
-
-
 class TestHandleSubscriptionUpdatedExtended:
-    """Extended tests for Career handle_subscription_updated logic."""
 
     @pytest.fixture
     def career_service(self):
@@ -908,7 +856,6 @@ class TestHandleSubscriptionUpdatedExtended:
 
     @pytest.mark.asyncio
     async def test_status_mapping_active(self, career_service, mock_career_sub):
-        """Stripe 'active' maps to ACTIVE."""
         stripe_sub = self._make_stripe_sub(status="active")
 
         with patch(
@@ -940,7 +887,6 @@ class TestHandleSubscriptionUpdatedExtended:
 
     @pytest.mark.asyncio
     async def test_status_mapping_canceled(self, career_service, mock_career_sub):
-        """Stripe 'canceled' maps to CANCELED."""
         stripe_sub = self._make_stripe_sub(status="canceled")
 
         with patch(
@@ -972,7 +918,6 @@ class TestHandleSubscriptionUpdatedExtended:
 
     @pytest.mark.asyncio
     async def test_amount_synced_from_stripe(self, career_service, mock_career_sub):
-        """Amount is calculated from Stripe item price."""
         stripe_sub = self._make_stripe_sub()
         stripe_sub.items.data[0].price.unit_amount = 4900  # $49.00
 
@@ -1005,7 +950,6 @@ class TestHandleSubscriptionUpdatedExtended:
 
     @pytest.mark.asyncio
     async def test_canceled_at_propagated(self, career_service, mock_career_sub):
-        """canceled_at from Stripe is propagated to DB update."""
         stripe_sub = self._make_stripe_sub(status="canceled")
         stripe_sub.canceled_at = 1702000000
 
@@ -1038,7 +982,6 @@ class TestHandleSubscriptionUpdatedExtended:
 
     @pytest.mark.asyncio
     async def test_plan_synced_when_price_changes(self, career_service, mock_career_sub):
-        """Plan is updated when Stripe price ID changes to a Career plan."""
         new_plan = MagicMock(id=uuid4(), product_type=ProductType.CAREER, name="Pro")
         stripe_sub = self._make_stripe_sub(price_id="price_new_career")
 
@@ -1073,13 +1016,7 @@ class TestHandleSubscriptionUpdatedExtended:
             assert data["plan_id"] == new_plan.id
 
 
-# ============================================================================
-# Phase 6: Career create_free_subscription tests
-# ============================================================================
-
-
 class TestCreateFreeSubscription:
-    """Tests for CareerSubscriptionService.create_free_subscription."""
 
     @pytest.fixture
     def career_service(self):
@@ -1091,7 +1028,6 @@ class TestCreateFreeSubscription:
 
     @pytest.mark.asyncio
     async def test_idempotency_returns_existing(self, career_service):
-        """If user already has a subscription, return it."""
         existing = MagicMock(id=uuid4())
         with patch(
             "app.apps.cubex_career.services.subscription.subscription_db"
@@ -1106,7 +1042,6 @@ class TestCreateFreeSubscription:
 
     @pytest.mark.asyncio
     async def test_creates_subscription_and_context(self, career_service):
-        """Creates subscription + career context for new user."""
         user = MagicMock(id=uuid4())
         free_plan = MagicMock(id=uuid4())
         new_sub = MagicMock(id=uuid4())
@@ -1129,13 +1064,11 @@ class TestCreateFreeSubscription:
             )
 
             assert result is new_sub
-            # Verify subscription creation data
             sub_data = mock_sub_db.create.call_args.args[1]
             assert sub_data["plan_id"] == free_plan.id
             assert sub_data["product_type"] == ProductType.CAREER
             assert sub_data["status"] == SubscriptionStatus.ACTIVE
             assert sub_data["seat_count"] == 1
-            # Verify context creation
             mock_ctx_db.create.assert_called_once()
             ctx_data = mock_ctx_db.create.call_args.args[1]
             assert ctx_data["subscription_id"] == new_sub.id
@@ -1143,7 +1076,6 @@ class TestCreateFreeSubscription:
 
     @pytest.mark.asyncio
     async def test_raises_when_no_free_plan(self, career_service):
-        """Raises ValueError if free plan is not seeded."""
         with patch(
             "app.apps.cubex_career.services.subscription.subscription_db"
         ) as mock_sub_db, patch(
@@ -1158,13 +1090,7 @@ class TestCreateFreeSubscription:
                 )
 
 
-# ============================================================================
-# Phase 6: Career create_checkout_session tests
-# ============================================================================
-
-
 class TestCreateCheckoutSession:
-    """Tests for CareerSubscriptionService.create_checkout_session."""
 
     @pytest.fixture
     def career_service(self):
@@ -1176,7 +1102,6 @@ class TestCreateCheckoutSession:
 
     @pytest.mark.asyncio
     async def test_happy_path_returns_checkout_session(self, career_service):
-        """Successful checkout creates Stripe session and returns it."""
         user = MagicMock(id=uuid4(), email="u@test.com", full_name="Test")
         user.stripe_customer_id = "cus_123"
         plan = MagicMock(
@@ -1216,7 +1141,6 @@ class TestCreateCheckoutSession:
 
     @pytest.mark.asyncio
     async def test_plan_not_found_raises(self, career_service):
-        """Raises when plan does not exist."""
         from app.apps.cubex_career.services.subscription import (
             CareerPlanNotFoundException,
         )
@@ -1237,7 +1161,6 @@ class TestCreateCheckoutSession:
 
     @pytest.mark.asyncio
     async def test_existing_paid_subscription_raises(self, career_service):
-        """Raises when user already has an active paid subscription."""
         from app.apps.cubex_career.services.subscription import (
             CareerSubscriptionAlreadyExistsException,
         )
@@ -1273,7 +1196,6 @@ class TestCreateCheckoutSession:
     async def test_ensure_stripe_customer_called_for_new_customer(
         self, career_service
     ):
-        """Creates a Stripe customer if user doesn't have one."""
         user = MagicMock(id=uuid4(), email="new@test.com", full_name="New User")
         user.stripe_customer_id = None
         plan = MagicMock(
@@ -1316,13 +1238,7 @@ class TestCreateCheckoutSession:
             mock_user_db.update.assert_called_once()
 
 
-# ============================================================================
-# Phase 6: Career cancel_subscription tests
-# ============================================================================
-
-
 class TestCancelSubscription:
-    """Tests for CareerSubscriptionService.cancel_subscription."""
 
     @pytest.fixture
     def career_service(self):
@@ -1334,7 +1250,6 @@ class TestCancelSubscription:
 
     @pytest.mark.asyncio
     async def test_cancel_at_period_end(self, career_service):
-        """Cancel at period end sets flag but keeps ACTIVE status."""
         sub = MagicMock(
             id=uuid4(),
             stripe_subscription_id="sub_cancel_test",
@@ -1371,7 +1286,6 @@ class TestCancelSubscription:
 
     @pytest.mark.asyncio
     async def test_cancel_immediately_downgrades_to_free(self, career_service):
-        """Immediate cancel downgrades to free plan instead of just marking CANCELED."""
         sub = MagicMock(
             id=uuid4(),
             stripe_subscription_id="sub_cancel_now",
@@ -1416,7 +1330,6 @@ class TestCancelSubscription:
 
     @pytest.mark.asyncio
     async def test_cancel_immediately_falls_back_when_no_free_plan(self, career_service):
-        """Immediate cancel falls back to CANCELED if free plan is missing."""
         sub = MagicMock(
             id=uuid4(),
             stripe_subscription_id="sub_cancel_now",
@@ -1457,7 +1370,6 @@ class TestCancelSubscription:
 
     @pytest.mark.asyncio
     async def test_not_found_raises(self, career_service):
-        """Raises when no subscription found for user."""
         from app.apps.cubex_career.services.subscription import (
             CareerSubscriptionNotFoundException,
         )
@@ -1473,13 +1385,7 @@ class TestCancelSubscription:
                 )
 
 
-# ============================================================================
-# Phase 6: Career preview_upgrade tests
-# ============================================================================
-
-
 class TestPreviewUpgrade:
-    """Tests for CareerSubscriptionService.preview_upgrade."""
 
     @pytest.fixture
     def career_service(self):
@@ -1506,7 +1412,6 @@ class TestPreviewUpgrade:
 
     @pytest.mark.asyncio
     async def test_happy_path_returns_invoice(self, career_service):
-        """Successful preview returns Stripe invoice preview."""
         current_plan_id = uuid4()
         sub = self._make_sub(plan_id=current_plan_id, plan_rank=1)
         new_plan = MagicMock(
@@ -1538,7 +1443,6 @@ class TestPreviewUpgrade:
 
     @pytest.mark.asyncio
     async def test_same_plan_raises(self, career_service):
-        """Raises when trying to preview same plan."""
         from app.apps.cubex_career.services.subscription import (
             CareerSamePlanException,
         )
@@ -1567,7 +1471,6 @@ class TestPreviewUpgrade:
 
     @pytest.mark.asyncio
     async def test_downgrade_raises(self, career_service):
-        """Raises when target plan has lower rank."""
         from app.apps.cubex_career.services.subscription import (
             CareerPlanDowngradeNotAllowedException,
         )
@@ -1596,7 +1499,6 @@ class TestPreviewUpgrade:
 
     @pytest.mark.asyncio
     async def test_not_found_raises(self, career_service):
-        """Raises when subscription not found."""
         from app.apps.cubex_career.services.subscription import (
             CareerSubscriptionNotFoundException,
         )
@@ -1614,13 +1516,7 @@ class TestPreviewUpgrade:
                 )
 
 
-# ============================================================================
-# Phase 6: Career upgrade_plan tests
-# ============================================================================
-
-
 class TestUpgradePlan:
-    """Tests for CareerSubscriptionService.upgrade_plan."""
 
     @pytest.fixture
     def career_service(self):
@@ -1647,7 +1543,6 @@ class TestUpgradePlan:
 
     @pytest.mark.asyncio
     async def test_happy_path_upgrades_plan(self, career_service):
-        """Successful upgrade updates Stripe and DB."""
         sub = self._make_sub(plan_rank=1)
         new_plan = MagicMock(
             id=uuid4(), rank=2, stripe_price_id="price_pro",
@@ -1676,7 +1571,6 @@ class TestUpgradePlan:
 
             assert result is updated_sub
             mock_stripe.update_subscription.assert_called_once()
-            # Verify DB plan_id updated
             update_data = mock_sub_db.update.call_args
             data = (
                 update_data.args[2]
@@ -1687,7 +1581,6 @@ class TestUpgradePlan:
 
     @pytest.mark.asyncio
     async def test_same_plan_raises(self, career_service):
-        """Raises when upgrading to same plan."""
         from app.apps.cubex_career.services.subscription import (
             CareerSamePlanException,
         )
@@ -1716,7 +1609,6 @@ class TestUpgradePlan:
 
     @pytest.mark.asyncio
     async def test_downgrade_raises(self, career_service):
-        """Raises when target plan rank is lower."""
         from app.apps.cubex_career.services.subscription import (
             CareerPlanDowngradeNotAllowedException,
         )
@@ -1745,7 +1637,6 @@ class TestUpgradePlan:
 
     @pytest.mark.asyncio
     async def test_not_found_raises(self, career_service):
-        """Raises when subscription not found."""
         from app.apps.cubex_career.services.subscription import (
             CareerSubscriptionNotFoundException,
         )

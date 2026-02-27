@@ -233,7 +233,6 @@ class Invoice(BaseModel):
                 ):
                     amount += line.amount
 
-        # Convert to Decimal
         return (Decimal(amount) / Decimal(100)).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
@@ -404,11 +403,6 @@ class LineItem(BaseModel):
     price_data: PriceData | dict[str, Any] | None = None
     quantity: int | None = None
     tax_rates: list[str] | None = None
-
-
-# ============================================================================
-# CheckoutSession Nested Schemas
-# ============================================================================
 
 
 class AfterExpirationRecovery(BaseModel):
@@ -2019,11 +2013,6 @@ class SubscriptionData(BaseModel):
     ] = None
 
 
-# ============================================================================
-# Subscription Object Schemas
-# ============================================================================
-
-
 class AutomaticTaxLiability(BaseModel):
     """The account that's liable for tax."""
 
@@ -3352,3 +3341,4 @@ class SubscriptionItemUpdate(BaseModel):
         list[str] | None,
         Field(description="ID of Tax rates applied to this subscription item."),
     ] = None
+

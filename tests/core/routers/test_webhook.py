@@ -11,17 +11,10 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from httpx import AsyncClient
 
 
-# ============================================================================
-# Test Stripe Webhook Endpoint
-# ============================================================================
-
-
 class TestStripeWebhookEndpoint:
-    """Tests for POST /webhooks/stripe"""
 
     @pytest.mark.asyncio
     async def test_webhook_missing_signature(self, client: AsyncClient):
-        """Should return 400 when Stripe-Signature header is missing."""
         payload = {"type": "checkout.session.completed", "id": "evt_123"}
         response = await client.post(
             "/webhooks/stripe",
@@ -34,7 +27,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_invalid_signature(self, client: AsyncClient):
-        """Should return 400 when signature verification fails."""
         payload = {"type": "checkout.session.completed", "id": "evt_123"}
 
         with patch(
@@ -55,7 +47,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_missing_event_id(self, client: AsyncClient):
-        """Should return 400 when event id is missing."""
         payload = {"type": "checkout.session.completed"}
 
         with patch(
@@ -76,7 +67,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_missing_event_type(self, client: AsyncClient):
-        """Should return 400 when event type is missing."""
         payload = {"id": "evt_123"}
 
         with patch(
@@ -97,7 +87,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_unhandled_event_type(self, client: AsyncClient):
-        """Should return ignored status for unhandled event types."""
         with patch(
             "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value={
@@ -120,7 +109,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_checkout_session_completed(self, client: AsyncClient):
-        """Should publish checkout.session.completed to queue."""
         event_data = {
             "id": "evt_checkout_123",
             "type": "checkout.session.completed",
@@ -156,7 +144,6 @@ class TestStripeWebhookEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "received"
 
-        # Verify publish was called with correct queue and message
         mock_publish.assert_called_once()
         call_args = mock_publish.call_args
         assert call_args[0][0] == "stripe_checkout_completed"
@@ -170,7 +157,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_subscription_created(self, client: AsyncClient):
-        """Should publish customer.subscription.created to queue."""
         event_data = {
             "id": "evt_sub_created_123",
             "type": "customer.subscription.created",
@@ -209,7 +195,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_subscription_updated(self, client: AsyncClient):
-        """Should publish customer.subscription.updated to queue."""
         event_data = {
             "id": "evt_sub_updated_123",
             "type": "customer.subscription.updated",
@@ -248,7 +233,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_subscription_deleted(self, client: AsyncClient):
-        """Should publish customer.subscription.deleted to queue."""
         event_data = {
             "id": "evt_sub_deleted_123",
             "type": "customer.subscription.deleted",
@@ -287,7 +271,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_invoice_paid(self, client: AsyncClient):
-        """Should publish invoice.paid to queue."""
         event_data = {
             "id": "evt_invoice_paid_123",
             "type": "invoice.paid",
@@ -326,7 +309,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_invoice_payment_failed(self, client: AsyncClient):
-        """Should publish invoice.payment_failed to queue with amount_due."""
         event_data = {
             "id": "evt_payment_failed_123",
             "type": "invoice.payment_failed",
@@ -369,7 +351,6 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_publish_failure(self, client: AsyncClient):
-        """Should return publish_failed status when queue publish fails."""
         event_data = {
             "id": "evt_fail_123",
             "type": "checkout.session.completed",
@@ -403,16 +384,9 @@ class TestStripeWebhookEndpoint:
         assert response.json()["status"] == "publish_failed"
 
 
-# ============================================================================
-# Test Event Queue Mapping
-# ============================================================================
-
-
 class TestEventQueueMapping:
-    """Tests for event type to queue mapping."""
 
     def test_checkout_session_completed_mapping(self):
-        """Test checkout.session.completed maps to correct queue."""
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
@@ -421,7 +395,6 @@ class TestEventQueueMapping:
         )
 
     def test_subscription_created_mapping(self):
-        """Test customer.subscription.created maps to correct queue."""
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
@@ -430,7 +403,6 @@ class TestEventQueueMapping:
         )
 
     def test_subscription_updated_mapping(self):
-        """Test customer.subscription.updated maps to correct queue."""
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
@@ -439,7 +411,6 @@ class TestEventQueueMapping:
         )
 
     def test_subscription_deleted_mapping(self):
-        """Test customer.subscription.deleted maps to correct queue."""
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
@@ -448,19 +419,16 @@ class TestEventQueueMapping:
         )
 
     def test_invoice_paid_mapping(self):
-        """Test invoice.paid maps to correct queue."""
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert EVENT_QUEUE_MAPPING["invoice.paid"] == "stripe_subscription_updated"
 
     def test_invoice_payment_failed_mapping(self):
-        """Test invoice.payment_failed maps to correct queue."""
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert EVENT_QUEUE_MAPPING["invoice.payment_failed"] == "stripe_payment_failed"
 
     def test_subscription_paused_mapping(self):
-        """Test customer.subscription.paused maps to correct queue."""
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
@@ -469,7 +437,6 @@ class TestEventQueueMapping:
         )
 
     def test_subscription_resumed_mapping(self):
-        """Test customer.subscription.resumed maps to correct queue."""
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
@@ -478,7 +445,6 @@ class TestEventQueueMapping:
         )
 
     def test_invoice_payment_action_required_mapping(self):
-        """Test invoice.payment_action_required maps to correct queue."""
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert (
@@ -487,16 +453,9 @@ class TestEventQueueMapping:
         )
 
 
-# ============================================================================
-# Test Build Queue Message Function
-# ============================================================================
-
-
 class TestBuildQueueMessage:
-    """Tests for _build_queue_message helper function."""
 
     def test_build_checkout_session_completed_message(self):
-        """Test building message for checkout.session.completed."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {
@@ -519,7 +478,6 @@ class TestBuildQueueMessage:
         assert message["seat_count"] == 10
 
     def test_build_checkout_session_completed_default_seat_count(self):
-        """Test default seat count of 1 when not provided."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {
@@ -533,7 +491,6 @@ class TestBuildQueueMessage:
         assert message["seat_count"] == 1
 
     def test_build_subscription_created_message(self):
-        """Test building message for customer.subscription.created."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {"id": "sub_new_123"}
@@ -544,7 +501,6 @@ class TestBuildQueueMessage:
         assert message["stripe_subscription_id"] == "sub_new_123"
 
     def test_build_subscription_updated_message(self):
-        """Test building message for customer.subscription.updated."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {"id": "sub_updated_123"}
@@ -555,7 +511,6 @@ class TestBuildQueueMessage:
         assert message["stripe_subscription_id"] == "sub_updated_123"
 
     def test_build_subscription_deleted_message(self):
-        """Test building message for customer.subscription.deleted."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {"id": "sub_deleted_123"}
@@ -568,7 +523,6 @@ class TestBuildQueueMessage:
         assert message["stripe_subscription_id"] == "sub_deleted_123"
 
     def test_build_invoice_paid_message(self):
-        """Test building message for invoice.paid."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {"subscription": "sub_invoice_123"}
@@ -579,7 +533,6 @@ class TestBuildQueueMessage:
         assert message["stripe_subscription_id"] == "sub_invoice_123"
 
     def test_build_invoice_payment_failed_message(self):
-        """Test building message for invoice.payment_failed."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {
@@ -596,7 +549,6 @@ class TestBuildQueueMessage:
         assert message["amount_due"] == 2999
 
     def test_build_invoice_payment_failed_message_no_amount(self):
-        """Test building message for invoice.payment_failed without amount_due."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {
@@ -609,7 +561,6 @@ class TestBuildQueueMessage:
         assert message["amount_due"] is None
 
     def test_build_invoice_payment_action_required_message(self):
-        """Test building message for invoice.payment_action_required."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {
@@ -628,7 +579,6 @@ class TestBuildQueueMessage:
         assert message["amount_due"] == 4999
 
     def test_build_subscription_paused_message(self):
-        """Test building message for customer.subscription.paused."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {"id": "sub_paused_123"}
@@ -641,7 +591,6 @@ class TestBuildQueueMessage:
         assert message["stripe_subscription_id"] == "sub_paused_123"
 
     def test_build_subscription_resumed_message(self):
-        """Test building message for customer.subscription.resumed."""
         from app.core.routers.webhook import _build_queue_message
 
         obj = {"id": "sub_resumed_123"}
@@ -654,29 +603,20 @@ class TestBuildQueueMessage:
         assert message["stripe_subscription_id"] == "sub_resumed_123"
 
 
-# ============================================================================
-# Test Router Configuration
-# ============================================================================
-
-
 class TestRouterConfiguration:
-    """Tests for router setup and configuration."""
 
     def test_router_is_api_router(self):
-        """Test that router is an APIRouter instance."""
         from fastapi import APIRouter
         from app.core.routers.webhook import router
 
         assert isinstance(router, APIRouter)
 
     def test_router_prefix(self):
-        """Test that router has correct prefix."""
         from app.core.routers.webhook import router
 
         assert router.prefix == "/webhooks"
 
     def test_router_has_stripe_endpoint(self):
-        """Test that router has /stripe endpoint."""
         from app.core.routers.webhook import router
 
         paths = [route.path for route in router.routes]
@@ -684,23 +624,16 @@ class TestRouterConfiguration:
         assert any("/stripe" in path for path in paths)
 
 
-# ============================================================================
-# Test Module Exports
-# ============================================================================
-
-
 class TestModuleExports:
-    """Tests for module exports."""
 
     def test_router_is_exported(self):
-        """Test that router is exported from module."""
         from app.core.routers.webhook import router
 
         assert router is not None
 
     def test_event_queue_mapping_exported(self):
-        """Test that EVENT_QUEUE_MAPPING is accessible."""
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert isinstance(EVENT_QUEUE_MAPPING, dict)
         assert len(EVENT_QUEUE_MAPPING) > 0
+

@@ -14,3 +14,4 @@ class OAuthAccountDB(BaseDB[OAuthAccount]):
     def __init__(self):
         super().__init__(model=OAuthAccount)
         self.user_loader = selectinload(OAuthAccount.user)
+

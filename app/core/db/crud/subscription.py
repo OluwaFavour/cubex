@@ -1,9 +1,6 @@
 """
 CRUD operations for Subscription and StripeEventLog models.
 
-This module provides database operations for managing subscriptions
-and Stripe webhook event deduplication. Uses context tables to link
-subscriptions to workspaces (API) or users (Career).
 """
 
 from datetime import datetime, timezone
@@ -239,3 +236,4 @@ class StripeEventLogDB(BaseDB[StripeEventLog]):
 
 
 __all__ = ["SubscriptionDB", "StripeEventLogDB"]
+

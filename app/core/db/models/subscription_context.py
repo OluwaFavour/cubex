@@ -1,9 +1,6 @@
 """
 Subscription context models for product-specific subscription linking.
 
-This module provides context tables that link subscriptions to their
-domain entities (workspaces for API, users for Career) via one-to-one
-relationships with unique constraints.
 """
 
 from decimal import Decimal
@@ -181,3 +178,4 @@ class CareerSubscriptionContext(BaseModel):
 
 
 __all__ = ["APISubscriptionContext", "CareerSubscriptionContext"]
+

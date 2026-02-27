@@ -34,7 +34,6 @@ def init_admin(app: FastAPI) -> None:
     """
     global admin
 
-    # Create Admin instance with async engine
     admin = Admin(
         app=app,
         engine=async_engine,
@@ -55,3 +54,4 @@ def init_admin(app: FastAPI) -> None:
 
 
 __all__ = ["admin", "init_admin"]
+

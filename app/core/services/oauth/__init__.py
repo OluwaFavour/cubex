@@ -10,11 +10,9 @@ This package contains OAuth provider implementations for authentication:
 Example usage:
     from app.core.services.oauth import GoogleOAuthService, GitHubOAuthService
 
-    # Initialize providers
     await GoogleOAuthService.init()
     await GitHubOAuthService.init()
 
-    # Get authorization URL
     url = GoogleOAuthService.get_authorization_url(
         redirect_uri="https://app.com/callback",
         state="random_state",
@@ -26,7 +24,6 @@ Example usage:
         redirect_uri="https://app.com/callback",
     )
 
-    # Get user info
     user_info = await GoogleOAuthService.get_user_info(tokens.access_token)
 """
 
@@ -52,3 +49,4 @@ __all__ = [
     "GoogleOAuthService",
     "GitHubOAuthService",
 ]
+

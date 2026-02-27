@@ -40,3 +40,4 @@ class BaseModel(Base):
         onupdate=datetime.now(timezone.utc),
         nullable=False,
     )
+

@@ -17,10 +17,8 @@ from app.core.db.models.plan import Plan, FeatureSchema
 
 
 class TestFeatureSchema:
-    """Test suite for FeatureSchema Pydantic model."""
 
     def test_feature_schema_with_required_fields(self):
-        """Test FeatureSchema with required title field."""
         features = FeatureSchema(title="API Access")
 
         assert features.title == "API Access"
@@ -29,7 +27,6 @@ class TestFeatureSchema:
         assert features.category is None
 
     def test_feature_schema_with_all_fields(self):
-        """Test FeatureSchema with all fields."""
         features = FeatureSchema(
             title="Premium Support",
             description="24/7 support access",
@@ -43,7 +40,6 @@ class TestFeatureSchema:
         assert features.category == "support"
 
     def test_feature_schema_to_dict(self):
-        """Test FeatureSchema model_dump method."""
         features = FeatureSchema(title="API Access", value="unlimited")
         data = features.model_dump()
 
@@ -52,7 +48,6 @@ class TestFeatureSchema:
         assert data["value"] == "unlimited"
 
     def test_feature_schema_from_dict(self):
-        """Test creating FeatureSchema from dict."""
         data = {
             "title": "Storage",
             "description": "Cloud storage",
@@ -65,16 +60,13 @@ class TestFeatureSchema:
         assert features.value == "10GB"
 
     def test_feature_schema_forbids_extra_fields(self):
-        """Test that FeatureSchema forbids extra fields."""
         with pytest.raises(ValidationError):
             FeatureSchema(title="Test", unknown_field="value")
 
 
 class TestPlanModel:
-    """Test suite for Plan SQLAlchemy model."""
 
     def test_plan_attributes(self):
-        """Test Plan model has expected attributes."""
         plan = Plan(
             name="Pro Plan",
             type=PlanType.PAID,
@@ -97,7 +89,6 @@ class TestPlanModel:
         assert plan.is_active is True
 
     def test_plan_seat_pricing_attributes(self):
-        """Test Plan model has seat pricing attributes."""
         plan = Plan(
             name="Professional",
             type=PlanType.PAID,
@@ -116,7 +107,6 @@ class TestPlanModel:
         assert plan.seat_stripe_price_id == "price_seat_123"
 
     def test_plan_has_seat_pricing_property(self):
-        """Test Plan has_seat_pricing property."""
         # Plan with seat pricing
         plan_with_seats = Plan(
             name="Professional",
@@ -140,7 +130,6 @@ class TestPlanModel:
         assert plan_without_seats.has_seat_pricing is False
 
     def test_plan_can_be_purchased_with_seat_pricing_only(self):
-        """Test Plan can_be_purchased works with seat pricing only."""
         # Plan with only seat stripe ID (no base stripe ID)
         plan = Plan(
             name="Seat Only",
@@ -155,7 +144,6 @@ class TestPlanModel:
         assert plan.can_be_purchased is True
 
     def test_plan_free_tier_defaults(self):
-        """Test Plan model for free tier has appropriate defaults."""
         plan = Plan(
             name="Free Plan",
             type=PlanType.FREE,
@@ -172,11 +160,6 @@ class TestPlanModel:
         assert plan.stripe_price_id is None
 
     def test_plan_product_type_default(self):
-        """Test Plan model product_type field.
-
-        Note: Default values are applied by the database on INSERT,
-        so we just verify the attribute exists and can be explicitly set.
-        """
         plan = Plan(
             name="Default Plan",
             type=PlanType.FREE,
@@ -187,7 +170,6 @@ class TestPlanModel:
         assert plan.product_type == ProductType.API
 
     def test_plan_product_type_career(self):
-        """Test Plan model can be set to CAREER product type."""
         plan = Plan(
             name="Career Pro",
             type=PlanType.PAID,
@@ -198,16 +180,13 @@ class TestPlanModel:
         assert plan.product_type == ProductType.CAREER
 
     def test_plan_has_product_type_attribute(self):
-        """Test Plan model has product_type attribute."""
         plan = Plan()
         assert hasattr(plan, "product_type")
 
 
 class TestSubscriptionModel:
-    """Test suite for Subscription SQLAlchemy model."""
 
     def test_subscription_attributes(self):
-        """Test Subscription model has expected attributes."""
         from app.core.db.models.subscription import Subscription
 
         plan_id = uuid4()
@@ -229,7 +208,6 @@ class TestSubscriptionModel:
         assert subscription.stripe_customer_id == "cus_test456"
 
     def test_subscription_status_enum(self):
-        """Test Subscription model uses correct status enum."""
         from app.core.db.models.subscription import Subscription
 
         subscription = Subscription(
@@ -241,11 +219,6 @@ class TestSubscriptionModel:
         assert subscription.status == SubscriptionStatus.PAST_DUE
 
     def test_subscription_product_type_default(self):
-        """Test Subscription model product_type field.
-
-        Note: Default values are applied by the database on INSERT,
-        so we just verify the attribute exists and can be explicitly set.
-        """
         from app.core.db.models.subscription import Subscription
 
         subscription = Subscription(
@@ -257,7 +230,6 @@ class TestSubscriptionModel:
         assert subscription.product_type == ProductType.API
 
     def test_subscription_product_type_career(self):
-        """Test Subscription model can be set to CAREER product type."""
         from app.core.db.models.subscription import Subscription
 
         subscription = Subscription(
@@ -269,7 +241,6 @@ class TestSubscriptionModel:
         assert subscription.product_type == ProductType.CAREER
 
     def test_subscription_context_relationships(self):
-        """Test Subscription model has context relationships."""
         from app.core.db.models.subscription import Subscription
 
         subscription = Subscription()
@@ -278,7 +249,6 @@ class TestSubscriptionModel:
         assert hasattr(subscription, "career_context")
 
     def test_subscription_is_active_property(self):
-        """Test Subscription is_active property."""
         from app.core.db.models.subscription import Subscription
 
         # Active subscription
@@ -303,7 +273,6 @@ class TestSubscriptionModel:
         assert canceled_sub.is_active is False
 
     def test_subscription_is_canceled_property(self):
-        """Test Subscription is_canceled property."""
         from app.core.db.models.subscription import Subscription
 
         # Canceled subscription
@@ -321,7 +290,6 @@ class TestSubscriptionModel:
         assert active_sub.is_canceled is False
 
     def test_subscription_is_past_due_property(self):
-        """Test Subscription is_past_due property."""
         from app.core.db.models.subscription import Subscription
 
         # Past due subscription
@@ -346,7 +314,6 @@ class TestSubscriptionModel:
         assert active_sub.is_past_due is False
 
     def test_subscription_requires_action_property(self):
-        """Test Subscription requires_action property."""
         from app.core.db.models.subscription import Subscription
 
         # Incomplete subscription
@@ -372,10 +339,8 @@ class TestSubscriptionModel:
 
 
 class TestStripeEventLogModel:
-    """Test suite for StripeEventLog model."""
 
     def test_stripe_event_log_attributes(self):
-        """Test StripeEventLog model has expected attributes."""
         from app.core.db.models.subscription import StripeEventLog
 
         event = StripeEventLog(
@@ -387,3 +352,4 @@ class TestStripeEventLogModel:
         assert event.event_id == "evt_test123"
         assert event.event_type == "checkout.session.completed"
         assert event.processed_at is not None
+

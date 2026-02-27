@@ -1,9 +1,6 @@
 """
 Base OAuth provider abstract class and core utilities.
 
-This module provides the abstract base class for OAuth providers and
-core data structures for OAuth authentication flows.
-
 Example usage:
     from app.core.services.oauth.base import BaseOAuthProvider, OAuthUserInfo
 
@@ -348,10 +345,8 @@ class OAuthStateManager:
             if settings.ENVIRONMENT == "production" and parsed.scheme != "https":
                 return False
 
-            # Build origin from callback URL
             callback_origin = f"{parsed.scheme}://{parsed.netloc}"
 
-            # Check against allowed CORS origins
             for allowed_origin in settings.CORS_ALLOW_ORIGINS:
                 # Handle wildcard
                 if allowed_origin == "*":
@@ -365,3 +360,4 @@ class OAuthStateManager:
 
         except Exception:
             return False
+

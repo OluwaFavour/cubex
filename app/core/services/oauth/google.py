@@ -1,16 +1,11 @@
 """
 Google OAuth 2.0 provider implementation.
 
-This module provides OAuth 2.0 authentication with Google, supporting
-the standard authorization code flow with OpenID Connect.
-
 Example usage:
     from app.core.services.oauth.google import GoogleOAuthService
 
-    # Initialize the service
     await GoogleOAuthService.init()
 
-    # Generate authorization URL
     url = GoogleOAuthService.get_authorization_url(
         redirect_uri="https://app.com/callback",
         state="random_state_token",
@@ -22,11 +17,9 @@ Example usage:
         redirect_uri="https://app.com/callback",
     )
 
-    # Get user information
     user_info = await GoogleOAuthService.get_user_info(tokens.access_token)
     print(f"User email: {user_info.email}")
 
-    # Cleanup
     await GoogleOAuthService.aclose()
 """
 
@@ -342,3 +335,4 @@ class GoogleOAuthService(BaseOAuthProvider):
         raise OAuthException(
             message="Failed to retrieve Google user info: network error"
         ) from last_error
+

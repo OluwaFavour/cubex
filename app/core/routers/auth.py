@@ -1,7 +1,6 @@
 """
 Authentication router for handling all auth-related endpoints.
 
-This module provides endpoints for:
 - Email signup with OTP verification
 - Email signin with remember me
 - Token refresh and revocation
@@ -74,9 +73,6 @@ router = APIRouter()
 _workspace_service = WorkspaceService()
 _career_subscription_service = CareerSubscriptionService()
 
-# =============================================================================
-# Rate Limiters
-# =============================================================================
 
 # Signup: 5 requests per hour per IP (prevent mass account creation)
 _signup_rate_limit = rate_limit_by_ip(limit=5, window=3600)
@@ -98,11 +94,6 @@ _password_reset_confirm_rate_limit = rate_limit_by_ip(limit=10, window=60)
 
 # OAuth: 20 requests per minute per IP (prevent abuse)
 _oauth_rate_limit = rate_limit_by_ip(limit=20, window=60)
-
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
 
 
 def _get_device_info_from_request(request: Request) -> str | None:
@@ -144,7 +135,6 @@ async def _setup_user_products(session: AsyncSession, user: User) -> None:
         user: User to set up products for.
     """
     try:
-        # Create personal workspace with free API subscription
         await _workspace_service.create_personal_workspace(
             session, user, commit_self=False
         )
@@ -154,7 +144,6 @@ async def _setup_user_products(session: AsyncSession, user: User) -> None:
         # Don't fail the signup flow - user can manually activate later
 
     try:
-        # Create free Career subscription
         await _career_subscription_service.create_free_subscription(
             session, user, commit_self=False
         )
@@ -162,11 +151,6 @@ async def _setup_user_products(session: AsyncSession, user: User) -> None:
     except Exception as e:
         auth_logger.warning(f"Failed to create Career subscription for {user.id}: {e}")
         # Don't fail the signup flow - user can manually activate later
-
-
-# =============================================================================
-# Email Signup Endpoints
-# =============================================================================
 
 
 @router.post(
@@ -282,7 +266,6 @@ async def signup(
                 commit_self=False,
             )
 
-            # Send verification OTP
             await AuthService.send_otp(
                 session=session,
                 email=user.email,
@@ -420,7 +403,6 @@ async def verify_signup(
     """
     try:
         async with session.begin():
-            # Verify OTP
             await AuthService.verify_otp(
                 session=session,
                 email=request_data.email,
@@ -450,7 +432,6 @@ async def verify_signup(
             # This is idempotent - safe to call on existing users
             await _setup_user_products(session, user)
 
-            # Generate tokens
             device_info = _get_device_info_from_request(request)
             tokens = await AuthService.create_token_pair(
                 session=session,
@@ -584,11 +565,6 @@ async def resend_verification(
         )
 
     return MessageResponse(message="Verification code sent to your email")
-
-
-# =============================================================================
-# Email Signin Endpoints
-# =============================================================================
 
 
 @router.post(
@@ -728,14 +704,12 @@ async def signin(
                 password=request_data.password,
             )
 
-            # Load OAuth accounts for profile
             user = await user_db.get_by_id(
                 session=session,
                 id=user.id,
                 options=[user_db.oauth_accounts_loader],
             )
 
-            # Generate tokens
             device_info = _get_device_info_from_request(request)
             tokens = await AuthService.create_token_pair(
                 session=session,
@@ -756,11 +730,6 @@ async def signin(
         raise InvalidCredentialsException("Invalid email or password")
     except AuthenticationException:
         raise
-
-
-# =============================================================================
-# Token Management Endpoints
-# =============================================================================
 
 
 @router.post(
@@ -1089,11 +1058,6 @@ async def signout_all(
     return MessageResponse(message=f"Signed out from {count} device(s)")
 
 
-# =============================================================================
-# OAuth Endpoints
-# =============================================================================
-
-
 @router.get(
     "/oauth/{provider}",
     response_model=OAuthInitResponse,
@@ -1249,16 +1213,13 @@ async def oauth_init(
         callback_url and remember_me preferences. It expires after 10 minutes.
         The callback_url must exactly match one registered in CORS settings.
     """
-    # Validate callback URL if provided
     if callback_url and not OAuthStateManager.validate_callback_url(callback_url):
         raise BadRequestException(
             message="Invalid callback URL. Must be in allowed origins and use HTTPS in production."
         )
 
-    # Get the OAuth provider service
     provider_class = AuthService.get_oauth_provider(provider)
 
-    # Generate signed state with callback_url and remember_me encoded
     state = OAuthStateManager.encode_state(
         callback_url=callback_url,
         remember_me=remember_me,
@@ -1267,7 +1228,6 @@ async def oauth_init(
     # Build redirect URI (must match the callback route)
     redirect_uri = f"{settings.OAUTH_REDIRECT_BASE_URI}/oauth/{provider.value}/callback"
 
-    # Get authorization URL
     auth_url = provider_class.get_authorization_url(
         redirect_uri=redirect_uri,
         state=state,
@@ -1464,7 +1424,6 @@ async def oauth_callback(
         if state:
             state_data = OAuthStateManager.decode_state(state)
             if state_data and state_data.callback_url:
-                # Build error redirect URL with provider error details
                 error_params = {"error": error}
                 if error_description:
                     error_params["error_description"] = error_description
@@ -1475,7 +1434,6 @@ async def oauth_callback(
         # No valid state or callback_url - raise exception
         raise BadRequestException(message=f"OAuth error: {error}")
 
-    # Validate required params for success flow
     if not code or not state:
         auth_logger.warning(
             f"OAuth callback: missing code or state for {provider.value}"
@@ -1495,7 +1453,6 @@ async def oauth_callback(
     remember_me = state_data.remember_me
 
     try:
-        # Get the OAuth provider service
         provider_class = AuthService.get_oauth_provider(provider)
 
         # Build redirect URI (must match the one used in auth URL)
@@ -1509,7 +1466,6 @@ async def oauth_callback(
             redirect_uri=redirect_uri,
         )
 
-        # Get user info from provider
         user_info = await provider_class.get_user_info(
             access_token=oauth_tokens.access_token,
         )
@@ -1522,7 +1478,6 @@ async def oauth_callback(
                 commit_self=False,
             )
 
-            # Load OAuth accounts
             user = await user_db.get_by_id(
                 session=session,
                 id=user.id,
@@ -1534,7 +1489,6 @@ async def oauth_callback(
             if user:
                 await _setup_user_products(session, user)
 
-            # Generate tokens
             device_info = _get_device_info_from_request(request)
             tokens = await AuthService.create_token_pair(
                 session=session,
@@ -1589,11 +1543,6 @@ async def oauth_callback(
                 status_code=307,
             )
         raise OAuthException(message="OAuth authentication failed")
-
-
-# =============================================================================
-# Password Reset Endpoints
-# =============================================================================
 
 
 @router.post(
@@ -1826,7 +1775,6 @@ async def confirm_password_reset(
     """
     try:
         async with session.begin():
-            # Verify OTP
             await AuthService.verify_otp(
                 session=session,
                 email=request_data.email,
@@ -2001,11 +1949,6 @@ async def change_password(
         raise InvalidCredentialsException("Current password is incorrect")
     except AuthenticationException:
         raise
-
-
-# =============================================================================
-# Profile Endpoints
-# =============================================================================
 
 
 @router.get(
@@ -2567,11 +2510,6 @@ async def delete_account(
     return MessageResponse(message="Account has been deleted")
 
 
-# =============================================================================
-# Session Management Endpoints
-# =============================================================================
-
-
 @router.post(
     "/sessions",
     response_model=ActiveSessionsResponse,
@@ -2711,7 +2649,6 @@ async def get_sessions(
         should not be passed in URLs for security reasons. The device_info
         may be null if the User-Agent header was not available during signin.
     """
-    # Get current token hash for comparison
     current_token_hash = AuthService.hash_token(request_data.refresh_token)
 
     sessions = await AuthService.get_active_sessions(
@@ -2737,3 +2674,4 @@ async def get_sessions(
 
 
 __all__ = ["router"]
+

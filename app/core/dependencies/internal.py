@@ -1,6 +1,3 @@
-# ============================================================================
-# Internal API Authentication
-# ============================================================================
 
 
 from typing import Annotated
@@ -59,3 +56,4 @@ __all__ = [
     # Exceptions
     "InvalidInternalAPIKeyException",
 ]
+

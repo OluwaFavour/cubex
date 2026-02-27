@@ -1,12 +1,6 @@
 """
 Workspace models for cubex_api.
 
-This module provides models for workspace management including
-workspaces, members, invitations, API keys, and usage logs.
-These models are designed to support the core functionality of
-cubex_api, including team collaboration, access control, and billing.
-The models use SQLAlchemy ORM and are structured to ensure data
-integrity, efficient queries, and clear relationships between entities.
 """
 
 from datetime import datetime, timezone
@@ -747,3 +741,4 @@ class UsageLog(BaseModel):
 
 
 __all__ = ["Workspace", "WorkspaceMember", "WorkspaceInvitation", "APIKey", "UsageLog"]
+

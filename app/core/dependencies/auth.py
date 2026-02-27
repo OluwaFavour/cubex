@@ -1,7 +1,6 @@
 """
 Authentication dependencies for FastAPI endpoints.
 
-This module provides FastAPI dependency injection functions for:
 - Extracting and validating JWT access tokens from requests
 - Getting the current authenticated user
 - Ensuring user is active and verified
@@ -79,19 +78,16 @@ async def get_current_user(
         auth_logger.warning("Authentication failed: invalid or expired token")
         raise AuthenticationException("Invalid or expired access token")
 
-    # Extract user ID from token
     user_id_str = payload.get("sub")
     if not user_id_str:
         auth_logger.warning("Authentication failed: token missing 'sub' claim")
         raise AuthenticationException("Invalid access token")
 
-    # Validate token type
     token_type = payload.get("type")
     if token_type != "access":
         auth_logger.warning(f"Authentication failed: wrong token type '{token_type}'")
         raise AuthenticationException("Invalid access token")
 
-    # Parse user ID
     try:
         user_id = UUID(user_id_str)
     except ValueError:
@@ -108,7 +104,6 @@ async def get_current_user(
         auth_logger.warning(f"Authentication failed: user not found {user_id}")
         raise AuthenticationException("User not found")
 
-    # Check if user is deleted
     if user.is_deleted:
         auth_logger.warning(f"Authentication failed: user deleted {user_id}")
         raise AuthenticationException("User account has been deleted")
@@ -217,17 +212,14 @@ async def get_optional_user(
     if payload is None:
         return None
 
-    # Extract user ID from token
     user_id_str = payload.get("sub")
     if not user_id_str:
         return None
 
-    # Validate token type
     token_type = payload.get("type")
     if token_type != "access":
         return None
 
-    # Parse user ID
     try:
         user_id = UUID(user_id_str)
     except ValueError:
@@ -262,3 +254,4 @@ __all__ = [
     "bearer_scheme",
     "optional_bearer_scheme",
 ]
+

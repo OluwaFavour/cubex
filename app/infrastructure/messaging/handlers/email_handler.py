@@ -1,8 +1,6 @@
 """
 Email message handlers for async email processing.
 
-This module contains handlers for processing email-related messages from queues.
-Emails are sent asynchronously to avoid blocking the main request flow.
 """
 
 from typing import Any
@@ -319,3 +317,4 @@ async def handle_workspace_invitation_email(event: dict[str, Any]) -> None:
             f"Failed to send workspace invitation email: email={email}, error={e}"
         )
         raise  # Re-raise to trigger retry mechanism
+

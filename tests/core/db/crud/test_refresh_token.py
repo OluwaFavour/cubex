@@ -1,8 +1,6 @@
 """
 Test suite for RefreshToken CRUD operations.
 
-This module contains comprehensive unit tests for the RefreshTokenDB CRUD class.
-Tests cover all CRUD operations including:
 - Token creation
 - Token validation and retrieval
 - Token revocation (single and all)
@@ -27,11 +25,9 @@ from app.core.db.crud.refresh_token import RefreshTokenDB
 
 
 class TestRefreshTokenDBCreate:
-    """Test suite for RefreshToken creation."""
 
     @pytest.mark.asyncio
     async def test_create_refresh_token_hashes_token(self):
-        """Test that create hashes the raw token."""
         mock_session = AsyncMock()
         mock_session.add = MagicMock()
         mock_session.flush = AsyncMock()
@@ -59,7 +55,6 @@ class TestRefreshTokenDBCreate:
 
     @pytest.mark.asyncio
     async def test_create_refresh_token_with_device_info(self):
-        """Test that create stores device info correctly."""
         mock_session = AsyncMock()
         user_id = uuid4()
         raw_token = "test_token"
@@ -82,11 +77,9 @@ class TestRefreshTokenDBCreate:
 
 
 class TestRefreshTokenDBGetValidToken:
-    """Test suite for retrieving valid tokens."""
 
     @pytest.mark.asyncio
     async def test_get_valid_token_finds_matching_token(self):
-        """Test that get_valid_token returns token when hash matches."""
         mock_session = AsyncMock()
         mock_result = MagicMock()
         mock_token = MagicMock()
@@ -109,7 +102,6 @@ class TestRefreshTokenDBGetValidToken:
 
     @pytest.mark.asyncio
     async def test_get_valid_token_returns_none_for_invalid_token(self):
-        """Test that get_valid_token returns None for non-existent token."""
         mock_session = AsyncMock()
 
         with patch.object(RefreshTokenDB, "get_valid_token") as mock_get:
@@ -124,7 +116,6 @@ class TestRefreshTokenDBGetValidToken:
 
     @pytest.mark.asyncio
     async def test_get_valid_token_excludes_revoked_tokens(self):
-        """Test that get_valid_token excludes revoked tokens."""
         mock_session = AsyncMock()
 
         with patch.object(RefreshTokenDB, "get_valid_token") as mock_get:
@@ -140,11 +131,9 @@ class TestRefreshTokenDBGetValidToken:
 
 
 class TestRefreshTokenDBRevoke:
-    """Test suite for revoking tokens."""
 
     @pytest.mark.asyncio
     async def test_revoke_sets_revoked_at(self):
-        """Test that revoke sets revoked_at timestamp."""
         mock_session = AsyncMock()
         token_id = uuid4()
 
@@ -162,7 +151,6 @@ class TestRefreshTokenDBRevoke:
 
     @pytest.mark.asyncio
     async def test_revoke_nonexistent_token_returns_none(self):
-        """Test that revoking non-existent token returns None."""
         mock_session = AsyncMock()
 
         with patch.object(RefreshTokenDB, "revoke") as mock_revoke:
@@ -177,11 +165,9 @@ class TestRefreshTokenDBRevoke:
 
 
 class TestRefreshTokenDBRevokeAllForUser:
-    """Test suite for revoking all user tokens."""
 
     @pytest.mark.asyncio
     async def test_revoke_all_for_user_returns_count(self):
-        """Test that revoke_all_for_user returns count of revoked tokens."""
         mock_session = AsyncMock()
         user_id = uuid4()
 
@@ -197,7 +183,6 @@ class TestRefreshTokenDBRevokeAllForUser:
 
     @pytest.mark.asyncio
     async def test_revoke_all_for_user_excludes_current_token(self):
-        """Test that revoke_all_for_user can exclude current token."""
         mock_session = AsyncMock()
         user_id = uuid4()
         current_token_id = uuid4()
@@ -216,7 +201,6 @@ class TestRefreshTokenDBRevokeAllForUser:
 
     @pytest.mark.asyncio
     async def test_revoke_all_for_user_with_no_tokens(self):
-        """Test that revoke_all_for_user returns 0 for user with no tokens."""
         mock_session = AsyncMock()
 
         with patch.object(RefreshTokenDB, "revoke_all_for_user") as mock_revoke:
@@ -231,11 +215,9 @@ class TestRefreshTokenDBRevokeAllForUser:
 
 
 class TestRefreshTokenDBCleanupExpired:
-    """Test suite for cleaning up expired tokens."""
 
     @pytest.mark.asyncio
     async def test_cleanup_expired_removes_old_tokens(self):
-        """Test that cleanup_expired removes expired tokens."""
         mock_session = AsyncMock()
 
         with patch.object(RefreshTokenDB, "cleanup_expired") as mock_cleanup:
@@ -249,7 +231,6 @@ class TestRefreshTokenDBCleanupExpired:
 
     @pytest.mark.asyncio
     async def test_cleanup_expired_respects_older_than(self):
-        """Test that cleanup_expired respects older_than parameter."""
         mock_session = AsyncMock()
         older_than = datetime.now(UTC) - timedelta(days=30)
 
@@ -265,11 +246,9 @@ class TestRefreshTokenDBCleanupExpired:
 
 
 class TestRefreshTokenDBGetActiveTokensForUser:
-    """Test suite for getting active tokens for a user."""
 
     @pytest.mark.asyncio
     async def test_get_active_tokens_returns_list(self):
-        """Test that get_active_tokens_for_user returns list of tokens."""
         mock_session = AsyncMock()
         user_id = uuid4()
 
@@ -287,7 +266,6 @@ class TestRefreshTokenDBGetActiveTokensForUser:
 
     @pytest.mark.asyncio
     async def test_get_active_tokens_returns_empty_for_no_tokens(self):
-        """Test that get_active_tokens_for_user returns empty list when no tokens."""
         mock_session = AsyncMock()
 
         with patch.object(RefreshTokenDB, "get_active_tokens_for_user") as mock_get:
@@ -302,7 +280,6 @@ class TestRefreshTokenDBGetActiveTokensForUser:
 
     @pytest.mark.asyncio
     async def test_get_active_tokens_excludes_expired(self):
-        """Test that get_active_tokens_for_user excludes expired tokens."""
         mock_session = AsyncMock()
         user_id = uuid4()
 
@@ -322,18 +299,14 @@ class TestRefreshTokenDBGetActiveTokensForUser:
 
 
 class TestRefreshTokenModel:
-    """Test suite for RefreshToken model properties."""
 
     def test_is_valid_property_returns_true_for_valid_token(self):
-        """Test is_valid returns True for non-expired, non-revoked token."""
         from app.core.db.models.refresh_token import RefreshToken
 
-        # Create mock token with valid attributes
         token = MagicMock(spec=RefreshToken)
         token.expires_at = datetime.now(UTC) + timedelta(days=5)
         token.revoked_at = None
 
-        # Mock the is_valid property
         token.is_valid = token.revoked_at is None and token.expires_at > datetime.now(
             UTC
         )
@@ -341,7 +314,6 @@ class TestRefreshTokenModel:
         assert token.is_valid is True
 
     def test_is_valid_property_returns_false_for_expired_token(self):
-        """Test is_valid returns False for expired token."""
         token = MagicMock()
         token.expires_at = datetime.now(UTC) - timedelta(days=1)
         token.revoked_at = None
@@ -352,7 +324,6 @@ class TestRefreshTokenModel:
         assert token.is_valid is False
 
     def test_is_valid_property_returns_false_for_revoked_token(self):
-        """Test is_valid returns False for revoked token."""
         token = MagicMock()
         token.expires_at = datetime.now(UTC) + timedelta(days=5)
         token.revoked_at = datetime.now(UTC) - timedelta(hours=1)
@@ -364,10 +335,8 @@ class TestRefreshTokenModel:
 
 
 class TestRefreshTokenHashingUtility:
-    """Test suite for token hashing functionality."""
 
     def test_hash_token_produces_consistent_hash(self):
-        """Test that same token always produces same hash."""
         raw_token = "consistent_token_12345"
         hash1 = hashlib.sha256(raw_token.encode()).hexdigest()
         hash2 = hashlib.sha256(raw_token.encode()).hexdigest()
@@ -376,7 +345,6 @@ class TestRefreshTokenHashingUtility:
         assert len(hash1) == 64  # SHA256 hex digest length
 
     def test_different_tokens_produce_different_hashes(self):
-        """Test that different tokens produce different hashes."""
         token1 = "token_one"
         token2 = "token_two"
 
@@ -386,9 +354,9 @@ class TestRefreshTokenHashingUtility:
         assert hash1 != hash2
 
     def test_hash_is_64_characters_hex(self):
-        """Test that hash is always 64 hex characters."""
         token = "any_token"
         token_hash = hashlib.sha256(token.encode()).hexdigest()
 
         assert len(token_hash) == 64
         assert all(c in "0123456789abcdef" for c in token_hash)
+

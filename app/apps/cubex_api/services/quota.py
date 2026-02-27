@@ -1,7 +1,6 @@
 """
 Quota service for API usage tracking and validation.
 
-This module provides business logic for:
 - Validating API keys and logging usage
 - Committing usage logs (idempotent)
 - Future: Quota checking and enforcement
@@ -35,21 +34,12 @@ from app.core.exceptions.types import NotFoundException
 from app.core.utils import create_request_fingerprint, hmac_hash_otp
 
 
-# ============================================================================
-# Constants
-# ============================================================================
-
 # API key prefixes for identification
 API_KEY_PREFIX = "cbx_live_"  # Live keys (consume credits)
 TEST_API_KEY_PREFIX = "cbx_test_"  # Test keys (no credits charged)
 
 # Client ID prefix for workspace identification
 CLIENT_ID_PREFIX = "ws_"
-
-
-# ============================================================================
-# Exceptions
-# ============================================================================
 
 
 class APIKeyNotFoundException(NotFoundException):
@@ -71,11 +61,6 @@ class UsageLogNotFoundException(NotFoundException):
 
     def __init__(self, message: str = "Usage log not found."):
         super().__init__(message)
-
-
-# ============================================================================
-# Rate Limiting Data Classes
-# ============================================================================
 
 
 @dataclass
@@ -109,17 +94,9 @@ class ResolvedAPIKey:
     plan_id: UUID | None
 
 
-# ============================================================================
-# Service
-# ============================================================================
-
-
 class QuotaService:
     """Service for API usage validation and quota management."""
 
-    # ========================================================================
-    # Private Helper Methods
-    # ========================================================================
 
     def _generate_api_key(self, is_test_key: bool = False) -> tuple[str, str, str]:
         """
@@ -134,7 +111,6 @@ class QuotaService:
             - key_hash: HMAC-SHA256 hash for storage and lookup
             - key_prefix: Display prefix (prefix + first 5 chars of token)
         """
-        # Generate random token
         token = secrets.token_urlsafe(32)
 
         # Choose prefix based on key type
@@ -236,13 +212,11 @@ class QuotaService:
             return (subscription_period_start, subscription_period_end)
 
         # Fall back to 30-day rolling periods from workspace creation
-        # Ensure workspace_created_at is timezone-aware
         if workspace_created_at.tzinfo is None:
             workspace_created_at = workspace_created_at.replace(tzinfo=timezone.utc)
 
         period_length = timedelta(days=30)
 
-        # Calculate which period we're in
         # Period 0: created_at to created_at + 30 days
         # Period 1: created_at + 30 days to created_at + 60 days
         # etc.
@@ -278,7 +252,6 @@ class QuotaService:
         Returns:
             RateLimitInfo with current rate limit status.
         """
-        # Get rate limit for the plan
         rate_limit = await APIQuotaCacheService.get_plan_rate_limit(plan_id)
 
         # Redis key for workspace rate limit
@@ -436,7 +409,6 @@ class QuotaService:
                 UUID(cached_info["plan_id"]) if cached_info.get("plan_id") else None
             )
 
-            # Update last_used_at timestamp
             await api_key_db.update_last_used(session, api_key_id, commit_self=False)
 
             workspace_logger.debug(
@@ -468,7 +440,6 @@ class QuotaService:
                 None,
             )
 
-        # Verify workspace matches
         if api_key_record.workspace_id != workspace_id:
             workspace_logger.warning(
                 f"API key workspace mismatch: key={api_key_record.workspace_id}, "
@@ -484,7 +455,6 @@ class QuotaService:
                 None,
             )
 
-        # Extract key info
         api_key_id = api_key_record.id
         is_test_key = api_key_record.is_test_key
 
@@ -503,7 +473,6 @@ class QuotaService:
             plan_id=str(plan_id) if plan_id else None,
         )
 
-        # Update last_used_at timestamp
         await api_key_db.update_last_used(session, api_key_id, commit_self=False)
 
         return ResolvedAPIKey(
@@ -546,7 +515,6 @@ class QuotaService:
 
         current_usage = context.credits_used if context else Decimal("0.0000")
 
-        # Check quota: current_usage + credits_reserved <= credits_limit
         remaining_credits = credits_limit - current_usage
         if current_usage + credits_reserved <= credits_limit:
             return (
@@ -563,9 +531,6 @@ class QuotaService:
                 status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-    # ========================================================================
-    # API Key Management
-    # ========================================================================
 
     async def create_api_key(
         self,
@@ -592,20 +557,16 @@ class QuotaService:
             Tuple of (APIKey model, raw_key).
             The raw_key is shown only once and cannot be retrieved later.
         """
-        # Verify workspace exists
         workspace = await workspace_db.get_by_id(session, workspace_id)
         if not workspace or workspace.is_deleted:
             raise NotFoundException(f"Workspace {workspace_id} not found.")
 
-        # Generate key with appropriate prefix
         raw_key, key_hash, key_prefix = self._generate_api_key(is_test_key=is_test_key)
 
-        # Calculate expiry
         expires_at = None
         if expires_in_days is not None:
             expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
 
-        # Create API key record
         api_key = await api_key_db.create(
             session,
             {
@@ -698,9 +659,6 @@ class QuotaService:
 
         return revoked_key
 
-    # ========================================================================
-    # Usage Validation (Internal API)
-    # ========================================================================
 
     async def validate_and_log_usage(
         self,
@@ -757,9 +715,6 @@ class QuotaService:
             - is_test_key: Whether a test key was used (for mocked responses)
             - rate_limit_info: Rate limiting information (None if rate limit check was skipped)
         """
-        # ================================================================
-        # Step 1: Parse and validate client_id
-        # ================================================================
         workspace_id = self._parse_client_id(client_id)
         if workspace_id is None:
             workspace_logger.warning(f"Invalid client_id format: {client_id}")
@@ -773,9 +728,6 @@ class QuotaService:
                 None,
             )
 
-        # ================================================================
-        # Step 2: Check idempotency (duplicate request detection)
-        # ================================================================
         fingerprint_hash = create_request_fingerprint(
             endpoint=endpoint,
             method=method,
@@ -788,9 +740,6 @@ class QuotaService:
         if idempotent_result is not None:
             return idempotent_result
 
-        # ================================================================
-        # Step 3: Validate API key format
-        # ================================================================
         if not self._validate_api_key_format(api_key):
             workspace_logger.warning(f"Invalid API key format: {api_key[:20]}...")
             return (
@@ -803,21 +752,14 @@ class QuotaService:
                 None,
             )
 
-        # ================================================================
-        # Step 4: Resolve API key (cache or DB lookup)
-        # ================================================================
         key_result = await self._resolve_api_key(session, api_key, workspace_id)
         if isinstance(key_result, tuple):
             return key_result  # Error response
 
-        # Extract resolved key info
         api_key_id = key_result.api_key_id
         is_test_key = key_result.is_test_key
         plan_id = key_result.plan_id
 
-        # ================================================================
-        # Step 5: Rate limiting (workspace-level)
-        # ================================================================
         rate_limit_info = await self._check_rate_limit(workspace_id, plan_id)
         if rate_limit_info.is_exceeded:
             workspace_logger.warning(
@@ -835,9 +777,6 @@ class QuotaService:
                 rate_limit_info,
             )
 
-        # ================================================================
-        # Step 6: Calculate credits and check quota
-        # ================================================================
         if is_test_key:
             credits_reserved = Decimal("0.00")
             access_status = AccessStatus.GRANTED
@@ -853,9 +792,6 @@ class QuotaService:
                 )
             )
 
-        # ================================================================
-        # Step 7: Create usage log
-        # ================================================================
         usage_log = await usage_log_db.create(
             session,
             {
@@ -931,7 +867,6 @@ class QuotaService:
         Returns:
             Tuple of (success, message).
         """
-        # Validate API key format
         if not self._validate_api_key_format(api_key):
             return (True, "Invalid API key format, but operation is idempotent.")
 
@@ -943,14 +878,12 @@ class QuotaService:
             # Key doesn't exist - could be deleted, still idempotent
             return (True, "API key not found, but operation is idempotent.")
 
-        # Get usage log
         usage_log = await usage_log_db.get_by_id(session, usage_id)
 
         if not usage_log or usage_log.is_deleted:
             # Log doesn't exist - already deleted or never existed, idempotent
             return (True, "Usage log not found, but operation is idempotent.")
 
-        # Verify ownership
         if usage_log.api_key_id != api_key_record.id:
             workspace_logger.warning(
                 f"Usage commit ownership mismatch: "
@@ -973,7 +906,6 @@ class QuotaService:
         )
 
         if committed_log:
-            # Check if this is a test key - test keys don't increment credits_used
             is_test_key = api_key_record.is_test_key
 
             # If successfully committed as SUCCESS, increment credits_used counter
@@ -1022,3 +954,4 @@ __all__ = [
     "TEST_API_KEY_PREFIX",
     "CLIENT_ID_PREFIX",
 ]
+

@@ -49,11 +49,6 @@ from app.core.services.payment.stripe.types import (
 )
 
 
-# ============================================================================
-# Exceptions
-# ============================================================================
-
-
 class SubscriptionNotFoundException(NotFoundException):
     """Raised when subscription is not found."""
 
@@ -134,11 +129,6 @@ class SamePlanException(BadRequestException):
 
     def __init__(self, message: str = "Already subscribed to this plan."):
         super().__init__(message)
-
-
-# ============================================================================
-# Service
-# ============================================================================
 
 
 class SubscriptionService:
@@ -231,26 +221,22 @@ class SubscriptionService:
             InvalidSeatCountException: If seat count is invalid.
             CannotUpgradeFreeWorkspace: If workspace already has paid subscription.
         """
-        # Get plan
         plan = await self.get_plan(session, plan_id)
 
         if not plan.can_be_purchased:
             raise PlanNotFoundException("Plan is not available for purchase.")
 
-        # Validate seat count
         if seat_count < plan.min_seats:
             raise InvalidSeatCountException(f"Minimum {plan.min_seats} seats required.")
         if plan.max_seats and seat_count > plan.max_seats:
             raise InvalidSeatCountException(f"Maximum {plan.max_seats} seats allowed.")
 
-        # Check current subscription
         current_sub = await subscription_db.get_by_workspace(
             session, workspace_id, active_only=False
         )
         if current_sub and current_sub.is_active and current_sub.plan.is_paid:
             raise CannotUpgradeFreeWorkspace()
 
-        # Ensure user has Stripe customer ID
         stripe_customer_id = await self._ensure_stripe_customer(session, user)
 
         # Create Stripe checkout session with dual line items (base + seats)
@@ -327,7 +313,6 @@ class SubscriptionService:
         Returns:
             Created/updated subscription.
         """
-        # Get Stripe subscription details
         stripe_sub: StripeSubscription = await Stripe.get_subscription(
             stripe_subscription_id
         )
@@ -351,14 +336,11 @@ class SubscriptionService:
                 commit_self=False,
             )
 
-        # Get plan details
         plan = await plan_db.get_by_id(session, plan_id)
         if not plan:
             stripe_logger.error(f"Plan not found: {plan_id}")
             raise PlanNotFoundException()  # This should not happen since plan_id is from our metadata, but just in case
 
-        # Create new subscription
-        # Get billing period and amount from subscription items
         current_period_start = None
         current_period_end = None
         amount = None
@@ -373,7 +355,6 @@ class SubscriptionService:
             current_period_start = base_item.current_period_start
             current_period_end = base_item.current_period_end
 
-            # Calculate total amount from all line items
             # For dual-line-item subscriptions: base_price + (seat_price * seat_count)
             # For single-line-item subscriptions: price * quantity
             total_amount_cents = 0
@@ -406,7 +387,6 @@ class SubscriptionService:
             session, workspace_id
         )
         if existing_context:
-            # Update existing context to point to new subscription
             await api_subscription_context_db.update(
                 session,
                 existing_context.id,
@@ -414,7 +394,6 @@ class SubscriptionService:
                 commit_self=False,
             )
         else:
-            # Create new API subscription context
             await api_subscription_context_db.create(
                 session,
                 {
@@ -476,11 +455,9 @@ class SubscriptionService:
         Returns:
             Updated subscription or None if not found.
         """
-        # Validate parameters
         if not stripe_subscription_id or not isinstance(stripe_subscription_id, str):
             stripe_logger.error("Invalid Stripe subscription ID provided.")
             raise ValueError("Invalid Stripe subscription ID.")
-        # Get our subscription record
         subscription = await subscription_db.get_by_stripe_subscription_id(
             session, stripe_subscription_id
         )
@@ -490,7 +467,6 @@ class SubscriptionService:
             )
             return None
 
-        # Get latest from Stripe
         stripe_sub: StripeSubscription = await Stripe.get_subscription(
             stripe_subscription_id
         )
@@ -508,13 +484,11 @@ class SubscriptionService:
         }
         new_status = status_map.get(stripe_sub.status, SubscriptionStatus.ACTIVE)
 
-        # Update subscription
         updates: dict[str, Any] = {
             "status": new_status,
             "cancel_at_period_end": stripe_sub.cancel_at_period_end or False,
         }
 
-        # Get billing period and price from subscription items
         if stripe_sub.items and stripe_sub.items.data:
             items_data = stripe_sub.items.data
             first_item = items_data[0]
@@ -536,7 +510,6 @@ class SubscriptionService:
                         f"reset credits_used to 0"
                     )
 
-            # Update billing period from first item
             updates["current_period_start"] = first_item.current_period_start
             updates["current_period_end"] = first_item.current_period_end
 
@@ -648,7 +621,6 @@ class SubscriptionService:
             )
             return None
 
-        # Get workspace_id from context for API subscriptions
         workspace_id: UUID | None = None
         if subscription.product_type == ProductType.API and subscription.api_context:
             workspace_id = subscription.api_context.workspace_id
@@ -706,12 +678,10 @@ class SubscriptionService:
         if not subscription:
             return None
 
-        # Get workspace_id from context for API subscriptions
         workspace_id: UUID | None = None
         if subscription.product_type == ProductType.API and subscription.api_context:
             workspace_id = subscription.api_context.workspace_id
 
-        # Mark as canceled
         subscription = await subscription_db.update(
             session,
             subscription.id,
@@ -751,7 +721,6 @@ class SubscriptionService:
             session: Database session.
             workspace_id: Workspace ID.
         """
-        # Update workspace status
         await workspace_db.update_status(
             session, workspace_id, WorkspaceStatus.FROZEN, commit_self=False
         )
@@ -783,7 +752,6 @@ class SubscriptionService:
         if user.stripe_customer_id:
             return user.stripe_customer_id
 
-        # Create Stripe customer for legacy user
         stripe_customer = await Stripe.create_customer(
             email=user.email,
             name=user.full_name,
@@ -834,7 +802,6 @@ class SubscriptionService:
         if plan.max_seats and new_seat_count > plan.max_seats:
             raise InvalidSeatCountException(f"Maximum {plan.max_seats} seats allowed.")
 
-        # Check enabled member count
         enabled_count = await workspace_member_db.get_enabled_member_count(
             session, workspace_id
         )
@@ -904,7 +871,6 @@ class SubscriptionService:
         if plan.max_seats and new_seat_count > plan.max_seats:
             raise InvalidSeatCountException(f"Maximum {plan.max_seats} seats allowed.")
 
-        # Check enabled member count
         enabled_count = await workspace_member_db.get_enabled_member_count(
             session, workspace_id
         )
@@ -924,7 +890,6 @@ class SubscriptionService:
         # Update Stripe subscription first (if exists)
         # If Stripe fails, exception propagates and transaction auto-rollbacks
         if subscription.stripe_subscription_id:
-            # Generate idempotency key for this operation
             idempotency_key = (
                 f"seat_update:{workspace_id}:{new_seat_count}:"
                 f"{int(subscription.current_period_start.timestamp()) if subscription.current_period_start else ''}"
@@ -943,7 +908,6 @@ class SubscriptionService:
 
         subscription_id = subscription.id
 
-        # Update our record
         updated_subscription = await subscription_db.update(
             session,
             subscription_id,
@@ -990,14 +954,12 @@ class SubscriptionService:
 
         subscription_id = subscription.id
 
-        # Cancel in Stripe if exists
         if subscription.stripe_subscription_id:
             await Stripe.cancel_subscription(
                 subscription.stripe_subscription_id,
                 cancel_at_period_end=cancel_at_period_end,
             )
 
-        # Update our record
         updates: dict[str, Any] = {"cancel_at_period_end": cancel_at_period_end}
         if not cancel_at_period_end:
             updates["status"] = SubscriptionStatus.CANCELED
@@ -1059,7 +1021,6 @@ class SubscriptionService:
         if not subscription or not subscription.is_active:
             raise SubscriptionNotFoundException("No active subscription.")
 
-        # Get all members
         members = await workspace_member_db.get_workspace_members(session, workspace_id)
 
         # Owner is always enabled
@@ -1071,7 +1032,6 @@ class SubscriptionService:
 
         # Enable selected members (if specified)
         if member_ids_to_enable:
-            # Check seat count
             # +1 for owner who is always enabled
             if len(member_ids_to_enable) + 1 > subscription.seat_count:
                 raise InvalidSeatCountException(
@@ -1137,11 +1097,9 @@ class SubscriptionService:
         if not subscription.stripe_subscription_id:
             raise SubscriptionNotFoundException("Subscription has no Stripe ID.")
 
-        # Get current and target plans
         current_plan = subscription.plan
         new_plan = await self.get_plan(session, new_plan_id) if new_plan_id else None
 
-        # Validate not same plan
         if new_plan and current_plan.id == new_plan.id:
             raise SamePlanException()
 
@@ -1153,7 +1111,6 @@ class SubscriptionService:
             )
 
         if new_seat_count is not None:
-            # Check enabled member count
             enabled_count = await workspace_member_db.get_enabled_member_count(
                 session, workspace_id
             )
@@ -1166,7 +1123,6 @@ class SubscriptionService:
 
         # Plan upgrades always prorate immediately, even if seat count decreases.
         proration_behavior = "create_prorations"
-        # Validate new plan's seat limits
         if new_plan:
             # If changing to a new plan, validate against new plan limits
             if new_seat_count is not None:
@@ -1208,7 +1164,6 @@ class SubscriptionService:
                 is_downgrade = new_seat_count < subscription.seat_count
                 proration_behavior = "none" if is_downgrade else "create_prorations"
 
-        # Get Stripe preview
         if new_plan and not new_plan.stripe_price_id:
             raise PlanNotFoundException("Target plan has no Stripe price.")
 
@@ -1269,11 +1224,9 @@ class SubscriptionService:
         if not subscription.stripe_subscription_id:
             raise SubscriptionNotFoundException("Subscription has no Stripe ID.")
 
-        # Get current and target plans
         current_plan = subscription.plan
         new_plan = await self.get_plan(session, new_plan_id)
 
-        # Validate not same plan
         if current_plan.id == new_plan.id:
             raise SamePlanException()
 
@@ -1284,7 +1237,6 @@ class SubscriptionService:
                 "Please cancel and resubscribe to a different plan."
             )
 
-        # Validate new plan's seat limits
         if new_plan.max_seats and subscription.seat_count > new_plan.max_seats:
             raise InvalidSeatCountException(
                 f"Current seat count ({subscription.seat_count}) exceeds "
@@ -1303,7 +1255,6 @@ class SubscriptionService:
         if not new_plan.seat_stripe_price_id:
             raise PlanNotFoundException("Target plan has no seat Stripe price.")
 
-        # Update Stripe subscription with new price
         # Proration is handled automatically by Stripe
         # For dual line item subscriptions (base + seats), update both:
         # - Base plan price: current_plan.stripe_price_id -> new_plan.stripe_price_id
@@ -1322,7 +1273,6 @@ class SubscriptionService:
             idempotency_key=idempotency_key,
         )
 
-        # Update our database record
         subscription_id = subscription.id
         updated_subscription = await subscription_db.update(
             session,
@@ -1341,7 +1291,6 @@ class SubscriptionService:
             f"{current_plan.name} -> {new_plan.name}"
         )
 
-        # Send upgrade confirmation email to workspace owner
         workspace = await workspace_db.get_by_id(session, workspace_id)
         if workspace and workspace.owner:
             await publish_event(
@@ -1382,3 +1331,4 @@ __all__ = [
     "PlanDowngradeNotAllowedException",
     "SamePlanException",
 ]
+

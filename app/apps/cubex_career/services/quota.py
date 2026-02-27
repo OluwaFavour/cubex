@@ -40,11 +40,6 @@ from app.core.services.redis_service import RedisService
 from app.core.utils import create_request_fingerprint
 
 
-# ============================================================================
-# Rate Limiting Data Classes
-# ============================================================================
-
-
 @dataclass
 class RateLimitInfo:
     """Rate limiting information for Career API responses.
@@ -70,11 +65,6 @@ class RateLimitInfo:
     exceeded_window: str | None = None
 
 
-# ============================================================================
-# Service
-# ============================================================================
-
-
 class CareerQuotaService:
     """Service for Career usage validation and quota management.
 
@@ -83,9 +73,6 @@ class CareerQuotaService:
     and the calling server is authenticated via X-Internal-API-Key.
     """
 
-    # ========================================================================
-    # Private Helper Methods
-    # ========================================================================
 
     def _calculate_billing_period(
         self,
@@ -155,7 +142,6 @@ class CareerQuotaService:
         Returns:
             RateLimitInfo with current rate limit status.
         """
-        # Get rate limits for the plan
         rate_limit_per_minute = await QuotaCacheService.get_plan_rate_limit(plan_id)
         rate_limit_per_day = await QuotaCacheService.get_plan_rate_day_limit(plan_id)
 
@@ -313,7 +299,6 @@ class CareerQuotaService:
         context = await career_subscription_context_db.get_by_user(session, user_id)
         current_usage = context.credits_used if context else Decimal("0.00")
 
-        # Check quota: current_usage + credits_reserved <= credits_limit
         remaining_credits = credits_limit - current_usage
         if current_usage + credits_reserved <= credits_limit:
             return (
@@ -330,9 +315,6 @@ class CareerQuotaService:
                 status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-    # ========================================================================
-    # Usage Validation (Internal API)
-    # ========================================================================
 
     async def validate_and_log_usage(
         self,
@@ -380,9 +362,6 @@ class CareerQuotaService:
             Tuple of (access_status, usage_id, message, credits_reserved,
                        status_code, rate_limit_info).
         """
-        # ================================================================
-        # Step 1: Check idempotency (duplicate request detection)
-        # ================================================================
         fingerprint_hash = create_request_fingerprint(
             endpoint=endpoint,
             method=method,
@@ -395,9 +374,6 @@ class CareerQuotaService:
         if idempotent_result is not None:
             return idempotent_result
 
-        # ================================================================
-        # Step 2: Rate limiting (user-level, per-minute + per-day)
-        # ================================================================
         rate_limit_info = await self._check_rate_limit(user_id, plan_id)
         if rate_limit_info.is_exceeded:
             window = rate_limit_info.exceeded_window or "minute"
@@ -422,9 +398,6 @@ class CareerQuotaService:
                 rate_limit_info,
             )
 
-        # ================================================================
-        # Step 3: Calculate credits and check quota
-        # ================================================================
         credits_reserved = await QuotaCacheService.calculate_billable_cost(
             feature_key, plan_id
         )
@@ -432,9 +405,6 @@ class CareerQuotaService:
             session, user_id, plan_id, credits_reserved
         )
 
-        # ================================================================
-        # Step 4: Create usage log
-        # ================================================================
         usage_log = await career_usage_log_db.create(
             session,
             {
@@ -507,13 +477,11 @@ class CareerQuotaService:
         Returns:
             Tuple of (success, message).
         """
-        # Get usage log
         usage_log = await career_usage_log_db.get_by_id(session, usage_id)
 
         if not usage_log or usage_log.is_deleted:
             return (True, "Usage log not found, but operation is idempotent.")
 
-        # Verify ownership
         if usage_log.user_id != user_id:
             career_logger.warning(
                 f"Usage commit ownership mismatch: "
@@ -569,3 +537,4 @@ __all__ = [
     "career_quota_service",
     "RateLimitInfo",
 ]
+

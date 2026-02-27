@@ -165,11 +165,9 @@ async def validate_usage(
 
     Returns access status, usage_id (if logged), credits_reserved, and a message.
     """
-    # Extract client info if provided
     client_ip = request.client.ip if request.client else None
     client_user_agent = request.client.user_agent if request.client else None
 
-    # Extract usage estimate if provided
     usage_estimate = None
     if request.usage_estimate:
         usage_estimate = {
@@ -178,7 +176,6 @@ async def validate_usage(
             "model": request.usage_estimate.model,
         }
 
-    # Get user's subscription context for plan_id and subscription_id
     context = await career_subscription_context_db.get_by_user(session, current_user.id)
 
     plan_id = None
@@ -233,7 +230,6 @@ async def validate_usage(
         credits_reserved=credits_reserved,
     )
 
-    # Build response headers with rate limit info
     headers: dict[str, str] = {}
     if rate_limit_info is not None:
         headers["X-RateLimit-Limit-Minute"] = str(rate_limit_info.limit_per_minute)
@@ -346,7 +342,6 @@ async def commit_usage(
     This is idempotent - if the log is already committed or doesn't exist,
     success is still returned.
     """
-    # Extract metrics if provided
     metrics = None
     if request.metrics:
         metrics = {
@@ -356,7 +351,6 @@ async def commit_usage(
             "latency_ms": request.metrics.latency_ms,
         }
 
-    # Extract failure details if provided
     failure = None
     if request.failure:
         failure = {
@@ -382,3 +376,4 @@ async def commit_usage(
 
 
 __all__ = ["router"]
+

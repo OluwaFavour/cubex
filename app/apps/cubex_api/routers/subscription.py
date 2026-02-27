@@ -1,7 +1,6 @@
 """
 Subscription router for cubex_api.
 
-This module provides endpoints for:
 - Viewing plans
 - Managing subscriptions
 - Checkout sessions
@@ -46,11 +45,6 @@ from app.core.db.crud import api_subscription_context_db
 
 
 router = APIRouter(prefix="/subscriptions")
-
-
-# ============================================================================
-# Helper Functions
-# ============================================================================
 
 
 def _build_plan_response(plan: Plan) -> PlanResponse:
@@ -112,23 +106,16 @@ async def _get_credits_info(
     Returns:
         Tuple of (credits_allocation, credits_used)
     """
-    # Get credits allocation from plan pricing rules
     credits_allocation = (
         await APIQuotaCacheService.get_plan_credits_allocation_with_fallback(
             session, plan_id
         )
     )
 
-    # Get credits used from subscription context
     context = await api_subscription_context_db.get_by_workspace(session, workspace_id)
     credits_used = context.credits_used if context else Decimal("0.00")
 
     return credits_allocation, credits_used
-
-
-# ============================================================================
-# Plan Endpoints
-# ============================================================================
 
 
 @router.get(
@@ -245,11 +232,6 @@ async def get_plan(
         return _build_plan_response(plan)
 
 
-# ============================================================================
-# Subscription Endpoints
-# ============================================================================
-
-
 @router.get(
     "/workspaces/{workspace_id}",
     response_model=SubscriptionResponse | None,
@@ -320,7 +302,6 @@ async def get_workspace_subscription(
         f"GET /subscriptions/workspaces/{workspace_id} - user={current_user.id}"
     )
     async with session.begin():
-        # Check access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -421,7 +402,6 @@ async def create_checkout(
         f"- user={current_user.id} plan={data.plan_id} seats={data.seat_count}"
     )
     async with session.begin():
-        # Check admin access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -536,7 +516,6 @@ async def update_seats(
         f"- user={current_user.id} seats={data.seat_count}"
     )
     async with session.begin():
-        # Check admin access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -743,7 +722,6 @@ async def reactivate_workspace(
         f"POST /subscriptions/workspaces/{workspace_id}/reactivate - user={current_user.id}"
     )
     async with session.begin():
-        # Check owner access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -876,14 +854,12 @@ async def preview_subscription_change(
         f"- user={current_user.id} new_plan={data.new_plan_id}"
     )
     async with session.begin():
-        # Check admin access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
         if not member or not member.is_admin:
             raise AdminPermissionRequiredException()
 
-        # Get current subscription for plan name
         current_sub = await subscription_service.get_subscription(session, workspace_id)
         if not current_sub:
             raise SubscriptionNotFoundException()
@@ -895,7 +871,6 @@ async def preview_subscription_change(
             else None
         )
 
-        # Get preview from Stripe
         invoice_preview = await subscription_service.preview_subscription_change(
             session,
             workspace_id=workspace_id,
@@ -903,7 +878,6 @@ async def preview_subscription_change(
             new_seat_count=data.new_seat_count,
         )
 
-        # Convert cents to dollars for response
         total_due = Decimal(invoice_preview.amount_due) / Decimal(100)
 
         return UpgradePreviewResponse(
@@ -1028,7 +1002,6 @@ async def upgrade_plan(
         f"- user={current_user.id} new_plan={data.new_plan_id}"
     )
     async with session.begin():
-        # Check admin access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -1051,3 +1024,4 @@ async def upgrade_plan(
 
 
 __all__ = ["router"]
+

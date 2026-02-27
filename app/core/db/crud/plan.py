@@ -1,7 +1,6 @@
 """
 CRUD operations for Plan model.
 
-This module provides database operations for managing subscription plans.
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -95,3 +94,4 @@ class PlanDB(BaseDB[Plan]):
 
 
 __all__ = ["PlanDB"]
+

@@ -1,7 +1,6 @@
 """
 Test suite for GoogleOAuthService.
 
-This module contains comprehensive tests for the Google OAuth provider including:
 - Authorization URL generation with correct scopes and parameters
 - Token exchange flow
 - User info retrieval
@@ -25,7 +24,6 @@ from app.core.exceptions.types import OAuthException
 
 
 class TestGoogleOAuthServiceInit:
-    """Test suite for GoogleOAuthService initialization."""
 
     @pytest.fixture(autouse=True)
     async def cleanup(self):
@@ -36,14 +34,12 @@ class TestGoogleOAuthServiceInit:
         await GoogleOAuthService.aclose()
 
     def test_provider_name(self):
-        """Test that provider_name is 'google'."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         assert GoogleOAuthService.provider_name == "google"
 
     @pytest.mark.asyncio
     async def test_init_creates_client(self):
-        """Test that init creates HTTP client."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         await GoogleOAuthService.init()
@@ -53,7 +49,6 @@ class TestGoogleOAuthServiceInit:
 
     @pytest.mark.asyncio
     async def test_init_with_custom_credentials(self):
-        """Test that init accepts custom credentials."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         await GoogleOAuthService.init(
@@ -66,7 +61,6 @@ class TestGoogleOAuthServiceInit:
 
     @pytest.mark.asyncio
     async def test_aclose_closes_client(self):
-        """Test that aclose closes the HTTP client."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         await GoogleOAuthService.init()
@@ -78,22 +72,18 @@ class TestGoogleOAuthServiceInit:
 
     @pytest.mark.asyncio
     async def test_aclose_when_client_is_none(self):
-        """Test that aclose handles None client gracefully."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         GoogleOAuthService._client = None
 
-        # Should not raise any exception
         await GoogleOAuthService.aclose()
 
         assert GoogleOAuthService._client is None
 
 
 class TestGoogleAuthorizationUrl:
-    """Test suite for Google authorization URL generation."""
 
     def test_get_authorization_url_structure(self):
-        """Test that authorization URL has correct structure."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         url = GoogleOAuthService.get_authorization_url(
@@ -107,7 +97,6 @@ class TestGoogleAuthorizationUrl:
         assert parsed.path == "/o/oauth2/v2/auth"
 
     def test_get_authorization_url_contains_client_id(self):
-        """Test that authorization URL contains client_id."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         url = GoogleOAuthService.get_authorization_url(
@@ -119,7 +108,6 @@ class TestGoogleAuthorizationUrl:
         assert "client_id" in params
 
     def test_get_authorization_url_contains_redirect_uri(self):
-        """Test that authorization URL contains redirect_uri."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         redirect_uri = "https://app.com/callback"
@@ -132,7 +120,6 @@ class TestGoogleAuthorizationUrl:
         assert params["redirect_uri"][0] == redirect_uri
 
     def test_get_authorization_url_contains_state(self):
-        """Test that authorization URL contains state parameter."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         state = "unique_state_token"
@@ -145,7 +132,6 @@ class TestGoogleAuthorizationUrl:
         assert params["state"][0] == state
 
     def test_get_authorization_url_has_correct_scopes(self):
-        """Test that authorization URL requests correct scopes."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         url = GoogleOAuthService.get_authorization_url(
@@ -161,7 +147,6 @@ class TestGoogleAuthorizationUrl:
         assert "profile" in scopes
 
     def test_get_authorization_url_response_type_code(self):
-        """Test that authorization URL uses code response type."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         url = GoogleOAuthService.get_authorization_url(
@@ -173,7 +158,6 @@ class TestGoogleAuthorizationUrl:
         assert params["response_type"][0] == "code"
 
     def test_get_authorization_url_access_type_offline(self):
-        """Test that authorization URL requests offline access."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         url = GoogleOAuthService.get_authorization_url(
@@ -186,7 +170,6 @@ class TestGoogleAuthorizationUrl:
 
 
 class TestGoogleTokenExchange:
-    """Test suite for Google token exchange."""
 
     @pytest.fixture(autouse=True)
     async def setup_client(self):
@@ -199,7 +182,6 @@ class TestGoogleTokenExchange:
 
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_success(self):
-        """Test successful token exchange."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         mock_response = MagicMock()
@@ -230,7 +212,6 @@ class TestGoogleTokenExchange:
 
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_posts_to_correct_url(self):
-        """Test that token exchange posts to correct Google endpoint."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         mock_response = MagicMock()
@@ -255,7 +236,6 @@ class TestGoogleTokenExchange:
 
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_sends_correct_data(self):
-        """Test that token exchange sends correct form data."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         mock_response = MagicMock()
@@ -284,7 +264,6 @@ class TestGoogleTokenExchange:
 
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_failure(self):
-        """Test token exchange failure handling."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         mock_response = MagicMock()
@@ -310,7 +289,6 @@ class TestGoogleTokenExchange:
 
     @pytest.mark.asyncio
     async def test_exchange_code_for_tokens_network_error(self):
-        """Test token exchange network error handling."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         with patch.object(
@@ -326,7 +304,6 @@ class TestGoogleTokenExchange:
 
 
 class TestGoogleUserInfo:
-    """Test suite for Google user info retrieval."""
 
     @pytest.fixture(autouse=True)
     async def setup_client(self):
@@ -339,7 +316,6 @@ class TestGoogleUserInfo:
 
     @pytest.mark.asyncio
     async def test_get_user_info_success(self):
-        """Test successful user info retrieval."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         mock_response = MagicMock()
@@ -374,7 +350,6 @@ class TestGoogleUserInfo:
 
     @pytest.mark.asyncio
     async def test_get_user_info_calls_correct_endpoint(self):
-        """Test that user info is fetched from correct endpoint."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         mock_response = MagicMock()
@@ -396,7 +371,6 @@ class TestGoogleUserInfo:
 
     @pytest.mark.asyncio
     async def test_get_user_info_sends_authorization_header(self):
-        """Test that user info request includes authorization header."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         mock_response = MagicMock()
@@ -419,7 +393,6 @@ class TestGoogleUserInfo:
 
     @pytest.mark.asyncio
     async def test_get_user_info_failure(self):
-        """Test user info retrieval failure handling."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         mock_response = MagicMock()
@@ -438,7 +411,6 @@ class TestGoogleUserInfo:
 
     @pytest.mark.asyncio
     async def test_get_user_info_stores_raw_data(self):
-        """Test that raw response data is stored."""
         from app.core.services.oauth.google import GoogleOAuthService
 
         raw_data = {
@@ -462,11 +434,10 @@ class TestGoogleUserInfo:
 
 
 class TestGoogleModuleExports:
-    """Test suite for module exports."""
 
     def test_all_exports(self):
-        """Test that __all__ contains expected exports."""
         from app.core.services.oauth import google
 
         assert hasattr(google, "__all__")
         assert "GoogleOAuthService" in google.__all__
+

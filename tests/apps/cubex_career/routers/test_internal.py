@@ -1,7 +1,6 @@
 """
 Test suite for Career Internal API Router.
 
-This module contains comprehensive tests for the career internal router endpoints:
 - POST /career/internal/usage/validate - validates user and logs usage
 - POST /career/internal/usage/commit - commits usage as success or failure
 - X-Internal-API-Key + Bearer JWT authentication
@@ -25,11 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.enums import AccessStatus, FeatureKey
-
-
-# ============================================================================
-# Helpers
-# ============================================================================
 
 
 def _generate_payload_hash(data: str = "") -> str:
@@ -80,64 +74,45 @@ def _make_auth_headers(user) -> dict[str, str]:
     }
 
 
-# ============================================================================
-# Router Setup Tests
-# ============================================================================
-
-
 class TestCareerInternalRouterSetup:
-    """Test career internal router setup and configuration."""
 
     def test_internal_router_import(self):
-        """Test that internal_router can be imported."""
         from app.apps.cubex_career.routers.internal import router
 
         assert router is not None
 
     def test_internal_router_export(self):
-        """Test that internal_router is exported from __init__."""
         from app.apps.cubex_career.routers import internal_router
 
         assert internal_router is not None
 
     def test_internal_router_prefix(self):
-        """Test that internal router has correct prefix."""
         from app.apps.cubex_career.routers.internal import router
 
         assert router.prefix == "/internal"
 
     def test_internal_router_tags(self):
-        """Test that internal router has correct tags."""
         from app.apps.cubex_career.routers.internal import router
 
         assert "Career - Internal API" in router.tags
 
     def test_internal_router_has_validate_endpoint(self):
-        """Test that router has /internal/usage/validate endpoint."""
         from app.apps.cubex_career.routers.internal import router
 
         paths = [r.path for r in router.routes if hasattr(r, "path")]  # type: ignore[attr-defined]
         assert "/internal/usage/validate" in paths
 
     def test_internal_router_has_commit_endpoint(self):
-        """Test that router has /internal/usage/commit endpoint."""
         from app.apps.cubex_career.routers.internal import router
 
         paths = [r.path for r in router.routes if hasattr(r, "path")]  # type: ignore[attr-defined]
         assert "/internal/usage/commit" in paths
 
 
-# ============================================================================
-# Authentication Tests
-# ============================================================================
-
-
 class TestCareerInternalAuthentication:
-    """Test career internal API authentication (JWT + internal API key)."""
 
     @pytest.mark.asyncio
     async def test_missing_both_headers_returns_401(self, client: AsyncClient):
-        """Test that missing both headers returns 401."""
         response = await client.post(
             "/career/internal/usage/validate",
             json=make_validate_request(),
@@ -148,7 +123,6 @@ class TestCareerInternalAuthentication:
     async def test_missing_internal_api_key_returns_401(
         self, client: AsyncClient, auth_headers: dict[str, str]
     ):
-        """Test that missing X-Internal-API-Key returns 401."""
         # Only Bearer token, no internal API key
         response = await client.post(
             "/career/internal/usage/validate",
@@ -161,7 +135,6 @@ class TestCareerInternalAuthentication:
     async def test_invalid_internal_api_key_returns_401(
         self, client: AsyncClient, auth_headers: dict[str, str]
     ):
-        """Test that invalid X-Internal-API-Key returns 401."""
         headers = {**auth_headers, "X-Internal-API-Key": "wrong_key"}
         response = await client.post(
             "/career/internal/usage/validate",
@@ -172,7 +145,6 @@ class TestCareerInternalAuthentication:
 
     @pytest.mark.asyncio
     async def test_missing_bearer_token_returns_401(self, client: AsyncClient):
-        """Test that missing Bearer token returns 401."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/validate",
@@ -183,7 +155,6 @@ class TestCareerInternalAuthentication:
 
     @pytest.mark.asyncio
     async def test_invalid_bearer_token_returns_401(self, client: AsyncClient):
-        """Test that invalid Bearer token returns 401."""
         headers = {
             "Authorization": "Bearer invalid_token",
             "X-Internal-API-Key": settings.INTERNAL_API_SECRET,
@@ -199,7 +170,6 @@ class TestCareerInternalAuthentication:
     async def test_commit_missing_internal_api_key_returns_401(
         self, client: AsyncClient
     ):
-        """Test that commit without internal API key returns 401."""
         response = await client.post(
             "/career/internal/usage/commit",
             json={
@@ -214,7 +184,6 @@ class TestCareerInternalAuthentication:
     async def test_commit_invalid_internal_api_key_returns_401(
         self, client: AsyncClient
     ):
-        """Test that commit with invalid API key returns 401."""
         response = await client.post(
             "/career/internal/usage/commit",
             json={
@@ -227,13 +196,7 @@ class TestCareerInternalAuthentication:
         assert response.status_code == 401
 
 
-# ============================================================================
-# Request Validation Tests
-# ============================================================================
-
-
 class TestCareerInternalRequestValidation:
-    """Test request body validation for career internal endpoints."""
 
     @pytest.fixture
     def headers(self, test_user) -> dict[str, str]:
@@ -243,7 +206,6 @@ class TestCareerInternalRequestValidation:
     async def test_validate_missing_request_id(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test validation with missing request_id field."""
         response = await client.post(
             "/career/internal/usage/validate",
             json={
@@ -260,7 +222,6 @@ class TestCareerInternalRequestValidation:
     async def test_validate_missing_feature_key(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test validation with missing feature_key field."""
         response = await client.post(
             "/career/internal/usage/validate",
             json={
@@ -277,7 +238,6 @@ class TestCareerInternalRequestValidation:
     async def test_validate_invalid_feature_key(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test validation with invalid feature_key value."""
         response = await client.post(
             "/career/internal/usage/validate",
             json=make_validate_request(feature_key="invalid.feature_key"),
@@ -289,7 +249,6 @@ class TestCareerInternalRequestValidation:
     async def test_validate_invalid_payload_hash_format(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test validation with invalid payload_hash (not 64 hex chars)."""
         response = await client.post(
             "/career/internal/usage/validate",
             json=make_validate_request(payload_hash="not_a_valid_hash"),
@@ -301,7 +260,6 @@ class TestCareerInternalRequestValidation:
     async def test_validate_with_valid_usage_estimate(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test validation with optional usage_estimate field."""
         response = await client.post(
             "/career/internal/usage/validate",
             json=make_validate_request(
@@ -320,7 +278,6 @@ class TestCareerInternalRequestValidation:
     async def test_validate_with_empty_usage_estimate_fails(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test that usage_estimate with no fields set returns 422."""
         response = await client.post(
             "/career/internal/usage/validate",
             json=make_validate_request(usage_estimate={}),
@@ -330,7 +287,6 @@ class TestCareerInternalRequestValidation:
 
     @pytest.mark.asyncio
     async def test_commit_missing_user_id(self, client: AsyncClient):
-        """Test commit with missing user_id field."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/commit",
@@ -344,7 +300,6 @@ class TestCareerInternalRequestValidation:
 
     @pytest.mark.asyncio
     async def test_commit_missing_usage_id(self, client: AsyncClient):
-        """Test commit with missing usage_id field."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/commit",
@@ -358,7 +313,6 @@ class TestCareerInternalRequestValidation:
 
     @pytest.mark.asyncio
     async def test_commit_invalid_uuid_usage_id(self, client: AsyncClient):
-        """Test commit with invalid UUID for usage_id."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/commit",
@@ -373,7 +327,6 @@ class TestCareerInternalRequestValidation:
 
     @pytest.mark.asyncio
     async def test_commit_missing_success_field(self, client: AsyncClient):
-        """Test commit with missing success field."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/commit",
@@ -389,7 +342,6 @@ class TestCareerInternalRequestValidation:
     async def test_commit_failure_without_details_returns_422(
         self, client: AsyncClient
     ):
-        """Test commit with success=False but no failure details returns 422."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/commit",
@@ -404,13 +356,7 @@ class TestCareerInternalRequestValidation:
         assert response.status_code == 422
 
 
-# ============================================================================
-# Response Format Tests
-# ============================================================================
-
-
 class TestCareerInternalResponseFormat:
-    """Test response format from career internal endpoints."""
 
     @pytest.fixture
     def headers(self, test_user) -> dict[str, str]:
@@ -420,7 +366,6 @@ class TestCareerInternalResponseFormat:
     async def test_validate_response_has_access_field(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test that validate response includes access field."""
         response = await client.post(
             "/career/internal/usage/validate",
             json=make_validate_request(),
@@ -437,7 +382,6 @@ class TestCareerInternalResponseFormat:
     async def test_validate_response_has_user_id_field(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test that validate response includes user_id field."""
         response = await client.post(
             "/career/internal/usage/validate",
             json=make_validate_request(),
@@ -450,7 +394,6 @@ class TestCareerInternalResponseFormat:
     async def test_validate_response_has_message_field(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test that validate response includes message field."""
         response = await client.post(
             "/career/internal/usage/validate",
             json=make_validate_request(),
@@ -463,7 +406,6 @@ class TestCareerInternalResponseFormat:
     async def test_validate_response_has_credits_reserved_field(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test that validate response includes credits_reserved field."""
         response = await client.post(
             "/career/internal/usage/validate",
             json=make_validate_request(),
@@ -474,7 +416,6 @@ class TestCareerInternalResponseFormat:
 
     @pytest.mark.asyncio
     async def test_commit_response_has_success_field(self, client: AsyncClient):
-        """Test that commit response includes success field."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/commit",
@@ -492,7 +433,6 @@ class TestCareerInternalResponseFormat:
 
     @pytest.mark.asyncio
     async def test_commit_response_has_message_field(self, client: AsyncClient):
-        """Test that commit response includes message field."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/commit",
@@ -509,13 +449,7 @@ class TestCareerInternalResponseFormat:
         assert isinstance(data["message"], str)
 
 
-# ============================================================================
-# No Subscription Tests
-# ============================================================================
-
-
 class TestCareerInternalNoSubscription:
-    """Test career internal endpoints when user has no subscription."""
 
     @pytest.fixture
     def headers(self, test_user) -> dict[str, str]:
@@ -525,7 +459,6 @@ class TestCareerInternalNoSubscription:
     async def test_validate_no_subscription_returns_402(
         self, client: AsyncClient, headers: dict[str, str]
     ):
-        """Test that user without subscription gets 402."""
         response = await client.post(
             "/career/internal/usage/validate",
             json=make_validate_request(),
@@ -537,19 +470,12 @@ class TestCareerInternalNoSubscription:
         assert "subscription" in data["message"].lower()
 
 
-# ============================================================================
-# Commit Endpoint Tests (idempotent behavior)
-# ============================================================================
-
-
 class TestCareerInternalCommitEndpoint:
-    """Test POST /career/internal/usage/commit endpoint."""
 
     @pytest.mark.asyncio
     async def test_commit_nonexistent_usage_returns_idempotent(
         self, client: AsyncClient
     ):
-        """Test commit with non-existent usage_id returns idempotent success."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/commit",
@@ -567,7 +493,6 @@ class TestCareerInternalCommitEndpoint:
 
     @pytest.mark.asyncio
     async def test_commit_with_metrics(self, client: AsyncClient):
-        """Test commit with metrics payload."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/commit",
@@ -590,7 +515,6 @@ class TestCareerInternalCommitEndpoint:
 
     @pytest.mark.asyncio
     async def test_commit_failure_with_details(self, client: AsyncClient):
-        """Test commit with failure details."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
         response = await client.post(
             "/career/internal/usage/commit",
@@ -610,13 +534,7 @@ class TestCareerInternalCommitEndpoint:
         assert data["success"] is True  # Idempotent success (usage doesn't exist)
 
 
-# ============================================================================
-# E2E Tests (real fixtures)
-# ============================================================================
-
-
 class TestCareerValidateUsageE2E:
-    """End-to-end tests for career validate_usage with real database + Redis."""
 
     @pytest.fixture
     async def career_pricing_rule(self, db_session: AsyncSession, free_career_plan):
@@ -654,7 +572,6 @@ class TestCareerValidateUsageE2E:
         career_subscription,
         career_pricing_rule,
     ):
-        """Test that user with active subscription gets access granted."""
         headers = _make_auth_headers(test_user)
         response = await client.post(
             "/career/internal/usage/validate",
@@ -676,7 +593,6 @@ class TestCareerValidateUsageE2E:
         career_subscription,
         career_pricing_rule,
     ):
-        """Test that validate response includes rate limit headers."""
         headers = _make_auth_headers(test_user)
         response = await client.post(
             "/career/internal/usage/validate",
@@ -699,7 +615,6 @@ class TestCareerValidateUsageE2E:
         career_subscription,
         career_pricing_rule,
     ):
-        """Test idempotency: same request_id + same fingerprint returns same usage_id."""
         headers = _make_auth_headers(test_user)
         request_id = str(uuid4())
         payload_hash = _generate_payload_hash("same_payload")
@@ -740,7 +655,6 @@ class TestCareerValidateUsageE2E:
         career_subscription,
         career_pricing_rule,
     ):
-        """Test that same request_id but different fingerprint creates new record."""
         headers = _make_auth_headers(test_user)
         request_id = str(uuid4())
 
@@ -776,7 +690,6 @@ class TestCareerValidateUsageE2E:
         career_subscription,
         career_pricing_rule,
     ):
-        """Test that exhausted quota returns 429."""
         from sqlalchemy import select
 
         from app.core.db.models import CareerSubscriptionContext
@@ -806,7 +719,6 @@ class TestCareerValidateUsageE2E:
 
 
 class TestCareerCommitUsageE2E:
-    """End-to-end tests for career commit_usage with real database + Redis."""
 
     @pytest.fixture
     async def career_pricing_rule(self, db_session: AsyncSession, free_career_plan):
@@ -844,7 +756,6 @@ class TestCareerCommitUsageE2E:
         career_subscription,
         career_pricing_rule,
     ):
-        """Test full validate → commit success flow."""
         auth_headers = _make_auth_headers(test_user)
 
         # Step 1: Validate
@@ -886,7 +797,6 @@ class TestCareerCommitUsageE2E:
         career_subscription,
         career_pricing_rule,
     ):
-        """Test full validate → commit failure flow."""
         auth_headers = _make_auth_headers(test_user)
 
         # Step 1: Validate
@@ -926,7 +836,6 @@ class TestCareerCommitUsageE2E:
         career_subscription,
         career_pricing_rule,
     ):
-        """Test that committing with wrong user_id returns failure."""
         auth_headers = _make_auth_headers(test_user)
 
         # Step 1: Validate
@@ -962,7 +871,6 @@ class TestCareerCommitUsageE2E:
         career_subscription,
         career_pricing_rule,
     ):
-        """Test that re-committing same usage returns idempotent success."""
         auth_headers = _make_auth_headers(test_user)
 
         # Validate
@@ -1002,13 +910,7 @@ class TestCareerCommitUsageE2E:
         assert commit2.json()["success"] is True
 
 
-# ============================================================================
-# Rate Limiting E2E Tests
-# ============================================================================
-
-
 class TestCareerRateLimitE2E:
-    """End-to-end rate limiting tests for career internal endpoints."""
 
     @pytest.fixture
     async def career_pricing_rule_low_limit(
@@ -1051,7 +953,6 @@ class TestCareerRateLimitE2E:
         career_subscription,
         career_pricing_rule_low_limit,
     ):
-        """Test that exceeding rate limit returns 429 with Retry-After header."""
         from unittest.mock import AsyncMock, patch
 
         from freezegun import freeze_time
@@ -1059,7 +960,6 @@ class TestCareerRateLimitE2E:
         rate_limit = career_pricing_rule_low_limit.rate_limit_per_minute
         rate_limit_day = career_pricing_rule_low_limit.rate_limit_per_day
 
-        # Mock the cache service so it returns our fixture's rate limits
         # (the pricing rule lives in an uncommitted test transaction invisible
         # to the QuotaCacheService's own DB connection)
         with (
@@ -1075,7 +975,6 @@ class TestCareerRateLimitE2E:
                 return_value=rate_limit_day,
             ),
         ):
-            # Create auth headers inside frozen time so JWT iat/exp are consistent
             headers = _make_auth_headers(test_user)
 
             # Make requests up to the limit
@@ -1100,3 +999,4 @@ class TestCareerRateLimitE2E:
             assert data["access"] == AccessStatus.DENIED.value
             assert "rate limit" in data["message"].lower()
             assert "Retry-After" in response.headers
+

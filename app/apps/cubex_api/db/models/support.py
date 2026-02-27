@@ -1,7 +1,6 @@
 """
 Support models for cubex_api.
 
-This module provides models for support management.
 """
 
 from sqlalchemy import (
@@ -29,3 +28,4 @@ class SalesRequest(BaseModel):
         default=SalesRequestStatus.PENDING,
         server_default=SalesRequestStatus.PENDING.value,
     )
+

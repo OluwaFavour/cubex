@@ -1,8 +1,6 @@
 """
 Plan model for subscription plans.
 
-This module provides the Plan model for defining subscription tiers
-with features, pricing, and Stripe integration.
 """
 
 from decimal import Decimal
@@ -29,11 +27,6 @@ if TYPE_CHECKING:
     from app.core.db.models.quota import PlanPricingRule
 
 
-# ============================================================================
-# Pydantic Feature Schema (for validation)
-# ============================================================================
-
-
 class FeatureSchema(PydanticBaseModel):
     """Schema for validating plan features stored in JSONB."""
 
@@ -43,11 +36,6 @@ class FeatureSchema(PydanticBaseModel):
     category: str | None = None
 
     model_config = ConfigDict(extra="forbid")
-
-
-# ============================================================================
-# Plan Model
-# ============================================================================
 
 
 class Plan(BaseModel):
@@ -196,7 +184,6 @@ class Plan(BaseModel):
             "max_seats IS NULL OR max_seats >= min_seats",
             name="ck_plans_max_seats_valid",
         ),
-        # Validate plan name matches product_type
         CheckConstraint(
             """
             (product_type = 'api' AND name IN ('Free', 'Basic', 'Professional'))
@@ -314,3 +301,4 @@ class Plan(BaseModel):
 
 
 __all__ = ["Plan", "FeatureSchema"]
+

@@ -1,7 +1,6 @@
 """
 Test suite for CloudinaryService file management service.
 
-This module contains comprehensive tests for the Cloudinary file service including:
 - Service initialization with credentials
 - File upload with various configurations
 - Single file deletion
@@ -29,10 +28,8 @@ from app.core.exceptions.types import AppException
 
 
 class TestCloudinaryServiceInit:
-    """Test suite for CloudinaryService initialization."""
 
     def test_init_configures_cloudinary(self):
-        """Test that init properly configures cloudinary with credentials."""
         with patch("app.core.services.cloudinary.cloudinary.config") as mock_config:
             CloudinaryService.init(
                 cloud_name="test-cloud",
@@ -47,7 +44,6 @@ class TestCloudinaryServiceInit:
             )
 
     def test_init_with_all_parameters(self):
-        """Test init accepts all required parameters."""
         with patch("app.core.services.cloudinary.cloudinary.config") as mock_config:
             CloudinaryService.init(
                 cloud_name="my-cloud", api_key="my-api-key", api_secret="my-api-secret"
@@ -60,12 +56,9 @@ class TestCloudinaryServiceInit:
 
 
 class TestCloudinaryServiceUploadFile:
-    """Test suite for file upload functionality."""
 
     @pytest.mark.asyncio
     async def test_upload_file_success(self):
-        """Test successful file upload to Cloudinary."""
-        # Create a mock UploadFile
         mock_file = MagicMock(spec=UploadFile)
         mock_file.file = BytesIO(b"test file content")
         mock_file.filename = "test.jpg"
@@ -92,7 +85,6 @@ class TestCloudinaryServiceUploadFile:
 
     @pytest.mark.asyncio
     async def test_upload_file_with_folder(self):
-        """Test file upload with folder parameter."""
         mock_file = MagicMock(spec=UploadFile)
         mock_file.file = BytesIO(b"test content")
 
@@ -126,14 +118,12 @@ class TestCloudinaryServiceUploadFile:
 
             assert secure_url == "https://cloudinary.com/uploads/test.jpg"
             assert public_id == "uploads/test_id"
-            # Verify upload was called with folder
             mock_upload.assert_called_once()
             call_kwargs = mock_upload.call_args[1]
             assert call_kwargs["folder"] == "uploads"
 
     @pytest.mark.asyncio
     async def test_upload_file_with_kwargs(self):
-        """Test file upload with additional kwargs."""
         mock_file = MagicMock(spec=UploadFile)
         mock_file.file = BytesIO(b"test content")
 
@@ -158,7 +148,6 @@ class TestCloudinaryServiceUploadFile:
 
     @pytest.mark.asyncio
     async def test_upload_file_video(self):
-        """Test uploading video file."""
         mock_file = MagicMock(spec=UploadFile)
         mock_file.file = BytesIO(b"video content")
         mock_file.filename = "test.mp4"
@@ -182,7 +171,6 @@ class TestCloudinaryServiceUploadFile:
 
     @pytest.mark.asyncio
     async def test_upload_file_raises_exception_on_failure(self):
-        """Test that upload failure raises AppException."""
         mock_file = MagicMock(spec=UploadFile)
         mock_file.file = BytesIO(b"test content")
 
@@ -200,7 +188,6 @@ class TestCloudinaryServiceUploadFile:
 
     @pytest.mark.asyncio
     async def test_upload_file_without_folder(self):
-        """Test file upload without folder uses default behavior."""
         mock_file = MagicMock(spec=UploadFile)
         mock_file.file = BytesIO(b"test content")
 
@@ -223,11 +210,9 @@ class TestCloudinaryServiceUploadFile:
 
 
 class TestCloudinaryServiceDeleteFile:
-    """Test suite for single file deletion."""
 
     @pytest.mark.asyncio
     async def test_delete_file_success(self):
-        """Test successful file deletion from Cloudinary."""
 
         # Use side_effect to actually call the inner function
         async def mock_run_sync(func, *args):
@@ -247,7 +232,6 @@ class TestCloudinaryServiceDeleteFile:
 
     @pytest.mark.asyncio
     async def test_delete_file_with_path(self):
-        """Test deletion of file with path in public_id."""
         with patch(
             "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
@@ -260,7 +244,6 @@ class TestCloudinaryServiceDeleteFile:
 
     @pytest.mark.asyncio
     async def test_delete_file_raises_exception_on_failure(self):
-        """Test that deletion failure raises AppException."""
         with patch(
             "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
@@ -275,7 +258,6 @@ class TestCloudinaryServiceDeleteFile:
 
     @pytest.mark.asyncio
     async def test_delete_file_logs_operation(self):
-        """Test that delete_file logs the operation."""
         with patch(
             "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync, patch(
@@ -285,7 +267,6 @@ class TestCloudinaryServiceDeleteFile:
 
             await CloudinaryService.delete_file("test_id")
 
-            # Verify logging occurred
             assert mock_logger.info.call_count == 2  # Before and after deletion
             calls = [str(call) for call in mock_logger.info.call_args_list]
             assert any("Deleting file" in str(call) for call in calls)
@@ -293,11 +274,9 @@ class TestCloudinaryServiceDeleteFile:
 
 
 class TestCloudinaryServiceDeleteFiles:
-    """Test suite for batch file deletion."""
 
     @pytest.mark.asyncio
     async def test_delete_files_success(self):
-        """Test successful batch deletion of files."""
         public_ids = ["id1", "id2", "id3"]
 
         # Use side_effect to actually call the inner function
@@ -317,7 +296,6 @@ class TestCloudinaryServiceDeleteFiles:
 
     @pytest.mark.asyncio
     async def test_delete_files_empty_list(self):
-        """Test batch deletion with empty list."""
         with patch(
             "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
@@ -330,7 +308,6 @@ class TestCloudinaryServiceDeleteFiles:
 
     @pytest.mark.asyncio
     async def test_delete_files_single_file(self):
-        """Test batch deletion with single file."""
         with patch(
             "app.core.services.cloudinary.run_sync", new_callable=AsyncMock
         ) as mock_run_sync:
@@ -343,7 +320,6 @@ class TestCloudinaryServiceDeleteFiles:
 
     @pytest.mark.asyncio
     async def test_delete_files_with_paths(self):
-        """Test batch deletion of files with folder paths."""
         public_ids = ["folder1/image1", "folder2/subfolder/image2", "root_image"]
 
         with patch(
@@ -358,7 +334,6 @@ class TestCloudinaryServiceDeleteFiles:
 
     @pytest.mark.asyncio
     async def test_delete_files_raises_exception_on_failure(self):
-        """Test that batch deletion failure raises AppException."""
         public_ids = ["id1", "id2"]
 
         with patch(
@@ -375,7 +350,6 @@ class TestCloudinaryServiceDeleteFiles:
 
     @pytest.mark.asyncio
     async def test_delete_files_logs_operation(self):
-        """Test that delete_files logs the operation."""
         public_ids = ["id1", "id2"]
 
         with patch(
@@ -387,7 +361,6 @@ class TestCloudinaryServiceDeleteFiles:
 
             await CloudinaryService.delete_files(public_ids)
 
-            # Verify logging occurred
             assert mock_logger.info.call_count == 2  # Before and after deletion
             calls = [str(call) for call in mock_logger.info.call_args_list]
             assert any("Deleting files" in str(call) for call in calls)
@@ -395,7 +368,6 @@ class TestCloudinaryServiceDeleteFiles:
 
     @pytest.mark.asyncio
     async def test_delete_files_large_batch(self):
-        """Test batch deletion with large number of files."""
         # Cloudinary typically has limits, but our service should handle any size
         large_batch = [f"image_{i}" for i in range(100)]
 
@@ -411,11 +383,9 @@ class TestCloudinaryServiceDeleteFiles:
 
 
 class TestCloudinaryServiceErrorHandling:
-    """Test suite for error handling and edge cases."""
 
     @pytest.mark.asyncio
     async def test_upload_file_chained_exception(self):
-        """Test that AppException chains original exception."""
         mock_file = MagicMock(spec=UploadFile)
         mock_file.file = BytesIO(b"test")
 
@@ -429,12 +399,10 @@ class TestCloudinaryServiceErrorHandling:
             with pytest.raises(AppException) as exc_info:
                 await CloudinaryService.upload_file(mock_file)
 
-            # Verify exception chaining
             assert exc_info.value.__cause__ is original_error
 
     @pytest.mark.asyncio
     async def test_delete_file_chained_exception(self):
-        """Test that delete_file AppException chains original exception."""
         original_error = ConnectionError("Network failure")
 
         with patch(
@@ -449,7 +417,6 @@ class TestCloudinaryServiceErrorHandling:
 
     @pytest.mark.asyncio
     async def test_delete_files_chained_exception(self):
-        """Test that delete_files AppException chains original exception."""
         original_error = TimeoutError("Request timeout")
 
         with patch(
@@ -464,7 +431,6 @@ class TestCloudinaryServiceErrorHandling:
 
     @pytest.mark.asyncio
     async def test_upload_file_includes_error_message_in_exception(self):
-        """Test that upload error message is included in AppException."""
         mock_file = MagicMock(spec=UploadFile)
         mock_file.file = BytesIO(b"test")
 
@@ -481,11 +447,9 @@ class TestCloudinaryServiceErrorHandling:
 
 
 class TestCloudinaryServiceGenerateUploadCredentials:
-    """Test suite for generate_upload_credentials method for secure client-side uploads."""
 
     def setup_method(self):
         """Set up test fixtures before each test method."""
-        # Initialize CloudinaryService with test credentials
         CloudinaryService.cloud_name = "test-cloud"
         CloudinaryService.api_key = "test-api-key"
         CloudinaryService.api_secret = "test-api-secret"
@@ -498,7 +462,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
         CloudinaryService.api_secret = None
 
     def test_generate_upload_credentials_success(self):
-        """Test successful generation of upload credentials."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -519,7 +482,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             assert credentials.resource_type == "auto"
 
     def test_generate_upload_credentials_with_folder(self):
-        """Test generation of upload credentials with folder parameter."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -531,13 +493,11 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             )
 
             assert credentials.folder == "uploads/images"
-            # Verify folder was included in params to sign
             call_args = mock_sign.call_args[0]
             params = call_args[0]
             assert params["folder"] == "uploads/images"
 
     def test_generate_upload_credentials_with_resource_type(self):
-        """Test generation of upload credentials with different resource types."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -566,7 +526,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             assert "raw/upload" in credentials.upload_url
 
     def test_generate_upload_credentials_with_upload_preset(self):
-        """Test generation of upload credentials with upload preset."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -578,13 +537,11 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             )
 
             assert credentials.upload_preset == "my_preset"
-            # Verify upload_preset was included in params to sign
             call_args = mock_sign.call_args[0]
             params = call_args[0]
             assert params["upload_preset"] == "my_preset"
 
     def test_generate_upload_credentials_with_eager(self):
-        """Test generation of upload credentials with eager transformations."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -596,13 +553,11 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             )
 
             assert credentials.eager == "w_400,h_300,c_pad|w_260,h_200,c_crop"
-            # Verify eager was included in params to sign
             call_args = mock_sign.call_args[0]
             params = call_args[0]
             assert params["eager"] == "w_400,h_300,c_pad|w_260,h_200,c_crop"
 
     def test_generate_upload_credentials_with_kwargs(self):
-        """Test generation of upload credentials with additional kwargs."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -614,7 +569,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
                 tags="tag1,tag2,tag3",
             )
 
-            # Verify kwargs are included in params to sign
             call_args = mock_sign.call_args[0]
             params = call_args[0]
             assert params["public_id"] == "custom_public_id"
@@ -625,7 +579,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             assert credentials.model_extra.get("tags") == "tag1,tag2,tag3"
 
     def test_generate_upload_credentials_with_all_parameters(self):
-        """Test generation of upload credentials with all parameters."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -655,8 +608,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             assert credentials.eager == "w_200,h_200"
 
     def test_generate_upload_credentials_raises_exception_when_not_configured(self):
-        """Test that generate_upload_credentials raises AppException when Cloudinary is not configured."""
-        # Set credentials to None to simulate unconfigured state
         CloudinaryService.cloud_name = None
         CloudinaryService.api_key = None
         CloudinaryService.api_secret = None
@@ -668,7 +619,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
         assert "not properly configured" in exc_info.value.message
 
     def test_generate_upload_credentials_raises_exception_when_cloud_name_missing(self):
-        """Test that generate_upload_credentials raises AppException when cloud_name is missing."""
         CloudinaryService.cloud_name = None
 
         with pytest.raises(AppException) as exc_info:
@@ -678,7 +628,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
         assert "not properly configured" in exc_info.value.message
 
     def test_generate_upload_credentials_raises_exception_when_api_key_missing(self):
-        """Test that generate_upload_credentials raises AppException when api_key is missing."""
         CloudinaryService.api_key = None
 
         with pytest.raises(AppException) as exc_info:
@@ -688,7 +637,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
         assert "not properly configured" in exc_info.value.message
 
     def test_generate_upload_credentials_raises_exception_when_api_secret_missing(self):
-        """Test that generate_upload_credentials raises AppException when api_secret is missing."""
         CloudinaryService.api_secret = None
 
         with pytest.raises(AppException) as exc_info:
@@ -698,7 +646,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
         assert "not properly configured" in exc_info.value.message
 
     def test_generate_upload_credentials_raises_exception_on_signature_failure(self):
-        """Test that generate_upload_credentials raises AppException when signature generation fails."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign:
@@ -712,7 +659,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             assert "Signature generation failed" in exc_info.value.message
 
     def test_generate_upload_credentials_logs_success(self):
-        """Test that generate_upload_credentials logs successful credential generation."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch(
@@ -731,7 +677,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             )
 
     def test_generate_upload_credentials_logs_error_on_failure(self):
-        """Test that generate_upload_credentials logs errors on failure."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch(
@@ -748,7 +693,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             )
 
     def test_generate_upload_credentials_signature_uses_api_secret(self):
-        """Test that signature generation uses the correct API secret."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -757,12 +701,10 @@ class TestCloudinaryServiceGenerateUploadCredentials:
 
             CloudinaryService.generate_upload_credentials()
 
-            # Verify api_sign_request was called with the correct api_secret
             call_args = mock_sign.call_args[0]
             assert call_args[1] == "test-api-secret"
 
     def test_generate_upload_credentials_timestamp_in_params(self):
-        """Test that timestamp is included in params to sign."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -771,14 +713,12 @@ class TestCloudinaryServiceGenerateUploadCredentials:
 
             credentials = CloudinaryService.generate_upload_credentials()
 
-            # Verify timestamp is in params to sign
             call_args = mock_sign.call_args[0]
             params = call_args[0]
             assert params["timestamp"] == 9876543210
             assert credentials.timestamp == 9876543210
 
     def test_generate_upload_credentials_none_kwargs_excluded(self):
-        """Test that None kwargs are excluded from the result."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -796,7 +736,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             assert credentials.eager is None
 
     def test_generate_upload_credentials_returns_pydantic_model(self):
-        """Test that the return type is CloudinaryUploadCredentials Pydantic model."""
         with patch(
             "app.core.services.cloudinary.cloudinary.utils.api_sign_request"
         ) as mock_sign, patch("app.core.services.cloudinary.time.time") as mock_time:
@@ -806,7 +745,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             credentials = CloudinaryService.generate_upload_credentials()
 
             assert isinstance(credentials, CloudinaryUploadCredentials)
-            # Verify it can be serialized to dict/json
             credentials_dict = credentials.model_dump()
             assert "upload_url" in credentials_dict
             assert "api_key" in credentials_dict
@@ -814,7 +752,6 @@ class TestCloudinaryServiceGenerateUploadCredentials:
             assert "signature" in credentials_dict
 
     def test_generate_upload_credentials_chained_exception(self):
-        """Test that AppException chains original exception."""
         original_error = ValueError("Original error")
 
         with patch(
@@ -826,3 +763,4 @@ class TestCloudinaryServiceGenerateUploadCredentials:
                 CloudinaryService.generate_upload_credentials()
 
             assert exc_info.value.__cause__ is original_error
+

@@ -1,10 +1,6 @@
 """
 Stripe webhook handler for core use across cubex apps.
 
-This module provides a single endpoint to handle all Stripe webhook events.
-Implements secure signature verification and publishes events to message queues
-for async processing with retry capabilities.
-
 Business logic is NOT handled here - only signature verification and event routing.
 """
 
@@ -21,10 +17,6 @@ from app.infrastructure.messaging.publisher import publish_event
 router = APIRouter(prefix="/webhooks")
 
 
-# ============================================================================
-# Event Type to Queue Mapping
-# ============================================================================
-
 EVENT_QUEUE_MAPPING: dict[str, str] = {
     "checkout.session.completed": "stripe_checkout_completed",
     "customer.subscription.created": "stripe_subscription_updated",
@@ -36,11 +28,6 @@ EVENT_QUEUE_MAPPING: dict[str, str] = {
     "invoice.payment_failed": "stripe_payment_failed",
     "invoice.payment_action_required": "stripe_payment_failed",
 }
-
-
-# ============================================================================
-# Webhook Handler
-# ============================================================================
 
 
 @router.post(
@@ -133,7 +120,6 @@ async def handle_stripe_webhook(request: Request) -> dict[str, str]:
     - Business logic handled by message consumers
     - Idempotency handled by message handlers via Redis
     """
-    # Get raw body and signature
     payload = await request.body()
     sig_header = request.headers.get("Stripe-Signature")
 
@@ -141,7 +127,6 @@ async def handle_stripe_webhook(request: Request) -> dict[str, str]:
         webhook_logger.warning("Webhook received without Stripe-Signature header")
         raise BadRequestException("Missing Stripe-Signature header")
 
-    # Verify signature and construct event
     try:
         event = Stripe.verify_webhook_signature(
             payload, {"Stripe-Signature": sig_header}
@@ -155,18 +140,15 @@ async def handle_stripe_webhook(request: Request) -> dict[str, str]:
 
     webhook_logger.info(f"Received webhook: {event_type} ({event_id})")
 
-    # Validate required fields
     if not event_id or not event_type:
         webhook_logger.warning("Webhook missing event id or type")
         raise BadRequestException("Missing event id or type")
 
-    # Get queue name for this event type
     queue_name = EVENT_QUEUE_MAPPING.get(event_type)
     if not queue_name:
         webhook_logger.debug(f"Unhandled event type: {event_type}")
         return {"status": "ignored"}
 
-    # Extract event data and publish to queue
     data = event.get("data", {})
     obj = data.get("object", {})
 
@@ -198,11 +180,9 @@ def _build_queue_message(
     Returns:
         Message payload for the queue.
     """
-    # Common fields for all messages
     message: dict[str, Any] = {"event_id": event_id}
 
     if event_type == "checkout.session.completed":
-        # Extract metadata for checkout completion
         metadata = obj.get("metadata", {})
         message.update(
             {
@@ -252,3 +232,4 @@ def _build_queue_message(
 
 
 __all__ = ["router"]
+

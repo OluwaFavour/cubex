@@ -1,16 +1,9 @@
 """
 Email Manager Service for centralized email sending.
 
-This module provides a unified interface for sending various types of emails
-including OTP verification, welcome emails, and password reset confirmations.
-It leverages the BrevoService for actual email delivery and the Renderer
-for template rendering.
-
 Example usage:
-    # Initialize the service
     EmailManagerService.init()
 
-    # Send OTP email
     await EmailManagerService.send_otp_email(
         email="user@example.com",
         user_name="John",
@@ -18,7 +11,6 @@ Example usage:
         purpose=OTPPurpose.EMAIL_VERIFICATION,
     )
 
-    # Send welcome email
     await EmailManagerService.send_welcome_email(
         email="user@example.com",
         user_name="John",
@@ -169,10 +161,8 @@ class EmailManagerService:
                     text_template, context=context
                 )
 
-            # Prepare recipient
             recipient = Contact(email=email, name=recipient_name)
 
-            # Send via Brevo
             await BrevoService.send_transactional_email(
                 to=ListContact(to=[recipient]),
                 subject=subject,
@@ -583,7 +573,6 @@ class EmailManagerService:
             )
             return False
 
-        # Format message body for display
         if isinstance(message_body, dict):
             formatted_body = json.dumps(message_body, indent=2, default=str)
         else:
@@ -636,7 +625,6 @@ class EmailManagerService:
             )
             return False
 
-        # Format message body for display
         if isinstance(message_body, dict):
             formatted_body = json.dumps(message_body, indent=2, default=str)
         else:
@@ -659,3 +647,4 @@ class EmailManagerService:
             context=context,
             recipient_name="Admin",
         )
+
