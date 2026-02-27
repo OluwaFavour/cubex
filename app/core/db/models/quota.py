@@ -75,6 +75,9 @@ class PlanPricingRule(BaseModel):
         multiplier: The pricing multiplier (e.g., 1.0 for standard, 0.8 for discount).
         credits_allocation: The number of credits allocated to users on this plan.
         rate_limit_per_minute: The maximum number of API requests allowed per minute.
+            None means unlimited.
+        rate_limit_per_day: The maximum number of API requests allowed per day.
+            None means unlimited.
     """
 
     __tablename__ = "plan_pricing_rules"
