@@ -16,7 +16,6 @@ from datetime import timezone
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy.engine import make_url
 
 from app.core.config import scheduler_logger, settings
 from app.core.services import BrevoService, RedisService, Renderer
@@ -29,12 +28,11 @@ logging.getLogger("apscheduler").setLevel(logging.DEBUG)
 def _sync_database_url() -> str:
     """Convert the async DATABASE_URL to a synchronous one for APScheduler.
 
-    Uses SQLAlchemy's URL parser to safely swap the driver, avoiding
-    fragile string replacement that would break if the URL contained
-    'asyncpg' elsewhere (e.g., in a password).
+    Only modifies the driver scheme (before ://) so the rest of the URL
+    — including any percent-encoded password — is preserved exactly.
     """
-    url = make_url(settings.DATABASE_URL)
-    return str(url.set(drivername="postgresql"))
+    scheme, rest = settings.DATABASE_URL.split("://", 1)
+    return f"{scheme.replace('+asyncpg', '')}://{rest}"
 
 
 _sync_url = _sync_database_url()

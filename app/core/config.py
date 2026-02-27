@@ -157,11 +157,12 @@ def get_settings() -> Settings:
 settings = get_settings()
 
 # Initialize Sentry once globally (non-blocking, runs in background threads)
-init_sentry(
-    dsn=settings.SENTRY_DSN,
-    environment=settings.SENTRY_ENVIRONMENT,
-    traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-)
+if not settings.DEBUG:
+    init_sentry(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.SENTRY_ENVIRONMENT,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+    )
 
 # Configure loggers with component-specific Sentry tags for separation of concerns
 # Each logger gets its own log file and Sentry tag for easy filtering
