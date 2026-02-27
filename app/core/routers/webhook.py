@@ -30,8 +30,11 @@ EVENT_QUEUE_MAPPING: dict[str, str] = {
     "customer.subscription.created": "stripe_subscription_updated",
     "customer.subscription.updated": "stripe_subscription_updated",
     "customer.subscription.deleted": "stripe_subscription_deleted",
+    "customer.subscription.paused": "stripe_subscription_updated",
+    "customer.subscription.resumed": "stripe_subscription_updated",
     "invoice.paid": "stripe_subscription_updated",
     "invoice.payment_failed": "stripe_payment_failed",
+    "invoice.payment_action_required": "stripe_payment_failed",
 }
 
 
@@ -56,8 +59,11 @@ for asynchronous processing.
 - `customer.subscription.created` - Subscription created
 - `customer.subscription.updated` - Subscription modified (plan change, renewal)
 - `customer.subscription.deleted` - Subscription cancelled
+- `customer.subscription.paused` - Subscription paused
+- `customer.subscription.resumed` - Subscription resumed
 - `invoice.paid` - Invoice successfully paid
 - `invoice.payment_failed` - Invoice payment failed
+- `invoice.payment_action_required` - Payment requires customer action (SCA)
 
 **Processing Flow:**
 1. Verify Stripe signature header
@@ -213,6 +219,8 @@ def _build_queue_message(
     elif event_type in (
         "customer.subscription.created",
         "customer.subscription.updated",
+        "customer.subscription.paused",
+        "customer.subscription.resumed",
     ):
         message["stripe_subscription_id"] = obj.get("id")
 
@@ -227,6 +235,16 @@ def _build_queue_message(
             {
                 "stripe_subscription_id": obj.get("subscription"),
                 "customer_email": obj.get("customer_email"),
+                "amount_due": obj.get("amount_due"),
+            }
+        )
+
+    elif event_type == "invoice.payment_action_required":
+        message.update(
+            {
+                "stripe_subscription_id": obj.get("subscription"),
+                "customer_email": obj.get("customer_email"),
+                "amount_due": obj.get("amount_due"),
             }
         )
 

@@ -563,6 +563,9 @@ class CareerSubscriptionService:
         """
         Handle Career subscription deletion from Stripe webhook.
 
+        Marks the subscription as canceled, then downgrades it to the free
+        plan so the user retains basic access.
+
         Args:
             session: Database session.
             stripe_subscription_id: Stripe subscription ID.
@@ -584,18 +587,42 @@ class CareerSubscriptionService:
             )
             return None
 
-        # Mark as canceled
+        # Downgrade to free plan
+        free_plan = await plan_db.get_free_plan(
+            session, product_type=ProductType.CAREER
+        )
+        if not free_plan:
+            stripe_logger.error(
+                "Free Career plan not found — cannot downgrade, marking as canceled only"
+            )
+            subscription = await subscription_db.update(
+                session,
+                subscription.id,
+                {
+                    "status": SubscriptionStatus.CANCELED,
+                    "canceled_at": datetime.now(timezone.utc),
+                },
+                commit_self=commit_self,
+            )
+            return subscription
+
         subscription = await subscription_db.update(
             session,
             subscription.id,
             {
-                "status": SubscriptionStatus.CANCELED,
+                "status": SubscriptionStatus.ACTIVE,
+                "plan_id": free_plan.id,
+                "stripe_subscription_id": None,
                 "canceled_at": datetime.now(timezone.utc),
+                "cancel_at_period_end": False,
             },
             commit_self=commit_self,
         )
 
-        stripe_logger.info(f"Career subscription {stripe_subscription_id} deleted")
+        stripe_logger.info(
+            f"Career subscription {stripe_subscription_id} deleted — "
+            f"downgraded to free plan {free_plan.id}"
+        )
 
         return subscription
 
