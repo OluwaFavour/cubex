@@ -17,7 +17,7 @@ from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
-from app.shared.config import settings
+from app.core.config import settings
 
 # Token expiry in seconds (24 hours)
 TOKEN_MAX_AGE = 86400
@@ -49,7 +49,6 @@ class AdminAuth(AuthenticationBackend):
         timestamp = int(time.time())
         credentials_hash = AdminAuth._get_credentials_hash()
 
-        # Create message to sign
         message = f"{credentials_hash}:{timestamp}"
 
         # Sign with HMAC-SHA256
@@ -79,17 +78,14 @@ class AdminAuth(AuthenticationBackend):
             credentials_hash, timestamp_str, signature = parts
             timestamp = int(timestamp_str)
 
-            # Check expiry
             if time.time() - timestamp > TOKEN_MAX_AGE:
                 return False
 
-            # Verify credentials hash matches current credentials
             # (invalidates token if password changed)
             expected_hash = AdminAuth._get_credentials_hash()
             if not hmac.compare_digest(credentials_hash, expected_hash):
                 return False
 
-            # Verify signature
             message = f"{credentials_hash}:{timestamp_str}"
             expected_signature = hmac.new(
                 secret_key.encode(), message.encode(), hashlib.sha256
@@ -116,7 +112,6 @@ class AdminAuth(AuthenticationBackend):
         username = form.get("username")
         password = form.get("password")
 
-        # Validate credentials using constant-time comparison
         username_valid = hmac.compare_digest(
             str(username or ""), settings.ADMIN_USERNAME
         )
@@ -125,7 +120,6 @@ class AdminAuth(AuthenticationBackend):
         )
 
         if username_valid and password_valid:
-            # Generate signed token
             token = self._create_token(settings.SESSION_SECRET_KEY)
             request.session.update({"admin_token": token})
             return True
@@ -163,7 +157,6 @@ class AdminAuth(AuthenticationBackend):
         token = request.session.get("admin_token")
 
         if not token or not self._validate_token(token, settings.SESSION_SECRET_KEY):
-            # Clear invalid session
             request.session.clear()
             return RedirectResponse(request.url_for("admin:login"), status_code=302)
 
@@ -172,3 +165,4 @@ class AdminAuth(AuthenticationBackend):
 
 # Singleton instance
 admin_auth = AdminAuth(secret_key=settings.SESSION_SECRET_KEY)
+

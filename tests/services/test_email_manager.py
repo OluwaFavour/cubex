@@ -1,7 +1,6 @@
 """
 Test suite for EmailManagerService.
 
-This module contains comprehensive tests for the EmailManagerService including:
 - OTP email sending (verification, password reset)
 - Welcome email sending
 - Password reset confirmation email
@@ -12,7 +11,7 @@ Run all tests:
     pytest app/tests/services/test_email_manager.py -v
 
 Run with coverage:
-    pytest app/tests/services/test_email_manager.py --cov=app.shared.services.email_manager --cov-report=term-missing -v
+    pytest app/tests/services/test_email_manager.py --cov=app.core.services.email_manager --cov-report=term-missing -v
 """
 
 from datetime import datetime
@@ -20,31 +19,28 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.shared.enums import OTPPurpose
+from app.core.enums import OTPPurpose
 
 
 class TestEmailManagerServiceInit:
-    """Test suite for EmailManagerService initialization."""
 
     @pytest.fixture(autouse=True)
     def reset_service(self):
         """Reset EmailManagerService state after each test."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
         yield
         EmailManagerService._initialized = False
 
     def test_init_sets_initialized_flag(self):
-        """Test that init sets the initialized flag."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
         EmailManagerService.init()
 
         assert EmailManagerService._initialized is True
 
     def test_init_is_idempotent(self):
-        """Test that init can be called multiple times safely."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
         EmailManagerService.init()
         EmailManagerService.init()
@@ -52,8 +48,7 @@ class TestEmailManagerServiceInit:
         assert EmailManagerService._initialized is True
 
     def test_is_initialized_returns_correct_state(self):
-        """Test that is_initialized returns correct state."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
         assert EmailManagerService.is_initialized() is False
 
@@ -63,12 +58,11 @@ class TestEmailManagerServiceInit:
 
 
 class TestSendOtpEmail:
-    """Test suite for send_otp_email method."""
 
     @pytest.fixture(autouse=True)
     def reset_service(self):
         """Reset EmailManagerService state after each test."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
         EmailManagerService._initialized = True
         yield
@@ -76,13 +70,10 @@ class TestSendOtpEmail:
 
     @pytest.mark.asyncio
     async def test_send_otp_email_for_verification(self):
-        """Test sending OTP email for email verification."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             # Setup mocks
             mock_renderer.render_template = AsyncMock(
@@ -103,7 +94,6 @@ class TestSendOtpEmail:
             assert mock_renderer.render_template.call_count == 2
             mock_brevo.send_transactional_email.assert_called_once()
 
-            # Verify template was called with correct context
             html_call = mock_renderer.render_template.call_args_list[0]
             assert html_call[0][0] == "otp_email.html"
             assert html_call[1]["context"]["otp_code"] == "123456"
@@ -112,13 +102,10 @@ class TestSendOtpEmail:
 
     @pytest.mark.asyncio
     async def test_send_otp_email_for_password_reset(self):
-        """Test sending OTP email for password reset."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Reset OTP</html>", "Reset OTP"]
@@ -136,19 +123,15 @@ class TestSendOtpEmail:
 
             assert result is True
 
-            # Verify purpose is correctly passed
             html_call = mock_renderer.render_template.call_args_list[0]
             assert html_call[1]["context"]["purpose"] == "password reset"
 
     @pytest.mark.asyncio
     async def test_send_otp_email_default_user_name(self):
-        """Test sending OTP email with default user name."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>OTP</html>", "OTP"]
@@ -170,15 +153,12 @@ class TestSendOtpEmail:
 
     @pytest.mark.asyncio
     async def test_send_otp_email_includes_app_name(self):
-        """Test that OTP email includes app name from settings."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo, patch(
-            "app.shared.services.email_manager.settings"
+            "app.core.services.email_manager.settings"
         ) as mock_settings:
             mock_settings.APP_NAME = "TestApp"
             mock_settings.OTP_EXPIRY_MINUTES = 10
@@ -201,13 +181,10 @@ class TestSendOtpEmail:
 
     @pytest.mark.asyncio
     async def test_send_otp_email_includes_year(self):
-        """Test that OTP email includes current year."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>OTP</html>", "OTP"]
@@ -227,15 +204,12 @@ class TestSendOtpEmail:
 
     @pytest.mark.asyncio
     async def test_send_otp_email_correct_subject_for_verification(self):
-        """Test that verification email has correct subject."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo, patch(
-            "app.shared.services.email_manager.settings"
+            "app.core.services.email_manager.settings"
         ) as mock_settings:
             mock_settings.APP_NAME = "MyApp"
             mock_settings.OTP_EXPIRY_MINUTES = 10
@@ -257,15 +231,12 @@ class TestSendOtpEmail:
 
     @pytest.mark.asyncio
     async def test_send_otp_email_correct_subject_for_password_reset(self):
-        """Test that password reset email has correct subject."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo, patch(
-            "app.shared.services.email_manager.settings"
+            "app.core.services.email_manager.settings"
         ) as mock_settings:
             mock_settings.APP_NAME = "MyApp"
             mock_settings.OTP_EXPIRY_MINUTES = 10
@@ -287,13 +258,10 @@ class TestSendOtpEmail:
 
     @pytest.mark.asyncio
     async def test_send_otp_email_handles_brevo_failure(self):
-        """Test handling of Brevo service failure."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>OTP</html>", "OTP"]
@@ -312,10 +280,9 @@ class TestSendOtpEmail:
 
     @pytest.mark.asyncio
     async def test_send_otp_email_handles_template_failure(self):
-        """Test handling of template rendering failure."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.shared.services.email_manager.Renderer") as mock_renderer:
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer:
             mock_renderer.render_template = AsyncMock(
                 side_effect=Exception("Template not found")
             )
@@ -330,12 +297,11 @@ class TestSendOtpEmail:
 
 
 class TestSendWelcomeEmail:
-    """Test suite for send_welcome_email method."""
 
     @pytest.fixture(autouse=True)
     def reset_service(self):
         """Reset EmailManagerService state after each test."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
         EmailManagerService._initialized = True
         yield
@@ -343,15 +309,12 @@ class TestSendWelcomeEmail:
 
     @pytest.mark.asyncio
     async def test_send_welcome_email_success(self):
-        """Test successful welcome email sending."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo, patch(
-            "app.shared.services.email_manager.settings"
+            "app.core.services.email_manager.settings"
         ) as mock_settings:
             mock_settings.APP_NAME = "CueBX"
             mock_renderer.render_template = AsyncMock(
@@ -369,25 +332,20 @@ class TestSendWelcomeEmail:
             assert result is True
             assert mock_renderer.render_template.call_count == 2
 
-            # Verify HTML template call
             html_call = mock_renderer.render_template.call_args_list[0]
             assert html_call[0][0] == "welcome_email.html"
             assert html_call[1]["context"]["user_name"] == "New User"
             assert html_call[1]["context"]["app_name"] == "CueBX"
 
-            # Verify Brevo was called with correct subject
             brevo_call = mock_brevo.send_transactional_email.call_args
             assert brevo_call[1]["subject"] == "Welcome to CueBX!"
 
     @pytest.mark.asyncio
     async def test_send_welcome_email_default_user_name(self):
-        """Test welcome email with default user name."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Welcome</html>", "Welcome"]
@@ -407,13 +365,10 @@ class TestSendWelcomeEmail:
 
     @pytest.mark.asyncio
     async def test_send_welcome_email_handles_failure(self):
-        """Test handling of welcome email failure."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Welcome</html>", "Welcome"]
@@ -431,12 +386,11 @@ class TestSendWelcomeEmail:
 
 
 class TestSendPasswordResetConfirmationEmail:
-    """Test suite for send_password_reset_confirmation_email method."""
 
     @pytest.fixture(autouse=True)
     def reset_service(self):
         """Reset EmailManagerService state after each test."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
         EmailManagerService._initialized = True
         yield
@@ -444,15 +398,12 @@ class TestSendPasswordResetConfirmationEmail:
 
     @pytest.mark.asyncio
     async def test_send_password_reset_confirmation_success(self):
-        """Test successful password reset confirmation email."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo, patch(
-            "app.shared.services.email_manager.settings"
+            "app.core.services.email_manager.settings"
         ) as mock_settings:
             mock_settings.APP_NAME = "CueBX"
             mock_renderer.render_template = AsyncMock(
@@ -469,24 +420,19 @@ class TestSendPasswordResetConfirmationEmail:
 
             assert result is True
 
-            # Verify template was called correctly
             html_call = mock_renderer.render_template.call_args_list[0]
             assert html_call[0][0] == "password_reset_confirmation_email.html"
             assert html_call[1]["context"]["user_name"] == "Existing User"
 
-            # Verify subject
             brevo_call = mock_brevo.send_transactional_email.call_args
             assert brevo_call[1]["subject"] == "Password Changed Successfully - CueBX"
 
     @pytest.mark.asyncio
     async def test_send_password_reset_confirmation_handles_failure(self):
-        """Test handling of password reset confirmation email failure."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Changed</html>", "Changed"]
@@ -504,12 +450,11 @@ class TestSendPasswordResetConfirmationEmail:
 
 
 class TestSendGenericEmail:
-    """Test suite for send_email generic method."""
 
     @pytest.fixture(autouse=True)
     def reset_service(self):
         """Reset EmailManagerService state after each test."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
         EmailManagerService._initialized = True
         yield
@@ -517,13 +462,10 @@ class TestSendGenericEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_with_custom_template(self):
-        """Test sending email with custom template."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Custom</html>", "Custom"]
@@ -542,7 +484,6 @@ class TestSendGenericEmail:
 
             assert result is True
 
-            # Verify custom template was used
             html_call = mock_renderer.render_template.call_args_list[0]
             assert html_call[0][0] == "custom_email.html"
             assert html_call[1]["context"]["custom_var"] == "custom_value"
@@ -552,13 +493,10 @@ class TestSendGenericEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_passes_recipient_correctly(self):
-        """Test that email is sent to correct recipient."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Test</html>", "Test"]
@@ -582,13 +520,10 @@ class TestSendGenericEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_with_recipient_name(self):
-        """Test sending email with recipient name."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Test</html>", "Test"]
@@ -612,13 +547,10 @@ class TestSendGenericEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_html_only(self):
-        """Test sending email with HTML content only."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo:
             mock_renderer.render_template = AsyncMock(
                 return_value="<html>HTML Only</html>"
@@ -639,15 +571,12 @@ class TestSendGenericEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_logs_on_success(self):
-        """Test that successful email sending is logged."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo, patch(
-            "app.shared.services.email_manager.email_manager_logger"
+            "app.core.services.email_manager.email_manager_logger"
         ) as mock_logger:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Test</html>", "Test"]
@@ -668,15 +597,12 @@ class TestSendGenericEmail:
 
     @pytest.mark.asyncio
     async def test_send_email_logs_on_failure(self):
-        """Test that failed email sending is logged as error."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch(
-            "app.shared.services.email_manager.Renderer"
-        ) as mock_renderer, patch(
-            "app.shared.services.email_manager.BrevoService"
+        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
+            "app.core.services.email_manager.BrevoService"
         ) as mock_brevo, patch(
-            "app.shared.services.email_manager.email_manager_logger"
+            "app.core.services.email_manager.email_manager_logger"
         ) as mock_logger:
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Test</html>", "Test"]
@@ -697,11 +623,9 @@ class TestSendGenericEmail:
 
 
 class TestPurposeMapping:
-    """Test suite for OTP purpose to display text mapping."""
 
     def test_get_purpose_display_text_email_verification(self):
-        """Test display text for email verification purpose."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
         text = EmailManagerService._get_purpose_display_text(
             OTPPurpose.EMAIL_VERIFICATION
@@ -709,17 +633,15 @@ class TestPurposeMapping:
         assert text == "email verification"
 
     def test_get_purpose_display_text_password_reset(self):
-        """Test display text for password reset purpose."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
         text = EmailManagerService._get_purpose_display_text(OTPPurpose.PASSWORD_RESET)
         assert text == "password reset"
 
     def test_get_subject_for_purpose_email_verification(self):
-        """Test email subject for email verification."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.shared.services.email_manager.settings") as mock_settings:
+        with patch("app.core.services.email_manager.settings") as mock_settings:
             mock_settings.APP_NAME = "TestApp"
 
             subject = EmailManagerService._get_subject_for_purpose(
@@ -728,10 +650,9 @@ class TestPurposeMapping:
             assert subject == "Verify Your Email - TestApp"
 
     def test_get_subject_for_purpose_password_reset(self):
-        """Test email subject for password reset."""
-        from app.shared.services.email_manager import EmailManagerService
+        from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.shared.services.email_manager.settings") as mock_settings:
+        with patch("app.core.services.email_manager.settings") as mock_settings:
             mock_settings.APP_NAME = "TestApp"
 
             subject = EmailManagerService._get_subject_for_purpose(
@@ -741,11 +662,10 @@ class TestPurposeMapping:
 
 
 class TestEmailManagerAllExports:
-    """Test suite for module exports."""
 
     def test_all_exports(self):
-        """Test that __all__ contains expected exports."""
-        from app.shared.services import email_manager
+        from app.core.services import email_manager
 
         assert hasattr(email_manager, "__all__")
         assert "EmailManagerService" in email_manager.__all__
+

@@ -1,8 +1,6 @@
 """
 CRUD operations for Workspace models.
 
-This module provides database operations for managing workspaces,
-members, and invitations.
 """
 
 import re
@@ -16,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.shared.db.crud.base import BaseDB
+from app.core.db.crud.base import BaseDB
 from app.apps.cubex_api.db.models.workspace import (
     APIKey,
     UsageLog,
@@ -24,15 +22,15 @@ from app.apps.cubex_api.db.models.workspace import (
     WorkspaceMember,
     WorkspaceInvitation,
 )
-from app.shared.db.models.subscription_context import APISubscriptionContext
-from app.shared.enums import (
+from app.core.db.models.subscription_context import APISubscriptionContext
+from app.core.enums import (
     InvitationStatus,
     MemberRole,
     MemberStatus,
     UsageLogStatus,
     WorkspaceStatus,
 )
-from app.shared.exceptions.types import DatabaseException
+from app.core.exceptions.types import DatabaseException
 
 
 def slugify(text: str) -> str:
@@ -45,7 +43,6 @@ def slugify(text: str) -> str:
     Returns:
         URL-friendly slug (lowercase, alphanumeric + hyphens).
     """
-    # Convert to lowercase
     slug = text.lower()
     # Replace spaces and underscores with hyphens
     slug = re.sub(r"[\s_]+", "-", slug)
@@ -1032,3 +1029,4 @@ __all__ = [
     "usage_log_db",
     "slugify",
 ]
+

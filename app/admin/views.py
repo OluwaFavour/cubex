@@ -3,7 +3,7 @@ SQLAdmin model views for Cubex.
 
 Defines admin views for managing application models:
 - PlanAdmin: Full CRUD for subscription plans
-- EndpointCostConfigAdmin: Manage API endpoint pricing
+- FeatureCostConfigAdmin: Manage feature pricing
 - PlanPricingRuleAdmin: Manage plan multipliers and rate limits
 - UserAdmin: Read-only user view
 - WorkspaceAdmin: Read-only workspace view
@@ -20,13 +20,13 @@ from sqlalchemy.sql.expression import Select
 from starlette.requests import Request
 import wtforms
 
-from app.apps.cubex_api.db.crud.quota import plan_pricing_rule_db
-from app.apps.cubex_api.db.models.quota import EndpointCostConfig, PlanPricingRule
+from app.core.db.crud.quota import plan_pricing_rule_db
+from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule
 from app.apps.cubex_api.db.models.workspace import UsageLog, Workspace, WorkspaceMember
-from app.shared.db.models.plan import Plan
-from app.shared.db.models.subscription import Subscription
-from app.shared.db.models.user import User
-from app.shared.enums import (
+from app.core.db.models.plan import Plan
+from app.core.db.models.subscription import Subscription
+from app.core.db.models.user import User
+from app.core.enums import (
     AccessStatus,
     FailureType,
     MemberRole,
@@ -37,11 +37,6 @@ from app.shared.enums import (
     UsageLogStatus,
     WorkspaceStatus,
 )
-
-
-# ============================================================================
-# Plan Management
-# ============================================================================
 
 
 class PlanAdmin(ModelView, model=Plan):
@@ -216,59 +211,50 @@ class PlanAdmin(ModelView, model=Plan):
     }
 
 
-# ============================================================================
-# Quota Configuration
-# ============================================================================
+class FeatureCostConfigAdmin(ModelView, model=FeatureCostConfig):
+    """Admin view for feature pricing configuration."""
 
-
-class EndpointCostConfigAdmin(ModelView, model=EndpointCostConfig):
-    """Admin view for API endpoint pricing configuration."""
-
-    name = "Endpoint Cost"
-    name_plural = "Endpoint Costs"
+    name = "Feature Cost"
+    name_plural = "Feature Costs"
     icon = "fa-solid fa-server"
 
     column_list = [
-        EndpointCostConfig.id,
-        EndpointCostConfig.endpoint,
-        EndpointCostConfig.internal_cost_credits,
-        EndpointCostConfig.created_at,
-        EndpointCostConfig.updated_at,
+        FeatureCostConfig.id,
+        FeatureCostConfig.feature_key,
+        FeatureCostConfig.internal_cost_credits,
+        FeatureCostConfig.created_at,
+        FeatureCostConfig.updated_at,
     ]
 
-    column_searchable_list = ["endpoint"]
+    column_searchable_list = ["feature_key"]
     column_sortable_list = [
-        EndpointCostConfig.endpoint,
-        EndpointCostConfig.internal_cost_credits,
-        EndpointCostConfig.created_at,
+        FeatureCostConfig.feature_key,
+        FeatureCostConfig.internal_cost_credits,
+        FeatureCostConfig.created_at,
     ]
-    column_default_sort = [(EndpointCostConfig.endpoint, False)]
+    column_default_sort = [(FeatureCostConfig.feature_key, False)]
 
     form_columns = [
-        EndpointCostConfig.endpoint,
-        EndpointCostConfig.internal_cost_credits,
+        FeatureCostConfig.feature_key,
+        FeatureCostConfig.internal_cost_credits,
     ]
 
     column_labels = {
-        EndpointCostConfig.id: "ID",
-        EndpointCostConfig.endpoint: "Endpoint Path",
-        EndpointCostConfig.internal_cost_credits: "Cost (Credits)",
-        EndpointCostConfig.created_at: "Created",
-        EndpointCostConfig.updated_at: "Updated",
+        FeatureCostConfig.id: "ID",
+        FeatureCostConfig.feature_key: "Feature Key",
+        FeatureCostConfig.internal_cost_credits: "Cost (Credits)",
+        FeatureCostConfig.created_at: "Created",
+        FeatureCostConfig.updated_at: "Updated",
     }
 
     column_formatters = {
-        EndpointCostConfig.internal_cost_credits: lambda m, a: f"{m.internal_cost_credits:.4f}",
+        FeatureCostConfig.internal_cost_credits: lambda m, a: f"{m.internal_cost_credits:.4f}",
     }
 
     form_args = {
-        "endpoint": {
-            "description": "API endpoint path (e.g., /v1/extract-cues/resume). "
-            "Will be normalized to lowercase.",
-        },
+        "feature_key": {"description": "Feature key (e.g., api.resume)."},
         "internal_cost_credits": {
-            "description": "Internal credit cost for calling this endpoint. "
-            "Default is 1.0 credit per call.",
+            "description": "Internal credit cost for calling this endpoint.",
         },
     }
 
@@ -292,6 +278,7 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
         PlanPricingRule.multiplier,
         PlanPricingRule.credits_allocation,
         PlanPricingRule.rate_limit_per_minute,
+        PlanPricingRule.rate_limit_per_day,
         PlanPricingRule.created_at,
     ]
 
@@ -299,6 +286,7 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
         PlanPricingRule.multiplier,
         PlanPricingRule.credits_allocation,
         PlanPricingRule.rate_limit_per_minute,
+        PlanPricingRule.rate_limit_per_day,
         PlanPricingRule.created_at,
     ]
 
@@ -307,6 +295,7 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
         PlanPricingRule.multiplier,
         PlanPricingRule.credits_allocation,
         PlanPricingRule.rate_limit_per_minute,
+        PlanPricingRule.rate_limit_per_day,
     ]
 
     column_labels = {
@@ -315,6 +304,7 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
         PlanPricingRule.multiplier: "Price Multiplier",
         PlanPricingRule.credits_allocation: "Credits Allocation",
         PlanPricingRule.rate_limit_per_minute: "Rate Limit/min",
+        PlanPricingRule.rate_limit_per_day: "Rate Limit/day",
         PlanPricingRule.created_at: "Created",
     }
 
@@ -328,10 +318,13 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
             "description": "Pricing multiplier (1.0 = standard rate, 0.8 = 20% discount)",
         },
         "credits_allocation": {
-            "description": "Total credits allocated to workspaces on this plan per billing period",
+            "description": "Total credits allocated per billing period",
         },
         "rate_limit_per_minute": {
-            "description": "Maximum API requests allowed per minute",
+            "description": "Maximum requests per minute (leave empty for unlimited)",
+        },
+        "rate_limit_per_day": {
+            "description": "Maximum requests per day (leave empty for unlimited)",
         },
     }
 
@@ -343,11 +336,6 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
 
     def details_query(self, request):
         return super().details_query(request).options(plan_pricing_rule_db.plan_loader)
-
-
-# ============================================================================
-# User Management (Read-Only)
-# ============================================================================
 
 
 class UserAdmin(ModelView, model=User):
@@ -398,11 +386,6 @@ class UserAdmin(ModelView, model=User):
     can_delete = False
     can_view_details = True
     can_export = True
-
-
-# ============================================================================
-# Workspace Management (Read-Only)
-# ============================================================================
 
 
 class WorkspaceAdmin(ModelView, model=Workspace):
@@ -502,11 +485,6 @@ class WorkspaceMemberAdmin(ModelView, model=WorkspaceMember):
     can_export = True
 
 
-# ============================================================================
-# Subscription Management
-# ============================================================================
-
-
 class SubscriptionAdmin(ModelView, model=Subscription):
     """Admin view for subscriptions."""
 
@@ -580,11 +558,6 @@ class SubscriptionAdmin(ModelView, model=Subscription):
     can_export = True
 
 
-# ============================================================================
-# Custom Filters
-# ============================================================================
-
-
 class DateRangeFilter:
     """Custom filter for date range filtering on datetime columns."""
 
@@ -648,11 +621,6 @@ class DateRangeFilter:
             )
 
         return query
-
-
-# ============================================================================
-# Usage Log Management (Read-Only)
-# ============================================================================
 
 
 class UsageLogAdmin(ModelView, model=UsageLog):
@@ -796,7 +764,7 @@ class UsageLogAdmin(ModelView, model=UsageLog):
 # Export all admin views
 __all__ = [
     "PlanAdmin",
-    "EndpointCostConfigAdmin",
+    "FeatureCostConfigAdmin",
     "PlanPricingRuleAdmin",
     "UserAdmin",
     "WorkspaceAdmin",

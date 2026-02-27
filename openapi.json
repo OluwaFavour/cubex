@@ -2061,20 +2061,14 @@
                     "Webhooks"
                 ],
                 "summary": "Handle Stripe webhook events",
-                "description": "Receives and processes Stripe webhook events with secure signature verification.\n\nThis endpoint is called by Stripe to notify the application of payment events.\nEvents are verified using webhook signature and then published to message queues\nfor asynchronous processing.\n\n**Handled Event Types:**\n- `checkout.session.completed` - New subscription checkout completed\n- `customer.subscription.created` - Subscription created\n- `customer.subscription.updated` - Subscription modified (plan change, renewal)\n- `customer.subscription.deleted` - Subscription cancelled\n- `invoice.paid` - Invoice successfully paid\n- `invoice.payment_failed` - Invoice payment failed\n\n**Processing Flow:**\n1. Verify Stripe signature header\n2. Parse and validate event payload\n3. Publish to appropriate message queue\n4. Return 200 OK immediately (async processing)\n\n**Note:** This endpoint should only be called by Stripe's webhook system.\nConfigure the webhook URL in your Stripe Dashboard.",
+                "description": "Receives and processes Stripe webhook events with secure signature verification.\n\nThis endpoint is called by Stripe to notify the application of payment events.\nEvents are verified using webhook signature and then published to message queues\nfor asynchronous processing.\n\n**Handled Event Types:**\n- `checkout.session.completed` - New subscription checkout completed\n- `customer.subscription.created` - Subscription created\n- `customer.subscription.updated` - Subscription modified (plan change, renewal)\n- `customer.subscription.deleted` - Subscription cancelled\n- `customer.subscription.paused` - Subscription paused\n- `customer.subscription.resumed` - Subscription resumed\n- `invoice.paid` - Invoice successfully paid\n- `invoice.payment_failed` - Invoice payment failed\n- `invoice.payment_action_required` - Payment requires customer action (SCA)\n\n**Processing Flow:**\n1. Verify Stripe signature header\n2. Parse and validate event payload\n3. Publish to appropriate message queue\n4. Return 200 OK immediately (async processing)\n\n**Note:** This endpoint should only be called by Stripe's webhook system.\nConfigure the webhook URL in your Stripe Dashboard.",
                 "operationId": "handle_stripe_webhook_webhooks_stripe_post",
                 "responses": {
                     "200": {
                         "description": "Webhook received and processed",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    },
-                                    "type": "object",
-                                    "title": "Response Handle Stripe Webhook Webhooks Stripe Post"
-                                },
+                                "schema": {},
                                 "examples": {
                                     "received": {
                                         "summary": "Event received and queued",
@@ -2086,12 +2080,6 @@
                                         "summary": "Unhandled event type",
                                         "value": {
                                             "status": "ignored"
-                                        }
-                                    },
-                                    "publish_failed": {
-                                        "summary": "Failed to publish to queue",
-                                        "value": {
-                                            "status": "publish_failed"
                                         }
                                     }
                                 }
@@ -2146,11 +2134,11 @@
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal error - event could not be queued; Stripe will retry",
                         "content": {
                             "application/json": {
                                 "example": {
-                                    "detail": "Some internal server error message"
+                                    "status": "publish_failed"
                                 }
                             }
                         }
@@ -2690,7 +2678,7 @@
                     "API - Workspaces"
                 ],
                 "summary": "List workspace members",
-                "description": "## List Workspace Members\n\nRetrieve all members of a workspace with optional status filtering.\n\n### Authorization\n\n- User must be a **member** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n\n### Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `status` | string | \u274c | Filter by status: `enabled` or `disabled` |\n\n### Response\n\nArray of member objects:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Member record ID |\n| `user_id` | UUID | User's ID |\n| `role` | string | `owner`, `admin`, or `member` |\n| `status` | string | `enabled` or `disabled` |\n| `joined_at` | datetime | When member joined |\n| `user_email` | string | Member's email |\n| `user_name` | string | Member's full name |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `404 Not Found` | Workspace not found or access denied |\n\n### Notes\n\n- All members can view the member list\n- Disabled members cannot access the workspace",
+                "description": "## List Workspace Members\n\nRetrieve all members of a workspace with optional status filtering.\n\n### Authorization\n\n- User must be a **member** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace identifier |\n\n### Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `status` | string | \u274c | Filter by status: `enabled` or `disabled` |\n\n### Response\n\nArray of member objects:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Member record ID |\n| `user_id` | UUID | User's ID |\n| `role` | string | `owner`, `admin`, or `member` |\n| `status` | string | `enabled` or `disabled` |\n| `joined_at` | datetime | When member joined |\n| `user_email` | string | Member's email |\n| `user_name` | string | Member's full name |\n| `user_avatar_url` | string | URL to member's avatar image |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `404 Not Found` | Workspace not found or access denied |\n\n### Notes\n\n- All members can view the member list\n- Disabled members cannot access the workspace",
                 "operationId": "list_members_api_workspaces__workspace_id__members_get",
                 "security": [
                     {
@@ -3959,7 +3947,7 @@
                     "API - Workspaces"
                 ],
                 "summary": "Accept invitation",
-                "description": "## Accept Workspace Invitation\n\nAccept an invitation to join a workspace using the invitation token.\n\n### Authorization\n\n- User must be authenticated\n- Token must match the user's email\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `token` | string | \u2705 | Invitation token from the invitation URL |\n\n### Response\n\nReturns the created member object:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Member record ID |\n| `user_id` | UUID | Your user ID |\n| `role` | string | Assigned role |\n| `status` | string | `enabled` |\n| `joined_at` | datetime | Current timestamp |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `402 Payment Required` | No available seats |\n| `404 Not Found` | Invalid or expired token |\n| `409 Conflict` | Already a member of this workspace |\n\n### Notes\n\n- Token is typically received via email or shared link\n- Token expires after 7 days\n- Email must match the invitation email\n- If seats are full, the invitation cannot be accepted",
+                "description": "## Accept Workspace Invitation\n\nAccept an invitation to join a workspace using the invitation token.\n\n### Authorization\n\n- User must be authenticated\n- Token must match the user's email\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `token` | string | \u2705 | Invitation token from the invitation URL |\n\n### Response\n\nReturns the created member object:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `id` | UUID | Member record ID |\n| `user_id` | UUID | Your user ID |\n| `role` | string | Assigned role |\n| `status` | string | `enabled` |\n| `joined_at` | datetime | Current timestamp |\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `402 Payment Required` | No available seats |\n| `404 Not Found` | Invalid or expired token |\n| `409 Conflict` | Already a member of this workspace |\n\n### Notes\n\n- Token is typically received via email or core link\n- Token expires after 7 days\n- Email must match the invitation email\n- If seats are full, the invitation cannot be accepted",
                 "operationId": "accept_invitation_api_workspaces_invitations_accept_post",
                 "requestBody": {
                     "content": {
@@ -5101,11 +5089,11 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid seat count",
                         "content": {
                             "application/json": {
                                 "example": {
-                                    "detail": "Bad request error message"
+                                    "detail": "Current seat count (5) exceeds target plan's maximum (3). Reduce seats before upgrading."
                                 }
                             }
                         }
@@ -5476,9 +5464,9 @@
                 "tags": [
                     "API - Subscriptions"
                 ],
-                "summary": "Preview plan upgrade",
-                "description": "## Preview Plan Upgrade Cost\n\nPreview the cost of upgrading to a different plan before committing.\nReturns detailed proration information showing charges and credits.\n\n### Authorization\n\n- User must be an **admin** or **owner** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace to preview upgrade for |\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `new_plan_id` | UUID | \u2705 | The plan to upgrade/downgrade to |\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `current_plan_name` | string | Name of current plan |\n| `new_plan_name` | string | Name of new plan |\n| `proration_date` | datetime | When proration is calculated |\n| `amount_due` | integer | Amount to charge (in cents) |\n| `credit` | integer | Credit from unused time (in cents) |\n| `currency` | string | Currency code (e.g., \"usd\") |\n\n### Proration Calculation\n\nThe preview shows:\n- **Credit**: Unused time on current plan\n- **Charge**: Cost of new plan for remaining period\n- **Net Amount**: What will be charged at upgrade\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `403 Forbidden` | User is not an admin of the workspace |\n| `404 Not Found` | No active subscription or plan not found |\n\n### Notes\n\n- This is a **preview only** - no changes are made\n- Use the `/upgrade` endpoint to execute the upgrade\n- Amounts are in the smallest currency unit (cents for USD)",
-                "operationId": "preview_upgrade_api_subscriptions_workspaces__workspace_id__preview_upgrade_post",
+                "summary": "Preview subscription change",
+                "description": "## Preview Subscription Change Cost\n\nPreview the cost of changing subscription plan or seat count before committing.\nReturns detailed proration information showing charges and credits.\n\n### Authorization\n\n- User must be an **admin** or **owner** of the workspace\n\n### Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `workspace_id` | UUID | The workspace to preview upgrade for |\n\n### Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `new_plan_id` | UUID | \u274c | The plan to upgrade/downgrade to |\n| `new_seat_count` | integer | \u274c | Optional new seat count (for upgrades/downgrades) |\n\nAt least one of `new_plan_id` or `new_seat_count` must be provided.\n\n### Response\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `current_plan_name` | string | Name of current plan |\n| `new_plan_name` | string | Name of new plan |\n| `current_seat_count` | integer | Current number of seats |\n| `new_seat_count` | integer | New number of seats (if changing) |\n| `proration_date` | datetime | When proration is calculated |\n| `amount_due` | integer | Amount to charge (in cents) |\n| `credit` | integer | Credit from unused time (in cents) |\n| `currency` | string | Currency code (e.g., \"usd\") |\n\n### Proration Calculation\n\nThe preview shows:\n- **Credit**: Unused time on current plan\n- **Charge**: Cost of new plan for remaining period\n- **Net Amount**: What will be charged at upgrade\n\n### Error Responses\n\n| Status | Reason |\n|--------|--------|\n| `403 Forbidden` | User is not an admin of the workspace |\n| `404 Not Found` | No active subscription or plan not found |\n\n### Notes\n\n- This is a **preview only** - no changes are made\n- Use the `/upgrade` endpoint to execute the upgrade or `/seats` endpoint to change seats\n- Amounts are in the main currency unit (dollars for USD)",
+                "operationId": "preview_subscription_change_api_subscriptions_workspaces__workspace_id__preview_upgrade_post",
                 "security": [
                     {
                         "HTTPBearer": []
@@ -5518,11 +5506,11 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid seat count",
                         "content": {
                             "application/json": {
                                 "example": {
-                                    "detail": "Bad request error message"
+                                    "detail": "Current seat count (5) exceeds target plan's maximum (3). Reduce seats before upgrading."
                                 }
                             }
                         }
@@ -5657,11 +5645,11 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid seat count",
                         "content": {
                             "application/json": {
                                 "example": {
-                                    "detail": "Bad request error message"
+                                    "detail": "Current seat count (5) exceeds target plan's maximum (3). Reduce seats before upgrading."
                                 }
                             }
                         }
@@ -5864,11 +5852,10 @@
         "/api/internal/usage/validate": {
             "post": {
                 "tags": [
-                    "API - Internal API",
-                    "Internal API"
+                    "API - Internal API"
                 ],
                 "summary": "Validate API key and log usage",
-                "description": "Validate an API key and log usage for quota tracking.\n    \n    This endpoint is called by the external developer API to:\n    1. Validate the API key is valid, active, and not expired\n    2. Verify the API key belongs to the specified workspace (client_id)\n    3. Check workspace-level rate limits\n    4. Check workspace quota (credits used vs credits_allocation)\n    5. Create a PENDING usage log for quota tracking\n    6. Calculate and reserve credits for billing\n    7. Return access granted/denied with a usage_id, credits_reserved, and is_test_key\n    \n    **Key Types**:\n    | Type | Prefix | Behavior |\n    |------|--------|----------|\n    | Live | `cbx_live_` | Full quota enforcement, credits charged |\n    | Test | `cbx_test_` | Rate limits apply, zero credits, `is_test_key=true` |\n    \n    **Test Keys**: Test API keys (`cbx_test_` prefix) are designed for development\n    and testing. They bypass quota checks, always return `access: \"granted\"`, and\n    reserve zero credits. The response includes `is_test_key: true` to indicate\n    that the caller should return mocked/sample responses instead of real data.\n    Note: Rate limits still apply to test keys.\n    \n    **Rate Limiting**: Workspace-level rate limiting is enforced using a sliding\n    window of 60 seconds. The rate limit is configurable per plan (default: 20 req/min).\n    \n    **Rate Limit Response Headers** (Server B should forward these to developers):\n    | Header | Type | Description |\n    |--------|------|-------------|\n    | `X-RateLimit-Limit` | int | Maximum requests allowed per minute for this workspace |\n    | `X-RateLimit-Remaining` | int | Number of requests remaining in the current window |\n    | `X-RateLimit-Reset` | int | Unix timestamp (seconds) when the rate limit window resets |\n    | `Retry-After` | int | Seconds until rate limit resets (only included on 429 responses) |\n    \n    **Important**: Server B should copy these headers from this response to the response\n    it sends to developers. This allows developers to implement proper rate limit handling\n    (e.g., exponential backoff, request throttling) in their applications.\n    \n    **Note**: These headers are **not always present** (e.g., for idempotent requests or\n    early validation failures). Use `.get()` to safely access them and avoid KeyError:\n    ```python\n    rate_limit = response.headers.get(\"X-RateLimit-Limit\")\n    remaining = response.headers.get(\"X-RateLimit-Remaining\")\n    reset_at = response.headers.get(\"X-RateLimit-Reset\")\n    retry_after = response.headers.get(\"Retry-After\")  # Only on 429\n    ```\n    \n    **Idempotency**: Uses request_id + fingerprint (computed from endpoint,\n    method, payload_hash, usage_estimate) for true idempotency.\n    - Same request_id + same fingerprint = return existing access_status\n    - Same request_id + different fingerprint = create new record (different payload)\n    \n    The caller must then call /usage/commit to mark the usage as SUCCESS\n    or FAILED after the request completes. PENDING logs that are not\n    committed will be expired by a scheduled job.\n    \n    **Quota Enforcement**: The system checks if the workspace has sufficient\n    credits remaining in the current billing period. If quota is exceeded,\n    access is denied with HTTP 429. Test keys bypass quota checks entirely.\n    \n    **Usage Estimate Validation**: If `usage_estimate` is provided, at least\n    one field must be set (input_chars, max_output_tokens, or model). Fields\n    are validated with bounds: input_chars (0-10M), max_output_tokens (0-2M),\n    model (max 100 chars).\n    \n    **Security**: Requires X-Internal-API-Key header.\n    \n    **Status Codes**:\n    - 200: Access granted (quota available, test key, or idempotent request)\n    - 400: Invalid request format (bad client_id or API key format)\n    - 401: API key not found, expired, or revoked\n    - 403: API key does not belong to the specified workspace\n    - 429: Rate limit exceeded OR quota exceeded",
+                "description": "Validate an API key and log usage for quota tracking.\n    \n    This endpoint is called by the external developer API to:\n    1. Validate the API key is valid, active, and not expired\n    2. Verify the API key belongs to the specified workspace (client_id)\n    3. Check workspace-level rate limits\n    4. Check workspace quota (credits used vs credits_allocation)\n    5. Create a PENDING usage log for quota tracking\n    6. Calculate and reserve credits for billing\n    7. Return access granted/denied with a usage_id, credits_reserved, and is_test_key\n    \n    **Key Types**:\n    | Type | Prefix | Behavior |\n    |------|--------|----------|\n    | Live | `cbx_live_` | Full quota enforcement, credits charged |\n    | Test | `cbx_test_` | Rate limits apply, zero credits, `is_test_key=true` |\n    \n    **Test Keys**: Test API keys (`cbx_test_` prefix) are designed for development\n    and testing. They bypass quota checks, always return `access: \"granted\"`, and\n    reserve zero credits. The response includes `is_test_key: true` to indicate\n    that the caller should return mocked/sample responses instead of real data.\n    Note: Rate limits still apply to test keys.\n    \n    **Rate Limiting**: Workspace-level rate limiting is enforced using sliding\n    windows for both per-minute and per-day limits. Limits are configurable\n    per plan via PlanPricingRule.\n    \n    **Rate Limit Response Headers** (Server B should forward these to developers):\n    | Header | Type | Description |\n    |--------|------|-------------|\n    | `X-RateLimit-Limit-Minute` | int | Max requests per minute for this workspace |\n    | `X-RateLimit-Remaining-Minute` | int | Remaining in current minute window |\n    | `X-RateLimit-Reset-Minute` | int | Unix timestamp when minute window resets |\n    | `X-RateLimit-Limit-Day` | int | Max requests per day for this workspace |\n    | `X-RateLimit-Remaining-Day` | int | Remaining in current day window |\n    | `X-RateLimit-Reset-Day` | int | Unix timestamp when day window resets |\n    | `Retry-After` | int | Seconds until rate limit resets (only included on 429 responses) |\n    \n    **Important**: Server B should copy these headers from this response to the response\n    it sends to developers. This allows developers to implement proper rate limit handling\n    (e.g., exponential backoff, request throttling) in their applications.\n    \n    **Note**: These headers are **not always present** (e.g., for idempotent requests or\n    early validation failures). Use `.get()` to safely access them and avoid KeyError:\n    ```python\n    limit_min = response.headers.get(\"X-RateLimit-Limit-Minute\")\n    remaining_min = response.headers.get(\"X-RateLimit-Remaining-Minute\")\n    reset_min = response.headers.get(\"X-RateLimit-Reset-Minute\")\n    limit_day = response.headers.get(\"X-RateLimit-Limit-Day\")\n    remaining_day = response.headers.get(\"X-RateLimit-Remaining-Day\")\n    reset_day = response.headers.get(\"X-RateLimit-Reset-Day\")\n    retry_after = response.headers.get(\"Retry-After\")  # Only on 429\n    ```\n    \n    **Idempotency**: Uses request_id + fingerprint (computed from endpoint,\n    method, payload_hash, usage_estimate, and feature_key) for true idempotency.\n    - Same request_id + same fingerprint = return existing access_status\n    - Same request_id + different fingerprint = create new record (different payload)\n    \n    The caller must then call /usage/commit to mark the usage as SUCCESS\n    or FAILED after the request completes. PENDING logs that are not\n    committed will be expired by a scheduled job.\n    \n    **Quota Enforcement**: The system checks if the workspace has sufficient\n    credits remaining in the current billing period. If quota is exceeded,\n    access is denied with HTTP 429. Test keys bypass quota checks entirely.\n    \n    **Usage Estimate Validation**: If `usage_estimate` is provided, at least\n    one field must be set (input_chars, max_output_tokens, or model). Fields\n    are validated with bounds: input_chars (0-10M), max_output_tokens (0-2M),\n    model (max 100 chars).\n    \n    **Security**: Requires X-Internal-API-Key header.\n    \n    **Status Codes**:\n    - 200: Access granted (quota available, test key, or idempotent request)\n    - 400: Invalid request format (bad client_id or API key format)\n    - 401: API key not found, expired, or revoked\n    - 403: API key does not belong to the specified workspace\n    - 429: Rate limit exceeded (per-minute or per-day) OR quota exceeded",
                 "operationId": "validate_usage_api_internal_usage_validate_post",
                 "parameters": [
                     {
@@ -5904,7 +5891,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/UsageValidateResponse"
+                                    "$ref": "#/components/schemas/app__apps__cubex_api__schemas__workspace__UsageValidateResponse"
                                 },
                                 "examples": {
                                     "granted": {
@@ -6018,12 +6005,21 @@
                         "content": {
                             "application/json": {
                                 "examples": {
-                                    "rate_limit_exceeded": {
-                                        "summary": "Rate Limit Exceeded",
-                                        "description": "Response includes X-RateLimit-* and Retry-After headers",
+                                    "rate_limit_exceeded_minute": {
+                                        "summary": "Rate Limit Exceeded (Per-Minute)",
+                                        "description": "Response includes X-RateLimit-*-Minute, X-RateLimit-*-Day, and Retry-After headers",
                                         "value": {
                                             "access": "denied",
                                             "message": "Rate limit exceeded. Limit: 20 requests/minute. Try again in 45 seconds.",
+                                            "is_test_key": false
+                                        }
+                                    },
+                                    "rate_limit_exceeded_day": {
+                                        "summary": "Rate Limit Exceeded (Per-Day)",
+                                        "description": "Response includes X-RateLimit-*-Minute, X-RateLimit-*-Day, and Retry-After headers",
+                                        "value": {
+                                            "access": "denied",
+                                            "message": "Rate limit exceeded. Limit: 500 requests/day. Try again in 3600 seconds.",
                                             "is_test_key": false
                                         }
                                     },
@@ -6084,11 +6080,10 @@
         "/api/internal/usage/commit": {
             "post": {
                 "tags": [
-                    "API - Internal API",
-                    "Internal API"
+                    "API - Internal API"
                 ],
                 "summary": "Commit a usage log",
-                "description": "Commit a pending usage log entry (idempotent).\n    \n    This endpoint is called by the external developer API after a request\n    completes to mark the usage as SUCCESS (counts toward quota) or FAILED\n    (does not count toward quota).\n    \n    **Metrics (optional)**: When `success=True`, you can optionally provide\n    metrics about the request:\n    - `model_used`: Model identifier (e.g., \"gpt-4o\")\n    - `input_tokens`: Actual input tokens used (0-2,000,000)\n    - `output_tokens`: Actual output tokens generated (0-2,000,000)\n    - `latency_ms`: Request latency in milliseconds (0-3,600,000)\n    \n    **Failure Details (required when success=False)**: When `success=False`,\n    you MUST provide failure details:\n    - `failure_type`: Category of failure (internal_error, timeout, rate_limited,\n      invalid_response, upstream_error, client_error, validation_error)\n    - `reason`: Human-readable description of what went wrong (max 1000 chars)\n    \n    **Idempotent**: This operation is safe to retry. If the usage log\n    is already committed or doesn't exist, success is still returned.\n    \n    **Security**: Requires X-Internal-API-Key header.",
+                "description": "Commit a pending usage log entry (idempotent).\n    \n    This endpoint is called by the external developer API after a request\n    completes to mark the usage as SUCCESS (counts toward quota) or FAILED\n    (does not count toward quota).\n    \n    **Async Alternative (RabbitMQ)**: Instead of calling this endpoint\n    synchronously, the caller can publish the same `UsageCommitRequest`\n    payload as a JSON message to the **`usage_commits`** RabbitMQ queue.\n    The message will be processed asynchronously by the usage commit handler.\n    - Retry queue: `usage_commits_retry` (30 s TTL, max 3 retries)\n    - Dead-letter queue: `usage_commits_dead`\n    \n    **Metrics (optional)**: When `success=True`, you can optionally provide\n    metrics about the request:\n    - `model_used`: Model identifier (e.g., \"gpt-4o\")\n    - `input_tokens`: Actual input tokens used (0-2,000,000)\n    - `output_tokens`: Actual output tokens generated (0-2,000,000)\n    - `latency_ms`: Request latency in milliseconds (0-3,600,000)\n    \n    **Failure Details (required when success=False)**: When `success=False`,\n    you MUST provide failure details:\n    - `failure_type`: Category of failure (internal_error, timeout, rate_limited,\n      invalid_response, upstream_error, client_error, validation_error)\n    - `reason`: Human-readable description of what went wrong (max 1000 chars)\n    \n    **Idempotent**: This operation is safe to retry. If the usage log\n    is already committed or doesn't exist, success is still returned.\n    \n    **Security**: Requires X-Internal-API-Key header.",
                 "operationId": "commit_usage_api_internal_usage_commit_post",
                 "parameters": [
                     {
@@ -6113,7 +6108,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/UsageCommitRequest"
+                                "$ref": "#/components/schemas/app__apps__cubex_api__schemas__workspace__UsageCommitRequest"
                             }
                         }
                     }
@@ -7102,6 +7097,353 @@
                         "HTTPBearer": []
                     }
                 ]
+            }
+        },
+        "/career/internal/usage/validate": {
+            "post": {
+                "tags": [
+                    "Career - Internal API",
+                    "Career - Internal API"
+                ],
+                "summary": "Validate user and log usage",
+                "description": "Validate user quota and log usage for the career product.\n\n    This endpoint is called by the AI tool server to:\n    1. Authenticate the user via JWT (Bearer token)\n    2. Verify the user has an active career subscription\n    3. Check user-level rate limits (per-minute and per-day)\n    4. Check user quota (credits used vs credits_allocation)\n    5. Create a PENDING usage log for quota tracking\n    6. Calculate and reserve credits for billing\n    7. Return access granted/denied with a usage_id and credits_reserved\n\n    **Rate Limiting**: User-level rate limiting is enforced using sliding\n    windows for both per-minute and per-day limits. Limits are configurable\n    per plan via PlanPricingRule.\n\n    **Rate Limit Response Headers** (AI tool server should forward these):\n    | Header | Type | Description |\n    |--------|------|-------------|\n    | `X-RateLimit-Limit-Minute` | int | Max requests per minute |\n    | `X-RateLimit-Remaining-Minute` | int | Remaining in current minute window |\n    | `X-RateLimit-Reset-Minute` | int | Unix timestamp when minute window resets |\n    | `X-RateLimit-Limit-Day` | int | Max requests per day |\n    | `X-RateLimit-Remaining-Day` | int | Remaining in current day window |\n    | `X-RateLimit-Reset-Day` | int | Unix timestamp when day window resets |\n    | `Retry-After` | int | Seconds until rate limit resets (only on 429) |\n\n    **Note**: These headers are **not always present** (e.g., for idempotent\n    requests or early validation failures like 402). Use `.get()` to safely\n    access them.\n\n    **Idempotency**: Uses request_id + fingerprint (computed from endpoint,\n    method, payload_hash, usage_estimate, and feature_key) for true\n    idempotency.\n    - Same request_id + same fingerprint = return existing access_status\n    - Same request_id + different fingerprint = create new record\n\n    The caller must then call /usage/commit to mark the usage as SUCCESS\n    or FAILED after the request completes. PENDING logs that are not\n    committed will be expired by a scheduled job.\n\n    **Quota Enforcement**: The system checks if the user has sufficient\n    credits remaining in the current billing period. If quota is exceeded,\n    access is denied with HTTP 429.\n\n    **Usage Estimate Validation**: If `usage_estimate` is provided, at least\n    one field must be set (input_chars, max_output_tokens, or model). Fields\n    are validated with bounds: input_chars (0-10M), max_output_tokens (0-2M),\n    model (max 100 chars).\n\n    **Security**: Requires Bearer JWT token AND X-Internal-API-Key header.\n\n    **Status Codes**:\n    - 200: Access granted (quota available or idempotent request)\n    - 402: No active career subscription found\n    - 429: Rate limit exceeded (per-minute or per-day) OR quota exceeded",
+                "operationId": "validate_usage_career_internal_usage_validate_post",
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "x-internal-api-key",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "X-Internal-Api-Key"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/app__apps__cubex_career__schemas__internal__UsageValidateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Access granted or idempotent request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsageValidateResponse"
+                                },
+                                "examples": {
+                                    "granted": {
+                                        "summary": "Access Granted",
+                                        "value": {
+                                            "access": "granted",
+                                            "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "message": "Access granted. 98.50 credits remaining after this request.",
+                                            "credits_reserved": "1.50"
+                                        }
+                                    },
+                                    "granted_idempotent": {
+                                        "summary": "Granted - Idempotent Request",
+                                        "value": {
+                                            "access": "granted",
+                                            "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "message": "Request already processed (idempotent). Access: granted",
+                                            "credits_reserved": "1.50"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Authentication failed."
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit or quota exceeded",
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "rate_limit_exceeded_minute": {
+                                        "summary": "Rate Limit Exceeded (per-minute)",
+                                        "value": {
+                                            "access": "denied",
+                                            "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "message": "Rate limit exceeded. Limit: 20 requests/minute. Try again in 45 seconds."
+                                        }
+                                    },
+                                    "rate_limit_exceeded_day": {
+                                        "summary": "Rate Limit Exceeded (per-day)",
+                                        "value": {
+                                            "access": "denied",
+                                            "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "message": "Rate limit exceeded. Limit: 200 requests/day. Try again in 3600 seconds."
+                                        }
+                                    },
+                                    "quota_exceeded": {
+                                        "summary": "Quota Exceeded",
+                                        "value": {
+                                            "access": "denied",
+                                            "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "message": "Quota exceeded. Used 100.00/100.00 credits. This request requires 1.50 credits.",
+                                            "credits_reserved": "1.50"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
+                    "402": {
+                        "description": "No active career subscription",
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "no_subscription": {
+                                        "summary": "No Active Subscription",
+                                        "value": {
+                                            "access": "denied",
+                                            "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "message": "No active career subscription found."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/career/internal/usage/commit": {
+            "post": {
+                "tags": [
+                    "Career - Internal API",
+                    "Career - Internal API"
+                ],
+                "summary": "Commit a usage log",
+                "description": "Commit a pending usage log entry (idempotent).\n\n    This endpoint is called by the AI tool server after a request\n    completes to mark the usage as SUCCESS (counts toward quota) or FAILED\n    (does not count toward quota).\n\n    **Async Alternative (RabbitMQ)**: Instead of calling this endpoint\n    synchronously, the caller can publish the same `UsageCommitRequest`\n    payload as a JSON message to the **`career_usage_commits`** RabbitMQ\n    queue. The message will be processed asynchronously by the career\n    usage commit handler.\n    - Retry queue: `career_usage_commits_retry` (30 s TTL, max 3 retries)\n    - Dead-letter queue: `career_usage_commits_dead`\n\n    **Metrics (optional)**: When `success=True`, you can optionally provide\n    metrics about the request:\n    - `model_used`: Model identifier (e.g., \"gpt-4o\")\n    - `input_tokens`: Actual input tokens used (0-2,000,000)\n    - `output_tokens`: Actual output tokens generated (0-2,000,000)\n    - `latency_ms`: Request latency in milliseconds (0-3,600,000)\n\n    **Failure Details (required when success=False)**: When `success=False`,\n    you MUST provide failure details:\n    - `failure_type`: Category of failure (internal_error, timeout,\n      rate_limited, invalid_response, upstream_error, client_error,\n      validation_error)\n    - `reason`: Human-readable description (max 1000 chars)\n\n    **Idempotent**: Safe to retry. If the usage log is already committed\n    or doesn't exist, success is still returned.\n\n    **Security**: Requires X-Internal-API-Key header. No JWT needed \u2014\n    the `user_id` is passed in the request body and ownership is verified\n    against the usage log record.",
+                "operationId": "commit_usage_career_internal_usage_commit_post",
+                "parameters": [
+                    {
+                        "name": "x-internal-api-key",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "X-Internal-Api-Key"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UsageCommitRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Commit result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsageCommitResponse"
+                                },
+                                "examples": {
+                                    "success_with_metrics": {
+                                        "summary": "Success with Metrics",
+                                        "value": {
+                                            "success": true,
+                                            "message": "Usage committed as SUCCESS."
+                                        }
+                                    },
+                                    "failed_with_details": {
+                                        "summary": "Failed with Details",
+                                        "value": {
+                                            "success": true,
+                                            "message": "Usage committed as FAILED."
+                                        }
+                                    },
+                                    "already_committed": {
+                                        "summary": "Already Committed (Idempotent)",
+                                        "value": {
+                                            "success": true,
+                                            "message": "Usage log not found, but operation is idempotent."
+                                        }
+                                    },
+                                    "ownership_mismatch": {
+                                        "summary": "Ownership Mismatch",
+                                        "value": {
+                                            "success": false,
+                                            "message": "User does not own this usage log."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Bad request error message"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource not found."
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Resource conflict."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Some internal server error message"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing internal API key or JWT"
+                    },
+                    "429": {
+                        "description": "Rate Limit Exceeded",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "Rate limit exceeded. Please try again later."
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "detail": "This feature is not yet implemented."
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error (e.g., missing failure details when success=False)"
+                    }
+                }
             }
         },
         "/health": {
@@ -8136,6 +8478,32 @@
                 ],
                 "title": "FailureType",
                 "description": "Type of failure for API usage tracking.\n\nUsed to categorize failures when committing usage logs with success=False.\nHelps identify patterns and issues we may be responsible for."
+            },
+            "FeatureKey": {
+                "type": "string",
+                "enum": [
+                    "api.career_path",
+                    "api.extract_keywords",
+                    "api.feedback_analyzer",
+                    "api.generate_feedback",
+                    "api.job_match",
+                    "api.extract_cues.resume",
+                    "api.extract_cues.feedback",
+                    "api.extract_cues.interview",
+                    "api.extract_cues.assessment",
+                    "api.reframe_feedback",
+                    "career.career_path",
+                    "career.extract_keywords",
+                    "career.feedback_analyzer",
+                    "career.generate_feedback",
+                    "career.job_match",
+                    "career.extract_cues.resume",
+                    "career.extract_cues.feedback",
+                    "career.extract_cues.interview",
+                    "career.extract_cues.assessment",
+                    "career.reframe_feedback"
+                ],
+                "title": "FeatureKey"
             },
             "FeatureResponse": {
                 "properties": {
@@ -9270,19 +9638,38 @@
             "UpgradePreviewRequest": {
                 "properties": {
                     "new_plan_id": {
-                        "type": "string",
-                        "format": "uuid",
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
                         "title": "New Plan Id"
+                    },
+                    "new_seat_count": {
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "maximum": 100.0,
+                                "minimum": 1.0,
+                                "description": "New seat count"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "New Seat Count"
                     }
                 },
                 "type": "object",
-                "required": [
-                    "new_plan_id"
-                ],
                 "title": "UpgradePreviewRequest",
                 "description": "Schema for requesting an upgrade preview.",
                 "example": {
-                    "new_plan_id": "550e8400-e29b-41d4-a716-446655440000"
+                    "new_plan_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "new_seat_count": 10
                 }
             },
             "UpgradePreviewResponse": {
@@ -9294,6 +9681,14 @@
                     "new_plan": {
                         "type": "string",
                         "title": "New Plan"
+                    },
+                    "current_seat_count": {
+                        "type": "integer",
+                        "title": "Current Seat Count"
+                    },
+                    "new_seat_count": {
+                        "type": "integer",
+                        "title": "New Seat Count"
                     },
                     "proration_amount": {
                         "type": "string",
@@ -9329,6 +9724,8 @@
                 "required": [
                     "current_plan",
                     "new_plan",
+                    "current_seat_count",
+                    "new_seat_count",
                     "proration_amount",
                     "total_due",
                     "currency",
@@ -9340,7 +9737,9 @@
                     "billing_period_end": "2024-02-15T00:00:00Z",
                     "currency": "usd",
                     "current_plan": "Basic",
+                    "current_seat_count": 5,
                     "new_plan": "Professional",
+                    "new_seat_count": 10,
                     "proration_amount": "15.50",
                     "total_due": "29.99"
                 }
@@ -9365,10 +9764,11 @@
             },
             "UsageCommitRequest": {
                 "properties": {
-                    "api_key": {
+                    "user_id": {
                         "type": "string",
-                        "title": "Api Key",
-                        "description": "The API key that made the original request"
+                        "format": "uuid",
+                        "title": "User Id",
+                        "description": "The ID of the user that made the original request. This value is returned in the `UsageValidateResponse`."
                     },
                     "usage_id": {
                         "type": "string",
@@ -9406,14 +9806,13 @@
                 },
                 "type": "object",
                 "required": [
-                    "api_key",
+                    "user_id",
                     "usage_id",
                     "success"
                 ],
                 "title": "UsageCommitRequest",
                 "description": "Schema for committing API usage (internal endpoint).\n\nWhen success=True, optionally provide metrics (model, tokens, latency).\nWhen success=False, failure details are REQUIRED.",
                 "example": {
-                    "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
                     "metrics": {
                         "input_tokens": 1500,
                         "latency_ms": 1200,
@@ -9421,7 +9820,8 @@
                         "output_tokens": 500
                     },
                     "success": true,
-                    "usage_id": "550e8400-e29b-41d4-a716-446655440000"
+                    "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "user_id": "550e8400-e29b-41d4-a716-446655440000"
                 }
             },
             "UsageCommitResponse": {
@@ -9576,6 +9976,10 @@
                         "title": "Client Id",
                         "description": "Workspace client ID in format ws_<workspace_uuid_hex>"
                     },
+                    "feature_key": {
+                        "$ref": "#/components/schemas/FeatureKey",
+                        "description": "Feature Key (e.g., 'api.analyze')"
+                    },
                     "api_key": {
                         "type": "string",
                         "title": "Api Key",
@@ -9626,6 +10030,7 @@
                 "required": [
                     "request_id",
                     "client_id",
+                    "feature_key",
                     "api_key",
                     "endpoint",
                     "method",
@@ -9641,6 +10046,7 @@
                     },
                     "client_id": "ws_550e8400e29b41d4a716446655440000",
                     "endpoint": "/v1/extract-cues/resume",
+                    "feature_key": "api.analyze",
                     "method": "POST",
                     "payload_hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
                     "request_id": "req_9f0c2a7e-acde-4b9a-8b2f-83cc71a3c9a2",
@@ -9655,6 +10061,18 @@
                 "properties": {
                     "access": {
                         "$ref": "#/components/schemas/AccessStatus"
+                    },
+                    "user_id": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "User Id"
                     },
                     "usage_id": {
                         "anyOf": [
@@ -9684,17 +10102,12 @@
                         ],
                         "title": "Credits Reserved",
                         "description": "The credits reserved/charged for this request"
-                    },
-                    "is_test_key": {
-                        "type": "boolean",
-                        "title": "Is Test Key",
-                        "description": "Whether this request used a test key. Server B can use this to return mocked responses.",
-                        "default": false
                     }
                 },
                 "type": "object",
                 "required": [
                     "access",
+                    "user_id",
                     "usage_id",
                     "message"
                 ],
@@ -9703,9 +10116,9 @@
                 "example": {
                     "access": "granted",
                     "credits_reserved": "1.5000",
-                    "is_test_key": false,
                     "message": "Access granted. 98.50 credits remaining after this request.",
-                    "usage_id": "550e8400-e29b-41d4-a716-446655440000"
+                    "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "user_id": "550e8400-e29b-41d4-a716-446655440000"
                 }
             },
             "ValidationError": {
@@ -9828,14 +10241,6 @@
                         "title": "Total Member Count",
                         "default": 0
                     },
-                    "members": {
-                        "items": {
-                            "$ref": "#/components/schemas/WorkspaceMemberResponse"
-                        },
-                        "type": "array",
-                        "title": "Members",
-                        "default": []
-                    },
                     "seat_count": {
                         "type": "integer",
                         "title": "Seat Count",
@@ -9858,6 +10263,21 @@
                         "title": "Credits Limit",
                         "default": "0.00"
                     },
+                    "members": {
+                        "items": {
+                            "$ref": "#/components/schemas/WorkspaceMemberResponse"
+                        },
+                        "type": "array",
+                        "title": "Members",
+                        "default": []
+                    },
+                    "credits_remaining": {
+                        "type": "string",
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                        "title": "Credits Remaining",
+                        "description": "Calculate remaining credits.",
+                        "readOnly": true
+                    },
                     "client_id": {
                         "type": "string",
                         "title": "Client Id",
@@ -9875,6 +10295,7 @@
                     "description",
                     "created_at",
                     "owner_id",
+                    "credits_remaining",
                     "client_id"
                 ],
                 "title": "WorkspaceDetailResponse",
@@ -9897,6 +10318,7 @@
                             "joined_at": "2024-01-15T10:30:00Z",
                             "role": "owner",
                             "status": "enabled",
+                            "user_avatar_url": "https://example.com/avatar_owner.jpg",
                             "user_email": "owner@example.com",
                             "user_id": "550e8400-e29b-41d4-a716-446655440001",
                             "user_name": "Owner Name"
@@ -9928,14 +10350,19 @@
                 "example": {
                     "workspaces": [
                         {
+                            "available_seats": 3,
                             "client_id": "ws_550e8400e29b41d4a716446655440000",
                             "created_at": "2024-01-15T10:30:00Z",
+                            "credits_limit": "1000.00",
+                            "credits_remaining": "850.00",
+                            "credits_used": "150.00",
                             "description": "Workspace for our startup team",
                             "display_name": "My Startup",
                             "enabled_member_count": 5,
                             "id": "550e8400-e29b-41d4-a716-446655440000",
                             "is_personal": false,
                             "owner_id": "550e8400-e29b-41d4-a716-446655440001",
+                            "seat_count": 10,
                             "slug": "my-startup",
                             "status": "active",
                             "total_member_count": 7
@@ -9987,6 +10414,17 @@
                             }
                         ],
                         "title": "User Name"
+                    },
+                    "user_avatar_url": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "User Avatar Url"
                     }
                 },
                 "type": "object",
@@ -10004,6 +10442,7 @@
                     "joined_at": "2024-01-15T10:30:00Z",
                     "role": "admin",
                     "status": "enabled",
+                    "user_avatar_url": "https://example.com/avatar.jpg",
                     "user_email": "john@example.com",
                     "user_id": "550e8400-e29b-41d4-a716-446655440001",
                     "user_name": "John Doe"
@@ -10062,6 +10501,35 @@
                         "title": "Total Member Count",
                         "default": 0
                     },
+                    "seat_count": {
+                        "type": "integer",
+                        "title": "Seat Count",
+                        "default": 0
+                    },
+                    "available_seats": {
+                        "type": "integer",
+                        "title": "Available Seats",
+                        "default": 0
+                    },
+                    "credits_used": {
+                        "type": "string",
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                        "title": "Credits Used",
+                        "default": "0.00"
+                    },
+                    "credits_limit": {
+                        "type": "string",
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                        "title": "Credits Limit",
+                        "default": "0.00"
+                    },
+                    "credits_remaining": {
+                        "type": "string",
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                        "title": "Credits Remaining",
+                        "description": "Calculate remaining credits.",
+                        "readOnly": true
+                    },
                     "client_id": {
                         "type": "string",
                         "title": "Client Id",
@@ -10079,19 +10547,25 @@
                     "description",
                     "created_at",
                     "owner_id",
+                    "credits_remaining",
                     "client_id"
                 ],
                 "title": "WorkspaceResponse",
                 "description": "Schema for workspace response.",
                 "example": {
+                    "available_seats": 3,
                     "client_id": "ws_550e8400e29b41d4a716446655440000",
                     "created_at": "2024-01-15T10:30:00Z",
+                    "credits_limit": "1000.00",
+                    "credits_remaining": "850.00",
+                    "credits_used": "150.00",
                     "description": "Workspace for our startup team",
                     "display_name": "My Startup",
                     "enabled_member_count": 5,
                     "id": "550e8400-e29b-41d4-a716-446655440000",
                     "is_personal": false,
                     "owner_id": "550e8400-e29b-41d4-a716-446655440001",
+                    "seat_count": 10,
                     "slug": "my-startup",
                     "status": "active",
                     "total_member_count": 7
@@ -10159,6 +10633,203 @@
                     "description": "Updated workspace description",
                     "display_name": "My Startup Renamed",
                     "slug": "my-startup-renamed"
+                }
+            },
+            "app__apps__cubex_api__schemas__workspace__UsageCommitRequest": {
+                "properties": {
+                    "api_key": {
+                        "type": "string",
+                        "title": "Api Key",
+                        "description": "The API key that made the original request"
+                    },
+                    "usage_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "title": "Usage Id",
+                        "description": "The usage log ID to commit"
+                    },
+                    "success": {
+                        "type": "boolean",
+                        "title": "Success",
+                        "description": "True if request succeeded, False if failed"
+                    },
+                    "metrics": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/UsageMetrics"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Optional metrics for successful requests"
+                    },
+                    "failure": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/FailureDetails"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Required failure details when success=False"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "api_key",
+                    "usage_id",
+                    "success"
+                ],
+                "title": "UsageCommitRequest",
+                "description": "Schema for committing API usage (internal endpoint).\n\nWhen success=True, optionally provide metrics (model, tokens, latency).\nWhen success=False, failure details are REQUIRED.",
+                "example": {
+                    "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
+                    "metrics": {
+                        "input_tokens": 1500,
+                        "latency_ms": 1200,
+                        "model_used": "gpt-4o",
+                        "output_tokens": 500
+                    },
+                    "success": true,
+                    "usage_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            },
+            "app__apps__cubex_api__schemas__workspace__UsageValidateResponse": {
+                "properties": {
+                    "access": {
+                        "$ref": "#/components/schemas/AccessStatus"
+                    },
+                    "usage_id": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Usage Id"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "credits_reserved": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Credits Reserved",
+                        "description": "The credits reserved/charged for this request"
+                    },
+                    "is_test_key": {
+                        "type": "boolean",
+                        "title": "Is Test Key",
+                        "description": "Whether this request used a test key. Server B can use this to return mocked responses.",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "access",
+                    "usage_id",
+                    "message"
+                ],
+                "title": "UsageValidateResponse",
+                "description": "Schema for usage validation response.",
+                "example": {
+                    "access": "granted",
+                    "credits_reserved": "1.5000",
+                    "is_test_key": false,
+                    "message": "Access granted. 98.50 credits remaining after this request.",
+                    "usage_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            },
+            "app__apps__cubex_career__schemas__internal__UsageValidateRequest": {
+                "properties": {
+                    "request_id": {
+                        "type": "string",
+                        "title": "Request Id",
+                        "description": "Globally unique request ID for idempotency"
+                    },
+                    "feature_key": {
+                        "$ref": "#/components/schemas/FeatureKey",
+                        "description": "The feature key identifying the career feature being used"
+                    },
+                    "endpoint": {
+                        "type": "string",
+                        "title": "Endpoint",
+                        "description": "The API endpoint path being called"
+                    },
+                    "method": {
+                        "type": "string",
+                        "title": "Method",
+                        "description": "HTTP method (GET, POST, etc.)"
+                    },
+                    "payload_hash": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "minLength": 64,
+                        "pattern": "^[a-f0-9]{64}$",
+                        "title": "Payload Hash",
+                        "description": "SHA-256 hash of the request payload for fingerprinting"
+                    },
+                    "client": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/ClientInfo"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Optional client information"
+                    },
+                    "usage_estimate": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/UsageEstimate"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Optional usage estimation for the request"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "request_id",
+                    "feature_key",
+                    "endpoint",
+                    "method",
+                    "payload_hash"
+                ],
+                "title": "UsageValidateRequest",
+                "description": "Schema for validating API usage (internal endpoint).",
+                "example": {
+                    "client": {
+                        "ip": "102.89.1.22",
+                        "user_agent": "Mozilla/5.0"
+                    },
+                    "endpoint": "/v1/extract-cues/resume",
+                    "feature_key": "career.career_path",
+                    "method": "POST",
+                    "payload_hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+                    "request_id": "req_9f0c2a7e-acde-4b9a-8b2f-83cc71a3c9a2",
+                    "usage_estimate": {
+                        "input_chars": 22000,
+                        "max_output_tokens": 700,
+                        "model": "gpt-4o-mini"
+                    }
                 }
             }
         },

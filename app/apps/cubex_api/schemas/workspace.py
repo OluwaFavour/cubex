@@ -18,19 +18,15 @@ from pydantic import (
     model_validator,
 )
 
-from app.shared.enums import (
+from app.core.enums import (
     AccessStatus,
     FailureType,
+    FeatureKey,
     InvitationStatus,
     MemberRole,
     MemberStatus,
     WorkspaceStatus,
 )
-
-
-# ============================================================================
-# Workspace Schemas
-# ============================================================================
 
 
 class WorkspaceCreate(BaseModel):
@@ -246,11 +242,6 @@ class WorkspaceListResponse(BaseModel):
     workspaces: list[WorkspaceResponse]
 
 
-# ============================================================================
-# Member Schemas
-# ============================================================================
-
-
 class MemberStatusUpdate(BaseModel):
     """Schema for updating member status."""
 
@@ -271,11 +262,6 @@ class MemberRoleUpdate(BaseModel):
         MemberRole,
         Field(description="New member role: admin or member"),
     ]
-
-
-# ============================================================================
-# Invitation Schemas
-# ============================================================================
 
 
 class InvitationCreate(BaseModel):
@@ -390,11 +376,6 @@ class InvitationCreatedResponse(BaseModel):
     invitation_url: str
 
 
-# ============================================================================
-# Message Schemas
-# ============================================================================
-
-
 class MessageResponse(BaseModel):
     """Generic message response."""
 
@@ -406,11 +387,6 @@ class MessageResponse(BaseModel):
 
     message: str
     success: bool = True
-
-
-# ============================================================================
-# API Key Schemas
-# ============================================================================
 
 
 class APIKeyCreate(BaseModel):
@@ -533,11 +509,6 @@ class APIKeyListResponse(BaseModel):
     api_keys: list[APIKeyResponse]
 
 
-# ============================================================================
-# Usage Validation Schemas (Internal API)
-# ============================================================================
-
-
 class ClientInfo(BaseModel):
     """Schema for client information in usage validation."""
 
@@ -594,6 +565,7 @@ class UsageValidateRequest(BaseModel):
             "example": {
                 "request_id": "req_9f0c2a7e-acde-4b9a-8b2f-83cc71a3c9a2",
                 "client_id": "ws_550e8400e29b41d4a716446655440000",
+                "feature_key": "api.analyze",
                 "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
                 "endpoint": "/v1/extract-cues/resume",
                 "method": "POST",
@@ -618,6 +590,9 @@ class UsageValidateRequest(BaseModel):
             description="Workspace client ID in format ws_<workspace_uuid_hex>",
             pattern=r"^ws_[a-f0-9]{32}$",
         ),
+    ]
+    feature_key: Annotated[
+        FeatureKey, Field(description="Feature Key (e.g., 'api.analyze')")
     ]
     api_key: Annotated[
         str,
@@ -848,3 +823,4 @@ __all__ = [
     "UsageMetrics",
     "FailureDetails",
 ]
+

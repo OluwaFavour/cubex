@@ -18,6 +18,9 @@ from app.infrastructure.messaging.handlers.stripe import (
     handle_stripe_payment_failed,
 )
 from app.infrastructure.messaging.handlers.usage_handler import handle_usage_commit
+from app.infrastructure.messaging.handlers.career_usage_handler import (
+    handle_career_usage_commit,
+)
 
 
 class RetryQueue(BaseModel):
@@ -175,6 +178,15 @@ QUEUE_CONFIG = [
         "max_retries": 3,
         "dead_letter_queue": "usage_commits_dead",
     },
+    # Career Usage Commit Queue - processes career usage commits from AI tool servers
+    {
+        "name": "career_usage_commits",
+        "handler": handle_career_usage_commit,
+        "retry_queue": "career_usage_commits_retry",
+        "retry_ttl": 30 * 1000,  # 30 seconds
+        "max_retries": 3,
+        "dead_letter_queue": "career_usage_commits_dead",
+    },
 ]
 
 
@@ -184,3 +196,4 @@ def get_queue_configs() -> list[QueueConfig]:
         QueueConfig.model_validate(config, from_attributes=True)
         for config in QUEUE_CONFIG
     ]
+

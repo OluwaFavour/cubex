@@ -8,16 +8,11 @@ import pytest
 from httpx import AsyncClient
 from uuid import uuid4
 
-from app.shared.enums import (
+from app.core.enums import (
     MemberRole,
     MemberStatus,
     WorkspaceStatus,
 )
-
-
-# ============================================================================
-# Test List Workspaces
-# ============================================================================
 
 
 class TestListWorkspaces:
@@ -149,11 +144,6 @@ class TestListWorkspaces:
         assert response.status_code == 422
 
 
-# ============================================================================
-# Test Create Workspace
-# ============================================================================
-
-
 class TestCreateWorkspace:
     """Tests for POST /api/workspaces"""
 
@@ -211,11 +201,6 @@ class TestCreateWorkspace:
         assert response.status_code == 401
 
 
-# ============================================================================
-# Test Get Workspace
-# ============================================================================
-
-
 class TestGetWorkspace:
     """Tests for GET /api/workspaces/{workspace_id}"""
 
@@ -249,8 +234,7 @@ class TestGetWorkspace:
         self, client: AsyncClient, test_workspace, db_session
     ):
         """Should return 404 if user is not a member."""
-        # Create a different authenticated user
-        from app.shared.db.models import User
+        from app.core.db.models import User
         from tests.conftest import create_test_access_token
 
         other_user = User(
@@ -269,11 +253,6 @@ class TestGetWorkspace:
 
         response = await client.get(f"/api/workspaces/{test_workspace.id}")
         assert response.status_code == 404
-
-
-# ============================================================================
-# Test Update Workspace
-# ============================================================================
 
 
 class TestUpdateWorkspace:
@@ -363,11 +342,6 @@ class TestUpdateWorkspace:
         assert response.status_code == 404
 
 
-# ============================================================================
-# Test List Members
-# ============================================================================
-
-
 class TestListMembers:
     """Tests for GET /api/workspaces/{workspace_id}/members"""
 
@@ -404,7 +378,7 @@ class TestListMembers:
         self, client: AsyncClient, test_workspace, db_session
     ):
         """Should return 404 if user is not a member."""
-        from app.shared.db.models import User
+        from app.core.db.models import User
         from tests.conftest import create_test_access_token
 
         other_user = User(
@@ -423,11 +397,6 @@ class TestListMembers:
 
         response = await client.get(f"/api/workspaces/{test_workspace.id}/members")
         assert response.status_code == 404
-
-
-# ============================================================================
-# Test Update Member Status
-# ============================================================================
 
 
 class TestUpdateMemberStatus:
@@ -513,11 +482,6 @@ class TestUpdateMemberStatus:
         assert response.status_code == 403
 
 
-# ============================================================================
-# Test Update Member Role
-# ============================================================================
-
-
 class TestUpdateMemberRole:
     """Tests for PATCH /api/workspaces/{workspace_id}/members/{member_user_id}/role"""
 
@@ -580,11 +544,6 @@ class TestUpdateMemberRole:
         assert response.status_code == 403
 
 
-# ============================================================================
-# Test Remove Member
-# ============================================================================
-
-
 class TestRemoveMember:
     """Tests for DELETE /api/workspaces/{workspace_id}/members/{member_user_id}"""
 
@@ -632,11 +591,6 @@ class TestRemoveMember:
         assert response.status_code == 403
 
 
-# ============================================================================
-# Test Leave Workspace
-# ============================================================================
-
-
 class TestLeaveWorkspace:
     """Tests for POST /api/workspaces/{workspace_id}/leave"""
 
@@ -673,7 +627,7 @@ class TestLeaveWorkspace:
         self, client: AsyncClient, test_workspace, db_session
     ):
         """Should return 404 if not a member."""
-        from app.shared.db.models import User
+        from app.core.db.models import User
         from tests.conftest import create_test_access_token
 
         other_user = User(
@@ -692,11 +646,6 @@ class TestLeaveWorkspace:
 
         response = await client.post(f"/api/workspaces/{test_workspace.id}/leave")
         assert response.status_code == 404
-
-
-# ============================================================================
-# Test Transfer Ownership
-# ============================================================================
 
 
 class TestTransferOwnership:
@@ -752,11 +701,6 @@ class TestTransferOwnership:
         assert response.status_code == 404
 
 
-# ============================================================================
-# Test List Invitations
-# ============================================================================
-
-
 class TestListInvitations:
     """Tests for GET /api/workspaces/{workspace_id}/invitations"""
 
@@ -803,11 +747,6 @@ class TestListInvitations:
         response = await client.get(f"/api/workspaces/{test_workspace.id}/invitations")
 
         assert response.status_code == 403
-
-
-# ============================================================================
-# Test Create Invitation
-# ============================================================================
 
 
 class TestCreateInvitation:
@@ -909,11 +848,6 @@ class TestCreateInvitation:
         assert response.status_code == 403
 
 
-# ============================================================================
-# Test Revoke Invitation
-# ============================================================================
-
-
 class TestRevokeInvitation:
     """Tests for DELETE /api/workspaces/{workspace_id}/invitations/{invitation_id}"""
 
@@ -967,11 +901,6 @@ class TestRevokeInvitation:
         assert response.status_code == 403
 
 
-# ============================================================================
-# Test Accept Invitation
-# ============================================================================
-
-
 class TestAcceptInvitation:
     """Tests for POST /api/workspaces/invitations/accept"""
 
@@ -982,13 +911,12 @@ class TestAcceptInvitation:
         """Should accept invitation and join workspace."""
         import secrets
         from datetime import datetime, timedelta, timezone
-        from app.shared.db.models import User, WorkspaceInvitation
-        from app.shared.config import settings
-        from app.shared.utils import hmac_hash_otp
+        from app.core.db.models import User, WorkspaceInvitation
+        from app.core.config import settings
+        from app.core.utils import hmac_hash_otp
         from tests.conftest import create_test_access_token
-        from app.shared.enums import InvitationStatus, MemberRole
+        from app.core.enums import InvitationStatus, MemberRole
 
-        # Create new user to accept invitation
         new_user = User(
             id=uuid4(),
             email="accepter@example.com",
@@ -1046,12 +974,11 @@ class TestAcceptInvitation:
         self, client: AsyncClient, test_workspace, expired_invitation, db_session
     ):
         """Should return 404 for expired invitation."""
-        from app.shared.db.models import User
+        from app.core.db.models import User
         from tests.conftest import create_test_access_token
 
         invitation, raw_token = expired_invitation  # Unpack tuple from fixture
 
-        # Create user matching invitation email
         new_user = User(
             id=uuid4(),
             email=invitation.email,
@@ -1070,11 +997,6 @@ class TestAcceptInvitation:
         response = await client.post("/api/workspaces/invitations/accept", json=payload)
 
         assert response.status_code == 404
-
-
-# ============================================================================
-# Test Activate Personal Workspace
-# ============================================================================
 
 
 class TestActivatePersonalWorkspace:
@@ -1112,3 +1034,4 @@ class TestActivatePersonalWorkspace:
         response = await client.post("/api/workspaces/activate")
 
         assert response.status_code == 401
+

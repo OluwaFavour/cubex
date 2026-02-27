@@ -43,10 +43,7 @@ from app.apps.cubex_api.services.quota import (
     CLIENT_ID_PREFIX,
 )
 from app.apps.cubex_api.services.quota_cache import (
-    QuotaCacheService,
-    QuotaCacheBackend,
-    MemoryBackend,
-    RedisBackend,
+    APIQuotaCacheService,
 )
 
 __all__ = [
@@ -88,8 +85,6 @@ __all__ = [
     "TEST_API_KEY_PREFIX",
     "CLIENT_ID_PREFIX",
     # Quota cache service
-    "QuotaCacheService",
-    "QuotaCacheBackend",
-    "MemoryBackend",
-    "RedisBackend",
+    "APIQuotaCacheService",
 ]
+

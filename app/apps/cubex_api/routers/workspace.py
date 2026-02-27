@@ -1,7 +1,6 @@
 """
 Workspace router for cubex_api.
 
-This module provides endpoints for:
 - Workspace CRUD operations
 - Member management (invite, enable/disable, remove)
 - Invitation management
@@ -13,12 +12,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.apps.cubex_api.services.quota_cache import QuotaCacheService
-from app.core.dependencies import get_async_session
-from app.shared.config import request_logger
-from app.shared.dependencies.auth import CurrentActiveUser
-from app.shared.exceptions.types import (
+from app.core.services.quota_cache import QuotaCacheService
+from app.core.dependencies import CurrentActiveUser, get_async_session
+from app.core.config import request_logger
+from app.core.services.rate_limit import rate_limit_by_ip
+from app.core.exceptions.types import (
     BadRequestException,
     ConflictException,
     ForbiddenException,
@@ -65,28 +65,53 @@ from app.apps.cubex_api.services import (
     FreeWorkspaceNoInvitesException,
     APIKeyNotFoundException,
 )
-from app.shared.enums import MemberRole, MemberStatus
-from app.shared.services.oauth.base import OAuthStateManager
+from app.core.enums import MemberRole, MemberStatus
+from app.core.services.oauth.base import OAuthStateManager
 from app.apps.cubex_api.db.models import (
     Workspace,
     WorkspaceMember,
     WorkspaceInvitation,
 )
+from app.core.db.models import Subscription
+from app.core.db.models.subscription_context import APISubscriptionContext
 
 
 router = APIRouter(prefix="/workspaces")
 
+# Standard loaders for building workspace responses (_build_workspace_response)
+_WORKSPACE_RESPONSE_LOADERS = [
+    selectinload(Workspace.members),
+    selectinload(Workspace.api_subscription_context).selectinload(
+        APISubscriptionContext.subscription
+    ),
+]
 
-# ============================================================================
-# Helper Functions
-# ============================================================================
+# Extended loaders for the workspace detail view (also needs member.user + api_context)
+_WORKSPACE_DETAIL_LOADERS = [
+    selectinload(Workspace.members).selectinload(WorkspaceMember.user),
+    selectinload(Workspace.api_subscription_context)
+    .selectinload(APISubscriptionContext.subscription)
+    .selectinload(Subscription.api_context),
+]
+
+# Rate limiters for workspace write operations
+# Create workspace: 10 req/hour per IP (prevent mass creation)
+_create_workspace_rate_limit = rate_limit_by_ip(limit=10, window=3600)
+
+# Send invitation: 20 req/hour per IP (prevent invitation spam)
+_invite_rate_limit = rate_limit_by_ip(limit=20, window=3600)
+
+# Transfer ownership: 5 req/hour per IP (sensitive operation)
+_transfer_rate_limit = rate_limit_by_ip(limit=5, window=3600)
+
+# Create API key: 10 req/hour per IP (prevent key flooding)
+_create_api_key_rate_limit = rate_limit_by_ip(limit=10, window=3600)
 
 
 async def _build_workspace_response(
     session: AsyncSession, workspace: Workspace
 ) -> WorkspaceResponse:
     """Build WorkspaceResponse from Workspace model."""
-    # Get seat count
     seat_count = (
         workspace.api_subscription_context.subscription.seat_count
         if workspace.api_subscription_context
@@ -97,20 +122,20 @@ async def _build_workspace_response(
     )
     available_seats = seat_count - enabled_count
 
-    # Get credits
     credits_used = (
         workspace.api_subscription_context.credits_used
         if workspace.api_subscription_context
         else Decimal("0.00")
     )
-    credits_limit = await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-        session,
-        (
-            workspace.api_subscription_context.subscription.plan_id
-            if workspace.api_subscription_context
-            else None
-        ),
+    plan_id = (
+        workspace.api_subscription_context.subscription.plan_id
+        if workspace.api_subscription_context
+        else None
     )
+    plan_config = (
+        await QuotaCacheService.get_plan_config(session, plan_id) if plan_id else None
+    )
+    credits_limit = plan_config.credits_allocation if plan_config else Decimal("0.00")
     return WorkspaceResponse(
         id=workspace.id,
         display_name=workspace.display_name,
@@ -154,11 +179,6 @@ def _build_invitation_response(invitation: WorkspaceInvitation) -> InvitationRes
         created_at=invitation.created_at,
         inviter_email=invitation.inviter.email if invitation.inviter else None,
     )
-
-
-# ============================================================================
-# Workspace Endpoints
-# ============================================================================
 
 
 @router.get(
@@ -283,6 +303,7 @@ async def create_workspace(
     data: WorkspaceCreate,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_create_workspace_rate_limit)],
 ) -> WorkspaceDetailResponse:
     """Create a new workspace."""
     request_logger.info(f"POST /workspaces - user={current_user.id}")
@@ -382,17 +403,19 @@ async def get_workspace(
     """Get workspace details."""
     request_logger.info(f"GET /workspaces/{workspace_id} - user={current_user.id}")
     async with session.begin():
-        # Check user has access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
         if not member:
             raise NotFoundException("Workspace not found or access denied.")
 
-        workspace = await workspace_service.get_workspace(session, workspace_id)
+        workspace = await workspace_service.get_workspace(
+            session,
+            workspace_id,
+            options=_WORKSPACE_DETAIL_LOADERS,
+        )
         members = workspace.members if workspace.members else []
 
-        # Get subscription info
         subscription = (
             workspace.api_subscription_context.subscription
             if workspace.api_subscription_context
@@ -401,16 +424,18 @@ async def get_workspace(
         seat_count = subscription.seat_count if subscription else 0
         enabled_count = len([m for m in members if m.status == MemberStatus.ENABLED])
 
-        # Get credits
         credits_used = (
             subscription.api_context.credits_used
             if subscription and subscription.api_context
             else Decimal("0.00")
         )
+        plan_config = (
+            await QuotaCacheService.get_plan_config(session, subscription.plan_id)
+            if subscription
+            else None
+        )
         credits_limit = (
-            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-                session, subscription.plan_id if subscription else None
-            )
+            plan_config.credits_allocation if plan_config else Decimal("0.00")
         )
 
         return WorkspaceDetailResponse(
@@ -509,17 +534,16 @@ async def update_workspace(
                 description=data.description,
                 commit_self=False,
             )
+            # Reload with relationships needed for response
+            workspace = await workspace_service.get_workspace(
+                session, workspace.id, options=_WORKSPACE_RESPONSE_LOADERS
+            )
             workspace_response = await _build_workspace_response(session, workspace)
             return workspace_response
     except PermissionDeniedException as e:
         raise ForbiddenException(str(e.message)) from e
     except WorkspaceNotFoundException as e:
         raise NotFoundException(str(e.message)) from e
-
-
-# ============================================================================
-# Member Endpoints
-# ============================================================================
 
 
 @router.get(
@@ -595,7 +619,6 @@ async def list_members(
         f"GET /workspaces/{workspace_id}/members - user={current_user.id}"
     )
     async with session.begin():
-        # Check access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -712,6 +735,10 @@ async def update_member_status(
                 status=data.status,
                 commit_self=False,
             )
+            # Reload with .user for response building
+            member = await workspace_member_db.get_member(
+                session, workspace_id, member_user_id
+            )
             return _build_member_response(member)
     except PermissionDeniedException as e:
         raise ForbiddenException(str(e.message)) from e
@@ -806,6 +833,10 @@ async def update_member_role(
                 admin_user_id=current_user.id,
                 role=data.role,
                 commit_self=False,
+            )
+            # Reload with .user for response building
+            member = await workspace_member_db.get_member(
+                session, workspace_id, member_user_id
             )
             return _build_member_response(member)
     except PermissionDeniedException as e:
@@ -1063,6 +1094,7 @@ async def transfer_ownership(
     new_owner_id: UUID,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_transfer_rate_limit)],
 ) -> WorkspaceResponse:
     """Transfer workspace ownership to another member."""
     request_logger.info(
@@ -1078,17 +1110,16 @@ async def transfer_ownership(
                 new_owner_id=new_owner_id,
                 commit_self=False,
             )
+            # Reload with relationships needed for response
+            workspace = await workspace_service.get_workspace(
+                session, workspace.id, options=_WORKSPACE_RESPONSE_LOADERS
+            )
             workspace_response = await _build_workspace_response(session, workspace)
             return workspace_response
     except PermissionDeniedException as e:
         raise ForbiddenException(str(e.message)) from e
     except MemberNotFoundException as e:
         raise NotFoundException(str(e.message)) from e
-
-
-# ============================================================================
-# Invitation Endpoints
-# ============================================================================
 
 
 @router.get(
@@ -1154,7 +1185,6 @@ async def list_invitations(
         f"GET /workspaces/{workspace_id}/invitations - user={current_user.id}"
     )
     async with session.begin():
-        # Check admin access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -1259,6 +1289,7 @@ async def create_invitation(
     data: InvitationCreate,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_invite_rate_limit)],
 ) -> InvitationCreatedResponse:
     """Invite a user to join the workspace."""
     request_logger.info(
@@ -1266,7 +1297,6 @@ async def create_invitation(
         f"- user={current_user.id} email={data.email}"
     )
 
-    # Validate callback URL is in allowed CORS origins
     if not OAuthStateManager.validate_callback_url(data.callback_url):
         raise BadRequestException(
             "Invalid callback URL. Must be in allowed origins and use HTTPS in production."
@@ -1391,11 +1421,6 @@ async def revoke_invitation(
         raise NotFoundException(str(e.message)) from e
 
 
-# ============================================================================
-# Public Invitation Accept Endpoint
-# ============================================================================
-
-
 @router.post(
     "/invitations/accept",
     response_model=WorkspaceMemberResponse,
@@ -1438,7 +1463,7 @@ Returns the created member object:
 
 ### Notes
 
-- Token is typically received via email or shared link
+- Token is typically received via email or core link
 - Token expires after 7 days
 - Email must match the invitation email
 - If seats are full, the invitation cannot be accepted
@@ -1483,6 +1508,10 @@ async def accept_invitation(
                 user=current_user,
                 commit_self=False,
             )
+            # Reload with .user for response building
+            member = await workspace_member_db.get_member(
+                session, member.workspace_id, member.user_id
+            )
             return _build_member_response(member)
     except InvitationNotFoundException as e:
         raise NotFoundException(str(e.message)) from e
@@ -1490,11 +1519,6 @@ async def accept_invitation(
         raise ConflictException(str(e.message)) from e
     except InsufficientSeatsException as e:
         raise PaymentRequiredException(str(e.message)) from e
-
-
-# ============================================================================
-# Manual Activation Endpoint
-# ============================================================================
 
 
 @router.post(
@@ -1553,17 +1577,16 @@ async def activate_personal_workspace(
                 commit_self=False,
             )
         )
+        # Reload with relationships needed for response
+        workspace = await workspace_service.get_workspace(
+            session, workspace.id, options=_WORKSPACE_RESPONSE_LOADERS
+        )
         workspace_response = await _build_workspace_response(session, workspace)
 
     request_logger.info(
         f"POST /workspaces/activate - workspace={workspace.id} for user={current_user.id}"
     )
     return workspace_response
-
-
-# ============================================================================
-# API Key Endpoints
-# ============================================================================
 
 
 def _build_api_key_response(api_key) -> APIKeyResponse:
@@ -1668,6 +1691,7 @@ async def create_api_key(
     data: APIKeyCreate,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_create_api_key_rate_limit)],
 ) -> APIKeyCreatedResponse:
     """Create a new API key for the workspace."""
     request_logger.info(
@@ -1675,7 +1699,6 @@ async def create_api_key(
     )
 
     async with session.begin():
-        # Get member and verify admin permission
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -1763,7 +1786,6 @@ async def list_api_keys(
     )
 
     async with session.begin():
-        # Verify user is a member of the workspace
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -1848,7 +1870,6 @@ async def revoke_api_key(
 
     try:
         async with session.begin():
-            # Get member and verify admin permission
             member = await workspace_member_db.get_member(
                 session, workspace_id, current_user.id
             )

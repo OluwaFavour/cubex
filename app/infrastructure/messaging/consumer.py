@@ -3,8 +3,8 @@ from typing import Callable, Any
 
 import aio_pika
 
-from app.shared.config import rabbitmq_logger
-from app.shared.services.email_manager import EmailManagerService
+from app.core.config import rabbitmq_logger
+from app.core.services.email_manager import EmailManagerService
 
 
 async def process_message(
@@ -57,7 +57,6 @@ async def process_message(
                     next_queue = retry_queue
                     rabbitmq_logger.info(f"Retrying message via {next_queue}")
 
-            # Send to next queue if it exists
             if next_queue:
                 headers["x-retry-attempt"] = attempt + 1
                 await channel.default_exchange.publish(
@@ -78,7 +77,6 @@ async def process_message(
                 )
                 rabbitmq_logger.warning(f"Message dead-lettered to {dead_letter_queue}")
 
-                # Send DLQ alert email
                 try:
                     message_body = message.body.decode()
                     await EmailManagerService.send_dlq_alert(
@@ -93,3 +91,4 @@ async def process_message(
 
             # Reject the message without requeuing
             await message.reject(requeue=False)
+

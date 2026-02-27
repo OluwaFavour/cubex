@@ -1,5 +1,5 @@
 """
-Pytest configuration and shared fixtures.
+Pytest configuration and core fixtures.
 
 Provides fixtures for integration tests using real test database with per-test rollback.
 All fixtures are function-scoped for complete test isolation.
@@ -23,14 +23,9 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy import select
 
 
-# ============================================================================
-# Test Utilities
-# ============================================================================
-
-
 def create_test_access_token(user) -> str:
     """Create a test access token for a user."""
-    from app.shared.utils import create_jwt_token
+    from app.core.utils import create_jwt_token
 
     return create_jwt_token(
         data={
@@ -40,11 +35,6 @@ def create_test_access_token(user) -> str:
         },
         expires_delta=timedelta(minutes=15),
     )
-
-
-# ============================================================================
-# Pytest Configuration
-# ============================================================================
 
 
 def pytest_configure(config):
@@ -60,11 +50,6 @@ def pytest_configure(config):
         "markers",
         "integration: marks tests as integration tests (require real database)",
     )
-
-
-# ============================================================================
-# Session-Scoped Database Setup (runs once per test session)
-# ============================================================================
 
 
 @pytest.fixture(scope="session")
@@ -92,7 +77,7 @@ def setup_test_database(event_loop_policy):
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    from app.shared.config import settings
+    from app.core.config import settings
 
     if not settings.TEST_DATABASE_URL:
         pytest.skip("TEST_DATABASE_URL not configured")
@@ -100,7 +85,6 @@ def setup_test_database(event_loop_policy):
     # Save the original DATABASE_URL to restore later
     original_database_url = os.environ.get("DATABASE_URL")
 
-    # Set the database URL for alembic to use
     os.environ["DATABASE_URL"] = settings.TEST_DATABASE_URL
 
     try:
@@ -180,11 +164,6 @@ def setup_test_database(event_loop_policy):
             print("[TEST] Removed temporary DATABASE_URL")
 
 
-# ============================================================================
-# Database Fixtures (all function-scoped for isolation)
-# ============================================================================
-
-
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a test database session with transaction rollback.
@@ -202,25 +181,22 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     - Routers to use their normal begin() calls (converted to savepoints)
     - Complete rollback after each test
     """
-    from app.shared.config import settings
+    from app.core.config import settings
 
     if not settings.TEST_DATABASE_URL:
         pytest.skip("TEST_DATABASE_URL not configured")
 
-    # Create a fresh engine for this test
     engine = create_async_engine(
         settings.TEST_DATABASE_URL,
         echo=False,
         pool_pre_ping=True,
     )
 
-    # Create connection
     connection = await engine.connect()
 
     # Start outer transaction for final rollback
     outer_transaction = await connection.begin()
 
-    # Create session bound to this connection
     # autobegin=True so test fixtures can use session without manual begin()
     session = AsyncSession(
         bind=connection,
@@ -247,11 +223,6 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         await outer_transaction.rollback()
         await connection.close()
         await engine.dispose()
-
-
-# ============================================================================
-# Application Fixtures
-# ============================================================================
 
 
 @pytest.fixture
@@ -288,11 +259,6 @@ async def client(app, db_session: AsyncSession) -> AsyncGenerator[AsyncClient, N
         app.dependency_overrides.pop(get_async_session, None)
 
 
-# ============================================================================
-# Stripe Mock Fixtures
-# ============================================================================
-
-
 @pytest.fixture(autouse=True)
 def mock_stripe():
     """Auto-mock Stripe API calls to prevent real HTTP requests.
@@ -305,7 +271,6 @@ def mock_stripe():
     We mock at the service layer to avoid Pydantic validation complexity.
     """
 
-    # Create a mock that returns the subscription model unchanged
     async def mock_cancel_subscription(subscription_id, **kwargs):
         """Mock cancel_subscription that doesn't call Stripe."""
         return AsyncMock(
@@ -315,16 +280,16 @@ def mock_stripe():
         )
 
     with patch(
-        "app.shared.services.payment.stripe.main.Stripe.cancel_subscription",
+        "app.core.services.payment.stripe.main.Stripe.cancel_subscription",
         side_effect=mock_cancel_subscription,
     ), patch(
-        "app.shared.services.payment.stripe.main.Stripe.create_checkout_session",
+        "app.core.services.payment.stripe.main.Stripe.create_checkout_session",
         new_callable=AsyncMock,
     ), patch(
-        "app.shared.services.payment.stripe.main.Stripe.create_customer_portal_session",
+        "app.core.services.payment.stripe.main.Stripe.create_customer_portal_session",
         new_callable=AsyncMock,
     ), patch(
-        "app.shared.services.payment.stripe.main.Stripe._request",
+        "app.core.services.payment.stripe.main.Stripe._request",
         new_callable=AsyncMock,
     ):
         yield
@@ -350,7 +315,7 @@ def mock_email_service():
         "app.infrastructure.messaging.publisher.publish_event",
         side_effect=mock_publish_event,
     ), patch(
-        "app.shared.services.auth.publish_event",
+        "app.core.services.auth.publish_event",
         side_effect=mock_publish_event,
     ), patch(
         "app.apps.cubex_api.services.workspace.publish_event",
@@ -362,7 +327,7 @@ def mock_email_service():
         "app.apps.cubex_career.services.subscription.publish_event",
         side_effect=mock_publish_event,
     ), patch(
-        "app.shared.routers.webhook.publish_event",
+        "app.core.routers.webhook.publish_event",
         side_effect=mock_publish_event,
     ), patch(
         "app.infrastructure.messaging.handlers.stripe.publish_event",
@@ -371,15 +336,9 @@ def mock_email_service():
         yield
 
 
-# ============================================================================
-# User Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 async def test_user(db_session: AsyncSession):
-    """Create a test user in the database."""
-    from app.shared.db.models import User
+    from app.core.db.models import User
 
     user = User(
         id=uuid4(),
@@ -396,8 +355,7 @@ async def test_user(db_session: AsyncSession):
 
 @pytest.fixture
 async def test_user_unverified(db_session: AsyncSession):
-    """Create an unverified test user."""
-    from app.shared.db.models import User
+    from app.core.db.models import User
 
     user = User(
         id=uuid4(),
@@ -417,7 +375,7 @@ async def auth_headers(test_user) -> dict[str, str]:
     """Generate authentication headers for test user."""
     from datetime import timedelta
 
-    from app.shared.utils import create_jwt_token
+    from app.core.utils import create_jwt_token
 
     access_token = create_jwt_token(
         data={
@@ -440,18 +398,13 @@ async def authenticated_client(
     return client
 
 
-# ============================================================================
-# Plan Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 async def free_api_plan(db_session: AsyncSession):
     """Get the free API plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import PlanType, ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import PlanType, ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -470,8 +423,8 @@ async def basic_api_plan(db_session: AsyncSession):
     """Get the basic API plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -493,16 +446,14 @@ async def basic_api_plan_pricing_rule(db_session: AsyncSession, basic_api_plan):
     """
     from decimal import Decimal
 
-    from app.apps.cubex_api.db.models import PlanPricingRule
+    from app.core.db.models import PlanPricingRule
 
-    # Check if pricing rule already exists
     result = await db_session.execute(
         select(PlanPricingRule).where(PlanPricingRule.plan_id == basic_api_plan.id)
     )
     pricing_rule = result.scalar_one_or_none()
 
     if pricing_rule is None:
-        # Create pricing rule for the plan
         pricing_rule = PlanPricingRule(
             id=uuid4(),
             plan_id=basic_api_plan.id,
@@ -514,6 +465,70 @@ async def basic_api_plan_pricing_rule(db_session: AsyncSession, basic_api_plan):
         await db_session.flush()
 
     return pricing_rule
+
+
+@pytest.fixture
+async def basic_feature_cost_config(db_session: AsyncSession, basic_api_plan):
+    """Get or create a FeatureCostConfig for API_EXTRACT_CUES_RESUME.
+
+    This ensures quota validation tests have a feature cost row.
+    """
+    from decimal import Decimal
+
+    from app.core.db.models import FeatureCostConfig
+    from app.core.enums import FeatureKey, ProductType
+
+    result = await db_session.execute(
+        select(FeatureCostConfig).where(
+            FeatureCostConfig.feature_key == FeatureKey.API_EXTRACT_CUES_RESUME,
+            FeatureCostConfig.product_type == ProductType.API,
+        )
+    )
+    config = result.scalar_one_or_none()
+
+    if config is None:
+        config = FeatureCostConfig(
+            id=uuid4(),
+            feature_key=FeatureKey.API_EXTRACT_CUES_RESUME,
+            product_type=ProductType.API,
+            internal_cost_credits=Decimal("1.0"),
+        )
+        db_session.add(config)
+        await db_session.flush()
+
+    return config
+
+
+@pytest.fixture
+async def career_feature_cost_config(db_session: AsyncSession):
+    """Get or create a FeatureCostConfig for CAREER_CAREER_PATH.
+
+    This ensures Career quota validation tests have a feature cost row.
+    """
+    from decimal import Decimal
+
+    from app.core.db.models import FeatureCostConfig
+    from app.core.enums import FeatureKey, ProductType
+
+    result = await db_session.execute(
+        select(FeatureCostConfig).where(
+            FeatureCostConfig.feature_key == FeatureKey.CAREER_CAREER_PATH,
+            FeatureCostConfig.product_type == ProductType.CAREER,
+        )
+    )
+    config = result.scalar_one_or_none()
+
+    if config is None:
+        config = FeatureCostConfig(
+            id=uuid4(),
+            feature_key=FeatureKey.CAREER_CAREER_PATH,
+            product_type=ProductType.CAREER,
+            internal_cost_credits=Decimal("1.0"),
+        )
+        db_session.add(config)
+        await db_session.flush()
+
+    return config
 
 
 @pytest.fixture
@@ -530,7 +545,6 @@ async def benchmark_plan_pricing_rule(
 
     from app.apps.cubex_api.db.models import PlanPricingRule
 
-    # Check if pricing rule already exists
     result = await db_session.execute(
         select(PlanPricingRule).where(PlanPricingRule.plan_id == basic_api_plan.id)
     )
@@ -539,7 +553,6 @@ async def benchmark_plan_pricing_rule(
     high_rate_limit = 1000
 
     if pricing_rule is None:
-        # Create pricing rule with high rate limit
         pricing_rule = PlanPricingRule(
             id=uuid4(),
             plan_id=basic_api_plan.id,
@@ -549,7 +562,6 @@ async def benchmark_plan_pricing_rule(
         )
         db_session.add(pricing_rule)
     else:
-        # Update existing rule to have high rate limit
         pricing_rule.rate_limit_per_minute = high_rate_limit
 
     await db_session.flush()
@@ -562,8 +574,8 @@ async def professional_api_plan(db_session: AsyncSession):
     """Get the professional API plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -582,8 +594,8 @@ async def free_career_plan(db_session: AsyncSession):
     """Get the free Career plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import PlanType, ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import PlanType, ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -602,8 +614,8 @@ async def plus_career_plan(db_session: AsyncSession):
     """Get the Plus Career plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -622,8 +634,8 @@ async def pro_career_plan(db_session: AsyncSession):
     """Get the Pro Career plan from seeded data."""
     from sqlalchemy import select
 
-    from app.shared.db.models import Plan
-    from app.shared.enums import ProductType
+    from app.core.db.models import Plan
+    from app.core.enums import ProductType
 
     result = await db_session.execute(
         select(Plan).where(
@@ -637,16 +649,10 @@ async def pro_career_plan(db_session: AsyncSession):
     return plan
 
 
-# ============================================================================
-# Workspace Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 async def test_workspace(db_session: AsyncSession, test_user):
-    """Create a test workspace owned by test_user."""
-    from app.shared.db.models import Workspace, WorkspaceMember
-    from app.shared.enums import MemberRole, MemberStatus, WorkspaceStatus
+    from app.core.db.models import Workspace, WorkspaceMember
+    from app.core.enums import MemberRole, MemberStatus, WorkspaceStatus
 
     workspace = Workspace(
         id=uuid4(),
@@ -676,13 +682,13 @@ async def test_workspace(db_session: AsyncSession, test_user):
 @pytest.fixture
 async def personal_workspace(db_session: AsyncSession, test_user, free_api_plan):
     """Create a personal workspace for test_user with a free subscription."""
-    from app.shared.db.models import (
+    from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
         Workspace,
         WorkspaceMember,
     )
-    from app.shared.enums import (
+    from app.core.enums import (
         MemberRole,
         MemberStatus,
         SubscriptionStatus,
@@ -711,7 +717,6 @@ async def personal_workspace(db_session: AsyncSession, test_user, free_api_plan)
     db_session.add(member)
     await db_session.flush()
 
-    # Create subscription for personal workspace
     subscription = Subscription(
         id=uuid4(),
         plan_id=free_api_plan.id,
@@ -736,9 +741,8 @@ async def personal_workspace(db_session: AsyncSession, test_user, free_api_plan)
 
 @pytest.fixture
 async def test_workspace_member(db_session: AsyncSession, test_workspace):
-    """Create another user who is a member of test_workspace."""
-    from app.shared.db.models import User, WorkspaceMember
-    from app.shared.enums import MemberRole, MemberStatus
+    from app.core.db.models import User, WorkspaceMember
+    from app.core.enums import MemberRole, MemberStatus
 
     user = User(
         id=uuid4(),
@@ -767,9 +771,8 @@ async def test_workspace_member(db_session: AsyncSession, test_workspace):
 
 @pytest.fixture
 async def test_workspace_admin(db_session: AsyncSession, test_workspace):
-    """Create another user who is an admin of test_workspace."""
-    from app.shared.db.models import User, WorkspaceMember
-    from app.shared.enums import MemberRole, MemberStatus
+    from app.core.db.models import User, WorkspaceMember
+    from app.core.enums import MemberRole, MemberStatus
 
     user = User(
         id=uuid4(),
@@ -796,16 +799,16 @@ async def test_workspace_admin(db_session: AsyncSession, test_workspace):
     return user, member
 
 
-# ============================================================================
-# Subscription Fixtures
-# ============================================================================
-
-
 @pytest.fixture
-async def test_subscription(db_session: AsyncSession, test_workspace, basic_api_plan):
-    """Create a test subscription for the workspace."""
-    from app.shared.db.models import APISubscriptionContext, Subscription
-    from app.shared.enums import SubscriptionStatus
+async def test_subscription(
+    db_session: AsyncSession,
+    test_workspace,
+    basic_api_plan,
+    basic_api_plan_pricing_rule,
+    basic_feature_cost_config,
+):
+    from app.core.db.models import APISubscriptionContext, Subscription
+    from app.core.enums import SubscriptionStatus
 
     subscription = Subscription(
         id=uuid4(),
@@ -834,8 +837,8 @@ async def test_subscription(db_session: AsyncSession, test_workspace, basic_api_
 @pytest.fixture
 async def career_subscription(db_session: AsyncSession, test_user, free_career_plan):
     """Create a career subscription for test user."""
-    from app.shared.db.models import CareerSubscriptionContext, Subscription
-    from app.shared.enums import ProductType, SubscriptionStatus
+    from app.core.db.models import CareerSubscriptionContext, Subscription
+    from app.core.enums import ProductType, SubscriptionStatus
 
     subscription = Subscription(
         id=uuid4(),
@@ -865,8 +868,8 @@ async def paid_career_subscription(
     db_session: AsyncSession, test_user, plus_career_plan
 ):
     """Create a paid career subscription for test user."""
-    from app.shared.db.models import CareerSubscriptionContext, Subscription
-    from app.shared.enums import ProductType, SubscriptionStatus
+    from app.core.db.models import CareerSubscriptionContext, Subscription
+    from app.core.enums import ProductType, SubscriptionStatus
 
     subscription = Subscription(
         id=uuid4(),
@@ -893,23 +896,14 @@ async def paid_career_subscription(
     return subscription
 
 
-# ============================================================================
-# Invitation Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 async def test_invitation(db_session: AsyncSession, test_workspace, test_user):
-    """Create a test workspace invitation.
-
-    Returns a tuple of (invitation, raw_token) so tests can use the raw token.
-    """
     import secrets
 
-    from app.shared.config import settings
-    from app.shared.db.models import WorkspaceInvitation
-    from app.shared.enums import InvitationStatus, MemberRole
-    from app.shared.utils import hmac_hash_otp
+    from app.core.config import settings
+    from app.core.db.models import WorkspaceInvitation
+    from app.core.enums import InvitationStatus, MemberRole
+    from app.core.utils import hmac_hash_otp
 
     # Generate raw token and its hash (same as WorkspaceService._generate_secure_token)
     raw_token = secrets.token_urlsafe(32)
@@ -940,12 +934,11 @@ async def expired_invitation(db_session: AsyncSession, test_workspace, test_user
     """
     import secrets
 
-    from app.shared.config import settings
-    from app.shared.db.models import WorkspaceInvitation
-    from app.shared.enums import InvitationStatus, MemberRole
-    from app.shared.utils import hmac_hash_otp
+    from app.core.config import settings
+    from app.core.db.models import WorkspaceInvitation
+    from app.core.enums import InvitationStatus, MemberRole
+    from app.core.utils import hmac_hash_otp
 
-    # Generate raw token and its hash
     raw_token = secrets.token_urlsafe(32)
     token_hash = hmac_hash_otp(raw_token, settings.OTP_HMAC_SECRET)
 
@@ -966,11 +959,6 @@ async def expired_invitation(db_session: AsyncSession, test_workspace, test_user
     return invitation, raw_token
 
 
-# ============================================================================
-# Path Fixtures
-# ============================================================================
-
-
 @pytest.fixture(scope="session")
 def project_root() -> Path:
     """Return the project root directory."""
@@ -981,11 +969,6 @@ def project_root() -> Path:
 def app_root(project_root: Path) -> Path:
     """Return the app root directory."""
     return project_root / "app"
-
-
-# ============================================================================
-# Mock Settings Fixture
-# ============================================================================
 
 
 @pytest.fixture
@@ -1003,17 +986,12 @@ def mock_settings():
     return settings
 
 
-# ============================================================================
-# Redis Testcontainer Fixtures
-# ============================================================================
-
-
 @pytest.fixture(scope="session")
 def redis_container():
     """Start a Redis container for the test session.
 
     Uses testcontainers to start a real Redis instance.
-    The container is shared across all tests in the session for efficiency.
+    The container is core across all tests in the session for efficiency.
     """
     try:
         from testcontainers.core.container import DockerContainer
@@ -1047,9 +1025,8 @@ async def setup_redis_service(redis_url):
     1. Initializes RedisService to use the testcontainer Redis
     2. After each test, flushes the database to ensure test isolation
     """
-    from app.shared.services.redis_service import RedisService
+    from app.core.services.redis_service import RedisService
 
-    # Initialize with testcontainer URL
     await RedisService.init(redis_url)
 
     yield
@@ -1057,11 +1034,6 @@ async def setup_redis_service(redis_url):
     # Flush the Redis database after each test for isolation
     if RedisService._client is not None:
         await RedisService._client.flushdb()
-
-
-# ============================================================================
-# API Key Fixtures
-# ============================================================================
 
 
 def make_client_id(workspace) -> str:
@@ -1079,7 +1051,6 @@ async def live_api_key(db_session: AsyncSession, test_workspace, test_subscripti
     from app.apps.cubex_api.db.models import APIKey
     from app.apps.cubex_api.services.quota import quota_service
 
-    # Generate key using the service's method
     raw_key, key_hash, key_prefix = quota_service._generate_api_key(is_test_key=False)
 
     api_key = APIKey(
@@ -1099,15 +1070,9 @@ async def live_api_key(db_session: AsyncSession, test_workspace, test_subscripti
 
 @pytest.fixture
 async def test_api_key(db_session: AsyncSession, test_workspace, test_subscription):
-    """Create a test API key for test_workspace (cbx_test_ prefix).
-
-    Returns:
-        Tuple of (raw_key, APIKey model instance)
-    """
     from app.apps.cubex_api.db.models import APIKey
     from app.apps.cubex_api.services.quota import quota_service
 
-    # Generate test key using the service's method
     raw_key, key_hash, key_prefix = quota_service._generate_api_key(is_test_key=True)
 
     api_key = APIKey(
@@ -1181,11 +1146,6 @@ async def revoked_api_key(db_session: AsyncSession, test_workspace, test_subscri
     return raw_key, api_key
 
 
-# ============================================================================
-# Quota Edge Case Fixtures
-# ============================================================================
-
-
 @pytest.fixture
 async def other_workspace(db_session: AsyncSession, test_user, basic_api_plan):
     """Create a second workspace for mismatch tests.
@@ -1193,13 +1153,13 @@ async def other_workspace(db_session: AsyncSession, test_user, basic_api_plan):
     This workspace is owned by the same user but is separate from test_workspace.
     Includes its own subscription for quota tracking.
     """
-    from app.shared.db.models import (
+    from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
         Workspace,
         WorkspaceMember,
     )
-    from app.shared.enums import (
+    from app.core.enums import (
         MemberRole,
         MemberStatus,
         SubscriptionStatus,
@@ -1228,7 +1188,6 @@ async def other_workspace(db_session: AsyncSession, test_user, basic_api_plan):
     db_session.add(member)
     await db_session.flush()
 
-    # Create subscription
     subscription = Subscription(
         id=uuid4(),
         plan_id=basic_api_plan.id,
@@ -1255,7 +1214,11 @@ async def other_workspace(db_session: AsyncSession, test_user, basic_api_plan):
 
 @pytest.fixture
 async def workspace_quota_exhausted(
-    db_session: AsyncSession, test_user, basic_api_plan, basic_api_plan_pricing_rule
+    db_session: AsyncSession,
+    test_user,
+    basic_api_plan,
+    basic_api_plan_pricing_rule,
+    basic_feature_cost_config,
 ):
     """Create a workspace with exhausted quota.
 
@@ -1265,13 +1228,13 @@ async def workspace_quota_exhausted(
     Returns:
         Tuple of (workspace, subscription, credits_allocation)
     """
-    from app.shared.db.models import (
+    from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
         Workspace,
         WorkspaceMember,
     )
-    from app.shared.enums import (
+    from app.core.enums import (
         MemberRole,
         MemberStatus,
         SubscriptionStatus,
@@ -1281,7 +1244,6 @@ async def workspace_quota_exhausted(
     # Use the pricing rule from fixture
     credits_allocation = basic_api_plan_pricing_rule.credits_allocation
 
-    # Create workspace
     workspace = Workspace(
         id=uuid4(),
         display_name="Exhausted Quota Workspace",
@@ -1304,7 +1266,6 @@ async def workspace_quota_exhausted(
     db_session.add(member)
     await db_session.flush()
 
-    # Create subscription
     subscription = Subscription(
         id=uuid4(),
         plan_id=basic_api_plan.id,
@@ -1318,13 +1279,11 @@ async def workspace_quota_exhausted(
     db_session.add(subscription)
     await db_session.flush()
 
-    # Create context with exhausted credits
     context = APISubscriptionContext(
         id=uuid4(),
         subscription_id=subscription.id,
         workspace_id=workspace.id,
         credits_used=credits_allocation,  # Exactly at the limit
-        billing_period_start=datetime.now(timezone.utc),
     )
     db_session.add(context)
     await db_session.flush()
@@ -1367,11 +1326,6 @@ async def api_key_for_exhausted_workspace(
 async def test_api_key_for_exhausted_workspace(
     db_session: AsyncSession, workspace_quota_exhausted
 ):
-    """Create a test API key for the exhausted quota workspace.
-
-    Returns:
-        Tuple of (raw_key, APIKey model instance, workspace, subscription, credits_allocation)
-    """
     from app.apps.cubex_api.db.models import APIKey
     from app.apps.cubex_api.services.quota import quota_service
 

@@ -17,11 +17,9 @@ from app.infrastructure.messaging.connection import get_connection
 
 
 class TestGetConnection:
-    """Test suite for get_connection function."""
 
     @pytest.mark.asyncio
     async def test_get_connection_creates_new_connection(self):
-        """Test that get_connection creates a new connection when none exists."""
         # Import the module to reset _connection
         from app.infrastructure.messaging import connection as conn_module
 
@@ -37,13 +35,11 @@ class TestGetConnection:
 
             assert result == mock_connection
             mock_connect.assert_called_once()
-            # Verify it was called with settings.RABBITMQ_URL
             call_args = mock_connect.call_args[0]
             assert len(call_args) > 0  # URL was passed
 
     @pytest.mark.asyncio
     async def test_get_connection_reuses_existing_connection(self):
-        """Test that get_connection reuses existing open connection."""
         from app.infrastructure.messaging import connection as conn_module
 
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
@@ -58,7 +54,6 @@ class TestGetConnection:
 
     @pytest.mark.asyncio
     async def test_get_connection_recreates_closed_connection(self):
-        """Test that get_connection recreates connection if it's closed."""
         from app.infrastructure.messaging import connection as conn_module
 
         old_connection = AsyncMock(spec=aio_pika.RobustConnection)
@@ -79,9 +74,8 @@ class TestGetConnection:
 
     @pytest.mark.asyncio
     async def test_get_connection_uses_settings_url(self):
-        """Test that get_connection uses RABBITMQ_URL from settings."""
         from app.infrastructure.messaging import connection as conn_module
-        from app.shared.config import settings
+        from app.core.config import settings
 
         conn_module._connection = None
 
@@ -93,12 +87,10 @@ class TestGetConnection:
 
             await get_connection()
 
-            # Verify it was called with the RABBITMQ_URL from settings
             mock_connect.assert_called_once_with(settings.RABBITMQ_URL)
 
     @pytest.mark.asyncio
     async def test_get_connection_returns_robust_connection(self):
-        """Test that get_connection returns RobustConnection instance."""
         from app.infrastructure.messaging import connection as conn_module
 
         conn_module._connection = None
@@ -113,3 +105,4 @@ class TestGetConnection:
 
             # Check it's a RobustConnection (or mock thereof)
             assert hasattr(result, "is_closed")
+

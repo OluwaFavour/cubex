@@ -1,7 +1,6 @@
 """
 Subscription router for cubex_api.
 
-This module provides endpoints for:
 - Viewing plans
 - Managing subscriptions
 - Checkout sessions
@@ -12,12 +11,12 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session
-from app.shared.config import request_logger
-from app.shared.dependencies.auth import CurrentActiveUser
+from app.core.dependencies import CurrentActiveUser, get_async_session
+from app.core.config import request_logger
+from app.core.services.rate_limit import rate_limit_by_ip
 from app.apps.cubex_api.db.crud import workspace_member_db
 from app.apps.cubex_api.schemas import (
     PlanResponse,
@@ -40,18 +39,26 @@ from app.apps.cubex_api.services import (
     AdminPermissionRequiredException,
     OwnerPermissionRequiredException,
     SubscriptionNotFoundException,
-    QuotaCacheService,
+    APIQuotaCacheService,
 )
-from app.shared.db.models import Plan, Subscription
-from app.shared.db.crud import api_subscription_context_db
+from app.core.db.models import Plan, Subscription
+from app.core.db.crud import api_subscription_context_db
 
 
 router = APIRouter(prefix="/subscriptions")
 
+# Rate limiters for subscription endpoints
+# Public plan listing: 30 req/min per IP (prevent scraping)
+_list_plans_rate_limit = rate_limit_by_ip(limit=30, window=60)
 
-# ============================================================================
-# Helper Functions
-# ============================================================================
+# Checkout: 10 req/hour per IP (prevent payment abuse)
+_checkout_rate_limit = rate_limit_by_ip(limit=10, window=3600)
+
+# Cancel: 5 req/hour per IP (prevent abuse)
+_cancel_rate_limit = rate_limit_by_ip(limit=5, window=3600)
+
+# Upgrade: 10 req/hour per IP (prevent abuse)
+_upgrade_rate_limit = rate_limit_by_ip(limit=10, window=3600)
 
 
 def _build_plan_response(plan: Plan) -> PlanResponse:
@@ -113,23 +120,15 @@ async def _get_credits_info(
     Returns:
         Tuple of (credits_allocation, credits_used)
     """
-    # Get credits allocation from plan pricing rules
+    plan_config = await APIQuotaCacheService.get_plan_config(session, plan_id)
     credits_allocation = (
-        await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-            session, plan_id
-        )
+        plan_config.credits_allocation if plan_config else Decimal("0.00")
     )
 
-    # Get credits used from subscription context
     context = await api_subscription_context_db.get_by_workspace(session, workspace_id)
     credits_used = context.credits_used if context else Decimal("0.00")
 
     return credits_allocation, credits_used
-
-
-# ============================================================================
-# Plan Endpoints
-# ============================================================================
 
 
 @router.get(
@@ -189,6 +188,7 @@ Returns a list of plans, each containing:
 )
 async def list_plans(
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_list_plans_rate_limit)],
 ) -> PlanListResponse:
     """List all active plans available for purchase."""
     request_logger.info("GET /subscriptions/plans")
@@ -244,11 +244,6 @@ async def get_plan(
     async with session.begin():
         plan = await subscription_service.get_plan(session, plan_id)
         return _build_plan_response(plan)
-
-
-# ============================================================================
-# Subscription Endpoints
-# ============================================================================
 
 
 @router.get(
@@ -321,7 +316,6 @@ async def get_workspace_subscription(
         f"GET /subscriptions/workspaces/{workspace_id} - user={current_user.id}"
     )
     async with session.begin():
-        # Check access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -415,6 +409,7 @@ async def create_checkout(
     data: CheckoutRequest,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_checkout_rate_limit)],
 ) -> CheckoutResponse:
     """Create a Stripe checkout session for subscription."""
     request_logger.info(
@@ -422,7 +417,6 @@ async def create_checkout(
         f"- user={current_user.id} plan={data.plan_id} seats={data.seat_count}"
     )
     async with session.begin():
-        # Check admin access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -537,7 +531,6 @@ async def update_seats(
         f"- user={current_user.id} seats={data.seat_count}"
     )
     async with session.begin():
-        # Check admin access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -634,6 +627,7 @@ async def cancel_subscription(
     data: CancelSubscriptionRequest,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_cancel_rate_limit)],
 ) -> SubscriptionResponse:
     """Cancel workspace subscription."""
     request_logger.info(
@@ -744,7 +738,6 @@ async def reactivate_workspace(
         f"POST /subscriptions/workspaces/{workspace_id}/reactivate - user={current_user.id}"
     )
     async with session.begin():
-        # Check owner access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
@@ -877,14 +870,12 @@ async def preview_subscription_change(
         f"- user={current_user.id} new_plan={data.new_plan_id}"
     )
     async with session.begin():
-        # Check admin access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )
         if not member or not member.is_admin:
             raise AdminPermissionRequiredException()
 
-        # Get current subscription for plan name
         current_sub = await subscription_service.get_subscription(session, workspace_id)
         if not current_sub:
             raise SubscriptionNotFoundException()
@@ -896,7 +887,6 @@ async def preview_subscription_change(
             else None
         )
 
-        # Get preview from Stripe
         invoice_preview = await subscription_service.preview_subscription_change(
             session,
             workspace_id=workspace_id,
@@ -904,12 +894,11 @@ async def preview_subscription_change(
             new_seat_count=data.new_seat_count,
         )
 
-        # Convert cents to dollars for response
         total_due = Decimal(invoice_preview.amount_due) / Decimal(100)
 
         return UpgradePreviewResponse(
             current_plan=current_plan.name,
-            new_plan=new_plan.name,
+            new_plan=new_plan.name if new_plan else current_plan.name,
             current_seat_count=current_sub.seat_count,
             new_seat_count=data.new_seat_count or current_sub.seat_count,
             proration_amount=invoice_preview.proration_amount,
@@ -1022,6 +1011,7 @@ async def upgrade_plan(
     data: UpgradeRequest,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_upgrade_rate_limit)],
 ) -> SubscriptionResponse:
     """Upgrade subscription to a different plan."""
     request_logger.info(
@@ -1029,7 +1019,6 @@ async def upgrade_plan(
         f"- user={current_user.id} new_plan={data.new_plan_id}"
     )
     async with session.begin():
-        # Check admin access
         member = await workspace_member_db.get_member(
             session, workspace_id, current_user.id
         )

@@ -10,7 +10,7 @@ from sqladmin import Admin
 
 from app.admin.auth import admin_auth
 from app.admin.views import (
-    EndpointCostConfigAdmin,
+    FeatureCostConfigAdmin,
     PlanAdmin,
     PlanPricingRuleAdmin,
     SubscriptionAdmin,
@@ -19,7 +19,7 @@ from app.admin.views import (
     WorkspaceAdmin,
     WorkspaceMemberAdmin,
 )
-from app.shared.db import async_engine
+from app.core.db import async_engine
 
 # Admin instance will be created when init_admin is called
 admin: Admin | None = None
@@ -34,7 +34,6 @@ def init_admin(app: FastAPI) -> None:
     """
     global admin
 
-    # Create Admin instance with async engine
     admin = Admin(
         app=app,
         engine=async_engine,
@@ -45,7 +44,7 @@ def init_admin(app: FastAPI) -> None:
 
     # Register model views
     admin.add_view(PlanAdmin)
-    admin.add_view(EndpointCostConfigAdmin)
+    admin.add_view(FeatureCostConfigAdmin)
     admin.add_view(PlanPricingRuleAdmin)
     admin.add_view(UserAdmin)
     admin.add_view(WorkspaceAdmin)
@@ -55,3 +54,4 @@ def init_admin(app: FastAPI) -> None:
 
 
 __all__ = ["admin", "init_admin"]
+

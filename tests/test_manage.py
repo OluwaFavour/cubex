@@ -24,17 +24,14 @@ runner = CliRunner()
 
 
 class TestSyncPlansCommand:
-    """Test suite for syncplans CLI command."""
 
     def test_syncplans_help(self):
-        """Test that syncplans command has help text."""
         result = runner.invoke(app, ["syncplans", "--help"])
         assert result.exit_code == 0
         assert "Synchronize subscription plans" in result.stdout
         assert "--dry-run" in result.stdout or "-n" in result.stdout
 
     def test_syncplans_dry_run_flag_accepted(self):
-        """Test that --dry-run flag is accepted."""
         with patch("manage.sync_plans_task") as mock_task:
             mock_task.return_value = None
             result = runner.invoke(app, ["syncplans", "--dry-run"])
@@ -43,7 +40,6 @@ class TestSyncPlansCommand:
             assert "--dry-run" not in result.stdout or result.exit_code in [0, 1]
 
     def test_syncplans_short_flag_accepted(self):
-        """Test that -n short flag is accepted."""
         with patch("manage.sync_plans_task") as mock_task:
             mock_task.return_value = None
             result = runner.invoke(app, ["syncplans", "-n"])
@@ -51,11 +47,9 @@ class TestSyncPlansCommand:
 
 
 class TestSyncPlansTask:
-    """Test suite for sync_plans_task async function."""
 
     @pytest.mark.asyncio
     async def test_sync_plans_task_loads_plans_json(self):
-        """Test that sync_plans_task loads plans.json file."""
         mock_plans_data = {
             "api_plans": [
                 {
@@ -95,7 +89,6 @@ class TestSyncPlansTask:
 
     @pytest.mark.asyncio
     async def test_sync_plans_task_dry_run_no_db_changes(self):
-        """Test that dry_run mode doesn't make database changes."""
         mock_plans_data = {
             "api_plans": [
                 {
@@ -124,18 +117,15 @@ class TestSyncPlansTask:
 
 
 class TestPlansJsonStructure:
-    """Test suite for plans.json file structure."""
 
     def test_plans_json_exists(self):
-        """Test that plans.json file exists."""
         plans_file = (
-            Path(__file__).parent.parent / "app" / "shared" / "data" / "plans.json"
+            Path(__file__).parent.parent / "app" / "core" / "data" / "plans.json"
         )
         # This may not exist in test environment, so we just verify the path is correct
         assert "plans.json" in str(plans_file)
 
     def test_plans_json_has_required_fields(self):
-        """Test that plans.json entries have required fields."""
         required_fields = [
             "name",
             "price",
@@ -145,7 +135,7 @@ class TestPlansJsonStructure:
         ]
 
         plans_file = (
-            Path(__file__).parent.parent / "app" / "shared" / "data" / "plans.json"
+            Path(__file__).parent.parent / "app" / "core" / "data" / "plans.json"
         )
 
         if plans_file.exists():
@@ -160,7 +150,6 @@ class TestPlansJsonStructure:
                     ), f"Plan '{plan.get('name', 'unknown')}' missing field: {field}"
 
     def test_plans_json_seat_pricing_fields(self):
-        """Test that plans.json entries have seat pricing fields."""
         seat_fields = [
             "seat_price",
             "seat_display_price",
@@ -168,7 +157,7 @@ class TestPlansJsonStructure:
         ]
 
         plans_file = (
-            Path(__file__).parent.parent / "app" / "shared" / "data" / "plans.json"
+            Path(__file__).parent.parent / "app" / "core" / "data" / "plans.json"
         )
 
         if plans_file.exists():
@@ -183,9 +172,8 @@ class TestPlansJsonStructure:
                     ), f"Plan '{plan.get('name', 'unknown')}' missing seat field: {field}"
 
     def test_plans_json_api_plans_structure(self):
-        """Test that API plans have correct structure."""
         plans_file = (
-            Path(__file__).parent.parent / "app" / "shared" / "data" / "plans.json"
+            Path(__file__).parent.parent / "app" / "core" / "data" / "plans.json"
         )
 
         if plans_file.exists():
@@ -195,15 +183,13 @@ class TestPlansJsonStructure:
             api_plans = data.get("api_plans", [])
             plan_names = [p["name"] for p in api_plans]
 
-            # Verify expected plans exist
             assert "Free" in plan_names
             assert "Basic" in plan_names
             assert "Professional" in plan_names
 
     def test_plans_json_career_plans_no_seat_pricing(self):
-        """Test that Career plans don't have seat stripe IDs."""
         plans_file = (
-            Path(__file__).parent.parent / "app" / "shared" / "data" / "plans.json"
+            Path(__file__).parent.parent / "app" / "core" / "data" / "plans.json"
         )
 
         if plans_file.exists():
@@ -216,3 +202,4 @@ class TestPlansJsonStructure:
                 assert (
                     plan.get("seat_stripe_price_id_env") is None
                 ), f"Career plan '{plan['name']}' should not have seat_stripe_price_id_env"
+

@@ -34,3 +34,4 @@ async def publish_event(
     )
 
     await channel.default_exchange.publish(message, routing_key=queue_name)
+

@@ -1,9 +1,6 @@
 """
 Career Subscription service for cubex_career.
 
-This module provides business logic for Career subscription management including
-checkout sessions, plan upgrades, and webhook handling. Uses context tables to
-link subscriptions to users (not workspaces like API product).
 """
 
 from datetime import datetime, timezone
@@ -13,34 +10,29 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.config import stripe_logger
-from app.shared.db.crud import (
+from app.core.config import stripe_logger
+from app.core.db.crud import (
     career_subscription_context_db,
     plan_db,
     subscription_db,
     user_db,
 )
-from app.shared.db.models import Plan, User
-from app.shared.db.models import Subscription as SubscriptionModel
-from app.shared.enums import ProductType, SubscriptionStatus
-from app.shared.exceptions.types import (
+from app.core.db.models import Plan, User
+from app.core.db.models import Subscription as SubscriptionModel
+from app.core.enums import ProductType, SubscriptionStatus
+from app.core.exceptions.types import (
     BadRequestException,
     NotFoundException,
 )
-from app.shared.services.payment.stripe.main import Stripe
+from app.core.services.payment.stripe.main import Stripe
 from app.infrastructure.messaging.publisher import publish_event
-from app.shared.services.payment.stripe.types import (
+from app.core.services.payment.stripe.types import (
     CheckoutSession,
     Invoice,
     LineItem,
     Subscription as StripeSubscription,
     SubscriptionData,
 )
-
-
-# ============================================================================
-# Exceptions
-# ============================================================================
 
 
 class CareerSubscriptionNotFoundException(NotFoundException):
@@ -81,11 +73,6 @@ class CareerSamePlanException(BadRequestException):
 
     def __init__(self, message: str = "Already subscribed to this plan."):
         super().__init__(message)
-
-
-# ============================================================================
-# Service
-# ============================================================================
 
 
 class CareerSubscriptionService:
@@ -197,7 +184,6 @@ class CareerSubscriptionService:
             commit_self=False,
         )
 
-        # Create Career subscription context to link subscription to user
         await career_subscription_context_db.create(
             session,
             {
@@ -244,23 +230,19 @@ class CareerSubscriptionService:
             CareerPlanNotFoundException: If plan not found.
             CareerSubscriptionAlreadyExistsException: If user already has paid sub.
         """
-        # Get plan
         plan = await self.get_plan(session, plan_id)
 
         if not plan.can_be_purchased:
             raise CareerPlanNotFoundException("Plan is not available for purchase.")
 
-        # Check current subscription
         current_sub = await subscription_db.get_by_user(
             session, user.id, active_only=False
         )
         if current_sub and current_sub.is_active and current_sub.plan.is_paid:
             raise CareerSubscriptionAlreadyExistsException()
 
-        # Ensure user has Stripe customer ID
         stripe_customer_id = await self._ensure_stripe_customer(session, user)
 
-        # Create Stripe checkout session
         line_items = [
             LineItem(
                 price=plan.stripe_price_id,  # type: ignore
@@ -319,7 +301,6 @@ class CareerSubscriptionService:
         Returns:
             Created/updated subscription.
         """
-        # Get Stripe subscription details
         stripe_sub: StripeSubscription = await Stripe.get_subscription(
             stripe_subscription_id
         )
@@ -343,7 +324,6 @@ class CareerSubscriptionService:
                 commit_self=False,
             )
 
-        # Create new subscription
         current_period_start = None
         current_period_end = None
         amount = None
@@ -377,7 +357,6 @@ class CareerSubscriptionService:
             session, user_id
         )
         if existing_context:
-            # Update existing context to point to new subscription
             await career_subscription_context_db.update(
                 session,
                 existing_context.id,
@@ -385,7 +364,6 @@ class CareerSubscriptionService:
                 commit_self=False,
             )
         else:
-            # Create new Career subscription context
             await career_subscription_context_db.create(
                 session,
                 {
@@ -440,7 +418,6 @@ class CareerSubscriptionService:
         Returns:
             Updated subscription or None if not found.
         """
-        # Get our subscription record
         subscription = await subscription_db.get_by_stripe_subscription_id(
             session, stripe_subscription_id
         )
@@ -450,14 +427,12 @@ class CareerSubscriptionService:
             )
             return None
 
-        # Verify this is a Career subscription
         if subscription.product_type != ProductType.CAREER:
             stripe_logger.debug(
                 f"Subscription {stripe_subscription_id} is not Career type, skipping"
             )
             return None
 
-        # Get latest from Stripe
         stripe_sub: StripeSubscription = await Stripe.get_subscription(
             stripe_subscription_id
         )
@@ -475,15 +450,31 @@ class CareerSubscriptionService:
         }
         new_status = status_map.get(stripe_sub.status, SubscriptionStatus.ACTIVE)
 
-        # Update subscription
         updates: dict[str, Any] = {
             "status": new_status,
             "cancel_at_period_end": stripe_sub.cancel_at_period_end or False,
         }
 
-        # Get billing period and price from first subscription item
         if stripe_sub.items and stripe_sub.items.data:
             first_item = stripe_sub.items.data[0]
+
+            # Check if billing period changed (renewal) - reset quota
+            old_period_start = subscription.current_period_start
+            new_period_start = first_item.current_period_start
+
+            if old_period_start != new_period_start and new_period_start is not None:
+                context = await career_subscription_context_db.get_by_subscription(
+                    session, subscription.id
+                )
+                if context:
+                    await career_subscription_context_db.reset_credits_used(
+                        session, context.id
+                    )
+                    stripe_logger.info(
+                        f"Billing period changed for career subscription {stripe_subscription_id}: "
+                        f"reset credits_used to 0"
+                    )
+
             updates["current_period_start"] = first_item.current_period_start
             updates["current_period_end"] = first_item.current_period_end
 
@@ -545,6 +536,9 @@ class CareerSubscriptionService:
         """
         Handle Career subscription deletion from Stripe webhook.
 
+        Marks the subscription as canceled, then downgrades it to the free
+        plan so the user retains basic access.
+
         Args:
             session: Database session.
             stripe_subscription_id: Stripe subscription ID.
@@ -559,25 +553,48 @@ class CareerSubscriptionService:
         if not subscription:
             return None
 
-        # Verify this is a Career subscription
         if subscription.product_type != ProductType.CAREER:
             stripe_logger.debug(
                 f"Subscription {stripe_subscription_id} is not Career type, skipping"
             )
             return None
 
-        # Mark as canceled
+        # Downgrade to free plan
+        free_plan = await plan_db.get_free_plan(
+            session, product_type=ProductType.CAREER
+        )
+        if not free_plan:
+            stripe_logger.error(
+                "Free Career plan not found — cannot downgrade, marking as canceled only"
+            )
+            subscription = await subscription_db.update(
+                session,
+                subscription.id,
+                {
+                    "status": SubscriptionStatus.CANCELED,
+                    "canceled_at": datetime.now(timezone.utc),
+                },
+                commit_self=commit_self,
+            )
+            return subscription
+
         subscription = await subscription_db.update(
             session,
             subscription.id,
             {
-                "status": SubscriptionStatus.CANCELED,
+                "status": SubscriptionStatus.ACTIVE,
+                "plan_id": free_plan.id,
+                "stripe_subscription_id": None,
                 "canceled_at": datetime.now(timezone.utc),
+                "cancel_at_period_end": False,
             },
             commit_self=commit_self,
         )
 
-        stripe_logger.info(f"Career subscription {stripe_subscription_id} deleted")
+        stripe_logger.info(
+            f"Career subscription {stripe_subscription_id} deleted — "
+            f"downgraded to free plan {free_plan.id}"
+        )
 
         return subscription
 
@@ -599,7 +616,6 @@ class CareerSubscriptionService:
         if user.stripe_customer_id:
             return user.stripe_customer_id
 
-        # Create Stripe customer for legacy user
         stripe_customer = await Stripe.create_customer(
             email=user.email,
             name=user.full_name,
@@ -646,18 +662,31 @@ class CareerSubscriptionService:
 
         subscription_id = subscription.id
 
-        # Cancel in Stripe if exists
         if subscription.stripe_subscription_id:
             await Stripe.cancel_subscription(
                 subscription.stripe_subscription_id,
                 cancel_at_period_end=cancel_at_period_end,
             )
 
-        # Update our record
         updates: dict[str, Any] = {"cancel_at_period_end": cancel_at_period_end}
         if not cancel_at_period_end:
-            updates["status"] = SubscriptionStatus.CANCELED
-            updates["canceled_at"] = datetime.now(timezone.utc)
+            # Immediate cancellation: downgrade to free plan right away
+            # so the user isn't left in a CANCELED state until the webhook fires.
+            free_plan = await plan_db.get_free_plan(
+                session, product_type=ProductType.CAREER
+            )
+            if free_plan:
+                updates["status"] = SubscriptionStatus.ACTIVE
+                updates["plan_id"] = free_plan.id
+                updates["stripe_subscription_id"] = None
+                updates["cancel_at_period_end"] = False
+                updates["canceled_at"] = datetime.now(timezone.utc)
+            else:
+                stripe_logger.error(
+                    "Free Career plan not found — marking as canceled only"
+                )
+                updates["status"] = SubscriptionStatus.CANCELED
+                updates["canceled_at"] = datetime.now(timezone.utc)
 
         updated_subscription = await subscription_db.update(
             session,
@@ -710,11 +739,9 @@ class CareerSubscriptionService:
         if not subscription.stripe_subscription_id:
             raise CareerSubscriptionNotFoundException("Subscription has no Stripe ID.")
 
-        # Get current and target plans
         current_plan = subscription.plan
         new_plan = await self.get_plan(session, new_plan_id)
 
-        # Validate not same plan
         if current_plan.id == new_plan.id:
             raise CareerSamePlanException()
 
@@ -725,13 +752,12 @@ class CareerSubscriptionService:
                 "Please cancel and resubscribe to a different plan."
             )
 
-        # Get Stripe preview
         if not new_plan.stripe_price_id:
             raise CareerPlanNotFoundException("Target plan has no Stripe price.")
 
         invoice_preview = await Stripe.preview_invoice(
             subscription.stripe_subscription_id,
-            new_plan.stripe_price_id,
+            new_price_id=new_plan.stripe_price_id,
         )
 
         stripe_logger.info(
@@ -777,11 +803,9 @@ class CareerSubscriptionService:
         if not subscription.stripe_subscription_id:
             raise CareerSubscriptionNotFoundException("Subscription has no Stripe ID.")
 
-        # Get current and target plans
         current_plan = subscription.plan
         new_plan = await self.get_plan(session, new_plan_id)
 
-        # Validate not same plan
         if current_plan.id == new_plan.id:
             raise CareerSamePlanException()
 
@@ -795,7 +819,6 @@ class CareerSubscriptionService:
         if not new_plan.stripe_price_id:
             raise CareerPlanNotFoundException("Target plan has no Stripe price.")
 
-        # Update Stripe subscription with new price
         await Stripe.update_subscription(
             subscription.stripe_subscription_id,
             new_price_id=new_plan.stripe_price_id,
@@ -803,7 +826,6 @@ class CareerSubscriptionService:
             proration_behavior="create_prorations",
         )
 
-        # Update our database record
         subscription_id = subscription.id
         updated_subscription = await subscription_db.update(
             session,
@@ -839,3 +861,4 @@ __all__ = [
     "CareerPlanDowngradeNotAllowedException",
     "CareerSamePlanException",
 ]
+

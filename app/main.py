@@ -8,8 +8,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_async_session
-from app.shared.config import settings, app_logger
-from app.shared.exceptions.handlers import (
+from app.core.config import settings, app_logger
+from app.core.exceptions.handlers import (
     authentication_exception_handler,
     bad_request_exception_handler,
     conflict_exception_handler,
@@ -31,7 +31,7 @@ from app.shared.exceptions.handlers import (
     too_many_attempts_exception_handler,
     value_error_exception_handler,
 )
-from app.shared.exceptions.types import (
+from app.core.exceptions.types import (
     AppException,
     AuthenticationException,
     BadRequestException,
@@ -53,10 +53,10 @@ from app.shared.exceptions.types import (
 )
 from app.infrastructure.messaging import start_consumers
 from app.infrastructure.scheduler import scheduler, initialize_scheduler
-from app.shared.services import BrevoService, CloudinaryService, Renderer, RedisService
-from app.shared.services.auth import AuthService
-from app.shared.services.oauth import GoogleOAuthService, GitHubOAuthService
-from app.shared.routers import auth_router, webhook_router
+from app.core.services import BrevoService, CloudinaryService, Renderer, RedisService
+from app.core.services.auth import AuthService
+from app.core.services.oauth import GoogleOAuthService, GitHubOAuthService
+from app.core.routers import auth_router, webhook_router
 from app.apps.cubex_api.routers import (
     internal_router,
     support_router,
@@ -65,10 +65,11 @@ from app.apps.cubex_api.routers import (
 )
 from app.apps.cubex_career.routers import (
     subscription_router as career_subscription_router,
+    internal_router as career_internal_router,
 )
-from app.apps.cubex_api.services import QuotaCacheService
-from app.shared.db import AsyncSessionLocal
-from app.shared.utils import generate_openapi_json, write_to_file_async
+from app.core.db import AsyncSessionLocal
+from app.core.services import QuotaCacheService
+from app.core.utils import generate_openapi_json, write_to_file_async
 from app.admin import init_admin
 
 
@@ -77,24 +78,20 @@ async def lifespan(app: FastAPI):
     app_logger.info("Starting application...")
     consumer_connection = None
 
-    # Initialize Redis service
     app_logger.info("Initializing Redis service...")
     await RedisService.init(settings.REDIS_URL)
     app_logger.info("Redis service initialized successfully.")
 
-    # Initialize Quota Cache service
     app_logger.info("Initializing Quota Cache service...")
     async with AsyncSessionLocal() as session:
         # Use "redis" backend for distributed deployments, "memory" for single instance
         await QuotaCacheService.init(session, backend=settings.QUOTA_CACHE_BACKEND)
     app_logger.info("Quota Cache service initialized successfully.")
 
-    # Initialize Auth service
     app_logger.info("Initializing Auth service...")
     AuthService.init()
     app_logger.info("Auth service initialized successfully.")
 
-    # Initialize OAuth services
     app_logger.info("Initializing OAuth services...")
     await GoogleOAuthService.init(
         client_id=settings.GOOGLE_CLIENT_ID,
@@ -124,7 +121,6 @@ async def lifespan(app: FastAPI):
     )
     app_logger.info("Cloudinary configured successfully.")
 
-    # Initialize Brevo Service
     app_logger.info("Initializing Brevo service...")
     await BrevoService.init(
         api_key=settings.BREVO_API_KEY,
@@ -141,12 +137,10 @@ async def lifespan(app: FastAPI):
     else:
         app_logger.info("Messaging disabled via ENABLE_MESSAGING setting.")
 
-    # Initialize template renderer
     app_logger.info("Initializing template renderer...")
     Renderer.initialize("app/templates")
     app_logger.info("Template renderer initialized successfully.")
 
-    # Generate and write OpenAPI schema to file
     app_logger.info("Generating OpenAPI schema...")
     openapi_schema = generate_openapi_json(app)
     await write_to_file_async("openapi.json", openapi_schema)
@@ -154,7 +148,6 @@ async def lifespan(app: FastAPI):
     # Yield control back to the application
     yield
 
-    # Cleanup on shutdown
     app_logger.info("Shutting down application...")
 
     # Stop message consumers
@@ -252,6 +245,9 @@ app.include_router(internal_router, prefix="/api", tags=["API - Internal API"])
 app.include_router(
     career_subscription_router, prefix="/career", tags=["Career - Subscriptions"]
 )
+app.include_router(
+    career_internal_router, prefix="/career", tags=["Career - Internal API"]
+)
 
 # Mount admin interface
 init_admin(app)
@@ -289,7 +285,6 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
         },
     }
 
-    # Check database connectivity
     try:
         async with session.begin():
             result = await session.execute(text("SELECT 1"))
@@ -301,7 +296,6 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
         health_status["checks"]["database"] = "unhealthy"
         health_status["status"] = "degraded"
 
-    # Check Redis connectivity
     try:
         redis_ok = await RedisService.ping()
         if not redis_ok:
@@ -321,3 +315,4 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
         )
 
     return health_status
+

@@ -1,12 +1,6 @@
 """
 Workspace models for cubex_api.
 
-This module provides models for workspace management including
-workspaces, members, invitations, API keys, and usage logs.
-These models are designed to support the core functionality of
-cubex_api, including team collaboration, access control, and billing.
-The models use SQLAlchemy ORM and are structured to ensure data
-integrity, efficient queries, and clear relationships between entities.
 """
 
 from datetime import datetime, timezone
@@ -30,9 +24,10 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.associationproxy import AssociationProxy, association_proxy
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.shared.db.models.base import BaseModel
-from app.shared.enums import (
+from app.core.db.models.base import BaseModel
+from app.core.enums import (
     FailureType,
+    FeatureKey,
     InvitationStatus,
     MemberRole,
     MemberStatus,
@@ -41,9 +36,9 @@ from app.shared.enums import (
 )
 
 if TYPE_CHECKING:
-    from app.shared.db.models.user import User
-    from app.shared.db.models.subscription import Subscription
-    from app.shared.db.models.subscription_context import APISubscriptionContext
+    from app.core.db.models.user import User
+    from app.core.db.models.subscription import Subscription
+    from app.core.db.models.subscription_context import APISubscriptionContext
 
 
 class Workspace(BaseModel):
@@ -112,14 +107,14 @@ class Workspace(BaseModel):
     owner: Mapped["User"] = relationship(
         "User",
         foreign_keys=[owner_id],
-        lazy="selectin",
+        lazy="raise",
     )
 
     members: Mapped[list["WorkspaceMember"]] = relationship(
         "WorkspaceMember",
         back_populates="workspace",
         cascade="all, delete-orphan",
-        lazy="selectin",
+        lazy="raise",
     )
 
     invitations: Mapped[list["WorkspaceInvitation"]] = relationship(
@@ -246,7 +241,7 @@ class WorkspaceMember(BaseModel):
     user: Mapped["User"] = relationship(
         "User",
         foreign_keys=[user_id],
-        lazy="selectin",
+        lazy="raise",
     )
 
     __table_args__ = (
@@ -570,6 +565,7 @@ class UsageLog(BaseModel):
         api_key_id: Foreign key to the API key used.
         workspace_id: Foreign key to the workspace (denormalized for efficient queries).
         request_id: Globally unique request ID for idempotency.
+        feature_key: The key of feature being used.
         fingerprint_hash: Hash of endpoint+method+payload_hash+usage_estimate.
         access_status: The access decision (GRANTED/DENIED) for this request.
         endpoint: The API endpoint path being called.
@@ -588,6 +584,7 @@ class UsageLog(BaseModel):
         Index("ix_usage_logs_api_key_created", "api_key_id", "created_at"),
         Index("ix_usage_logs_status", "status"),
         Index("ix_usage_logs_endpoint", "endpoint"),
+        Index("ix_usage_logs_feature_key", "feature_key"),
         Index(
             "ix_usage_logs_request_fingerprint_workspace",
             "request_id",
@@ -631,6 +628,13 @@ class UsageLog(BaseModel):
         String(10),
         nullable=False,
         comment="Access decision: 'granted' or 'denied'",
+    )
+
+    feature_key: Mapped[FeatureKey] = mapped_column(
+        Enum(FeatureKey, native_enum=False, name="feature_key"),
+        nullable=False,
+        index=True,
+        comment="Feature Key (e.g., 'api.analyze')",
     )
 
     endpoint: Mapped[str] = mapped_column(

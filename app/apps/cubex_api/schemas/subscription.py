@@ -9,12 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from app.shared.enums import PlanType, SubscriptionStatus
-
-
-# ============================================================================
-# Plan Schemas
-# ============================================================================
+from app.core.enums import PlanType, SubscriptionStatus
 
 
 class FeatureResponse(BaseModel):
@@ -111,11 +106,6 @@ class PlanListResponse(BaseModel):
     )
 
     plans: list[PlanResponse]
-
-
-# ============================================================================
-# Subscription Schemas
-# ============================================================================
 
 
 class SubscriptionResponse(BaseModel):
@@ -230,11 +220,6 @@ class ReactivateRequest(BaseModel):
     member_ids_to_enable: list[UUID] | None = None
 
 
-# ============================================================================
-# Message Schemas
-# ============================================================================
-
-
 class MessageResponse(BaseModel):
     """Generic message response."""
 
@@ -246,11 +231,6 @@ class MessageResponse(BaseModel):
 
     message: str
     success: bool = True
-
-
-# ============================================================================
-# Upgrade Schemas
-# ============================================================================
 
 
 class UpgradePreviewRequest(BaseModel):
@@ -342,3 +322,4 @@ __all__ = [
     "UpgradePreviewResponse",
     "UpgradeRequest",
 ]
+

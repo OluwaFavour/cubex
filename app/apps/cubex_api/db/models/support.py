@@ -1,7 +1,6 @@
 """
 Support models for cubex_api.
 
-This module provides models for support management.
 """
 
 from sqlalchemy import (
@@ -10,8 +9,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.shared.db.models.base import BaseModel
-from app.shared.enums import SalesRequestStatus
+from app.core.db.models.base import BaseModel
+from app.core.enums import SalesRequestStatus
 
 
 class SalesRequest(BaseModel):
@@ -29,3 +28,4 @@ class SalesRequest(BaseModel):
         default=SalesRequestStatus.PENDING,
         server_default=SalesRequestStatus.PENDING.value,
     )
+

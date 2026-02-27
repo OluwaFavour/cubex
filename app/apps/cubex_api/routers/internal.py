@@ -1,7 +1,6 @@
 """
 Internal API router for external developer API communication.
 
-This module provides endpoints for:
 - Usage validation and logging (creates PENDING usage logs)
 - Usage committing (marks usage as SUCCESS or FAILED)
 
@@ -21,7 +20,6 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.apps.cubex_api.dependencies import InternalAPIKeyDep
 from app.apps.cubex_api.schemas.workspace import (
     UsageCommitRequest,
     UsageCommitResponse,
@@ -29,10 +27,10 @@ from app.apps.cubex_api.schemas.workspace import (
     UsageValidateResponse,
 )
 from app.apps.cubex_api.services.quota import quota_service
-from app.core.dependencies import get_async_session
+from app.core.dependencies import get_async_session, InternalAPIKeyDep
 
 
-router = APIRouter(prefix="/internal", tags=["Internal API"])
+router = APIRouter(prefix="/internal")
 
 
 @router.post(
@@ -63,15 +61,19 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     that the caller should return mocked/sample responses instead of real data.
     Note: Rate limits still apply to test keys.
     
-    **Rate Limiting**: Workspace-level rate limiting is enforced using a sliding
-    window of 60 seconds. The rate limit is configurable per plan (default: 20 req/min).
+    **Rate Limiting**: Workspace-level rate limiting is enforced using sliding
+    windows for both per-minute and per-day limits. Limits are configurable
+    per plan via PlanPricingRule.
     
     **Rate Limit Response Headers** (Server B should forward these to developers):
     | Header | Type | Description |
     |--------|------|-------------|
-    | `X-RateLimit-Limit` | int | Maximum requests allowed per minute for this workspace |
-    | `X-RateLimit-Remaining` | int | Number of requests remaining in the current window |
-    | `X-RateLimit-Reset` | int | Unix timestamp (seconds) when the rate limit window resets |
+    | `X-RateLimit-Limit-Minute` | int | Max requests per minute for this workspace |
+    | `X-RateLimit-Remaining-Minute` | int | Remaining in current minute window |
+    | `X-RateLimit-Reset-Minute` | int | Unix timestamp when minute window resets |
+    | `X-RateLimit-Limit-Day` | int | Max requests per day for this workspace |
+    | `X-RateLimit-Remaining-Day` | int | Remaining in current day window |
+    | `X-RateLimit-Reset-Day` | int | Unix timestamp when day window resets |
     | `Retry-After` | int | Seconds until rate limit resets (only included on 429 responses) |
     
     **Important**: Server B should copy these headers from this response to the response
@@ -81,14 +83,17 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     **Note**: These headers are **not always present** (e.g., for idempotent requests or
     early validation failures). Use `.get()` to safely access them and avoid KeyError:
     ```python
-    rate_limit = response.headers.get("X-RateLimit-Limit")
-    remaining = response.headers.get("X-RateLimit-Remaining")
-    reset_at = response.headers.get("X-RateLimit-Reset")
+    limit_min = response.headers.get("X-RateLimit-Limit-Minute")
+    remaining_min = response.headers.get("X-RateLimit-Remaining-Minute")
+    reset_min = response.headers.get("X-RateLimit-Reset-Minute")
+    limit_day = response.headers.get("X-RateLimit-Limit-Day")
+    remaining_day = response.headers.get("X-RateLimit-Remaining-Day")
+    reset_day = response.headers.get("X-RateLimit-Reset-Day")
     retry_after = response.headers.get("Retry-After")  # Only on 429
     ```
     
     **Idempotency**: Uses request_id + fingerprint (computed from endpoint,
-    method, payload_hash, usage_estimate) for true idempotency.
+    method, payload_hash, usage_estimate, and feature_key) for true idempotency.
     - Same request_id + same fingerprint = return existing access_status
     - Same request_id + different fingerprint = create new record (different payload)
     
@@ -112,7 +117,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     - 400: Invalid request format (bad client_id or API key format)
     - 401: API key not found, expired, or revoked
     - 403: API key does not belong to the specified workspace
-    - 429: Rate limit exceeded OR quota exceeded
+    - 429: Rate limit exceeded (per-minute or per-day) OR quota exceeded
     """,
     responses={
         200: {
@@ -226,13 +231,24 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
             "content": {
                 "application/json": {
                     "examples": {
-                        "rate_limit_exceeded": {
-                            "summary": "Rate Limit Exceeded",
-                            "description": "Response includes X-RateLimit-* and Retry-After headers",
+                        "rate_limit_exceeded_minute": {
+                            "summary": "Rate Limit Exceeded (Per-Minute)",
+                            "description": "Response includes X-RateLimit-*-Minute, X-RateLimit-*-Day, and Retry-After headers",
                             "value": {
                                 "access": "denied",
                                 "usage_id": None,
                                 "message": "Rate limit exceeded. Limit: 20 requests/minute. Try again in 45 seconds.",
+                                "credits_reserved": None,
+                                "is_test_key": False,
+                            },
+                        },
+                        "rate_limit_exceeded_day": {
+                            "summary": "Rate Limit Exceeded (Per-Day)",
+                            "description": "Response includes X-RateLimit-*-Minute, X-RateLimit-*-Day, and Retry-After headers",
+                            "value": {
+                                "access": "denied",
+                                "usage_id": None,
+                                "message": "Rate limit exceeded. Limit: 500 requests/day. Try again in 3600 seconds.",
                                 "credits_reserved": None,
                                 "is_test_key": False,
                             },
@@ -270,11 +286,9 @@ async def validate_usage(
     - 403: API key doesn't belong to workspace
     - 429: Quota exceeded
     """
-    # Extract client info if provided
     client_ip = request.client.ip if request.client else None
     client_user_agent = request.client.user_agent if request.client else None
 
-    # Extract usage estimate if provided
     usage_estimate = None
     if request.usage_estimate:
         usage_estimate = {
@@ -295,6 +309,7 @@ async def validate_usage(
         ) = await quota_service.validate_and_log_usage(
             session=session,
             api_key=request.api_key,
+            feature_key=request.feature_key,
             client_id=request.client_id,
             request_id=request.request_id,
             endpoint=request.endpoint,
@@ -314,16 +329,31 @@ async def validate_usage(
         is_test_key=is_test_key,
     )
 
-    # Build response headers with rate limit info
     headers: dict[str, str] = {}
     if rate_limit_info is not None:
-        headers["X-RateLimit-Limit"] = str(rate_limit_info.limit)
-        headers["X-RateLimit-Remaining"] = str(rate_limit_info.remaining)
-        headers["X-RateLimit-Reset"] = str(rate_limit_info.reset_timestamp)
+        if rate_limit_info.limit_per_minute is not None:
+            headers["X-RateLimit-Limit-Minute"] = str(rate_limit_info.limit_per_minute)
+            headers["X-RateLimit-Remaining-Minute"] = str(
+                rate_limit_info.remaining_per_minute
+            )
+            headers["X-RateLimit-Reset-Minute"] = str(rate_limit_info.reset_per_minute)
+        if rate_limit_info.limit_per_day is not None:
+            headers["X-RateLimit-Limit-Day"] = str(rate_limit_info.limit_per_day)
+            headers["X-RateLimit-Remaining-Day"] = str(
+                rate_limit_info.remaining_per_day
+            )
+            headers["X-RateLimit-Reset-Day"] = str(rate_limit_info.reset_per_day)
 
         # Add Retry-After header for rate limit exceeded responses
         if rate_limit_info.is_exceeded:
-            retry_after = max(0, rate_limit_info.reset_timestamp - int(time.time()))
+            if rate_limit_info.exceeded_window == "minute":
+                retry_after = max(
+                    0, (rate_limit_info.reset_per_minute or 0) - int(time.time())
+                )
+            else:
+                retry_after = max(
+                    0, (rate_limit_info.reset_per_day or 0) - int(time.time())
+                )
             headers["Retry-After"] = str(retry_after)
 
     return JSONResponse(
@@ -344,6 +374,13 @@ async def validate_usage(
     This endpoint is called by the external developer API after a request
     completes to mark the usage as SUCCESS (counts toward quota) or FAILED
     (does not count toward quota).
+    
+    **Async Alternative (RabbitMQ)**: Instead of calling this endpoint
+    synchronously, the caller can publish the same `UsageCommitRequest`
+    payload as a JSON message to the **`usage_commits`** RabbitMQ queue.
+    The message will be processed asynchronously by the usage commit handler.
+    - Retry queue: `usage_commits_retry` (30 s TTL, max 3 retries)
+    - Dead-letter queue: `usage_commits_dead`
     
     **Metrics (optional)**: When `success=True`, you can optionally provide
     metrics about the request:
@@ -418,7 +455,6 @@ async def commit_usage(
     This is idempotent - if the log is already committed or doesn't exist,
     success is still returned.
     """
-    # Extract metrics if provided
     metrics = None
     if request.metrics:
         metrics = {
@@ -428,7 +464,6 @@ async def commit_usage(
             "latency_ms": request.metrics.latency_ms,
         }
 
-    # Extract failure details if provided
     failure = None
     if request.failure:
         failure = {

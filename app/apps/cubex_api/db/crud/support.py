@@ -1,11 +1,10 @@
 """
 CRUD operations for support models.
 
-This module provides database operations for sales requests.
 """
 
 from app.apps.cubex_api.db.models.support import SalesRequest
-from app.shared.db.crud.base import BaseDB
+from app.core.db.crud.base import BaseDB
 
 
 class SalesRequestDB(BaseDB[SalesRequest]):
@@ -24,3 +23,4 @@ __all__ = [
     "SalesRequestDB",
     "sales_request_db",
 ]
+

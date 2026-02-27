@@ -14,14 +14,17 @@ Run with coverage:
 """
 
 import hashlib
+from decimal import Decimal
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.config import settings
-from app.shared.enums import AccessStatus
+from app.core.config import settings
+from app.core.enums import AccessStatus, FeatureKey
+from app.core.services.quota_cache import PlanConfig
 
 
 def _generate_payload_hash(data: str = "") -> str:
@@ -35,6 +38,7 @@ def make_validate_request(
     api_key: str = "cbx_live_test123abc",
     client_id: str | None = None,
     request_id: str | None = None,
+    feature_key: str = FeatureKey.API_EXTRACT_CUES_RESUME.value,
     endpoint: str = "/test/endpoint",
     method: str = "POST",
     payload_hash: str | None = None,
@@ -51,6 +55,7 @@ def make_validate_request(
         "api_key": api_key,
         "client_id": client_id,
         "request_id": request_id,
+        "feature_key": feature_key,
         "endpoint": endpoint,
         "method": method,
         "payload_hash": payload_hash,
@@ -91,12 +96,6 @@ class TestInternalRouterSetup:
 
         assert router.prefix == "/internal"
 
-    def test_internal_router_tags(self):
-        """Test that internal router has correct tags."""
-        from app.apps.cubex_api.routers.internal import router
-
-        assert "Internal API" in router.tags
-
 
 class TestInternalAPIKeyAuthentication:
     """Test internal API key authentication."""
@@ -135,7 +134,6 @@ class TestInternalAPIKeyAuthentication:
             headers=internal_api_headers,
         )
 
-        # Should not be 403 Forbidden - could be 404 or other error
         assert response.status_code != 403
 
 
@@ -153,7 +151,6 @@ class TestUsageValidateEndpoint:
             headers=internal_api_headers,
         )
 
-        # Should return DENIED access
         data = response.json()
         assert data["access"] == AccessStatus.DENIED.value
 
@@ -168,7 +165,6 @@ class TestUsageValidateEndpoint:
             headers=internal_api_headers,
         )
 
-        # Should return 422 due to pydantic validation
         assert response.status_code == 422
 
     @pytest.mark.asyncio
@@ -492,11 +488,6 @@ class TestResponseFormat:
         data = response.json()
         assert "success" in data
         assert isinstance(data["success"], bool)
-
-
-# ============================================================================
-# E2E Tests for validate_usage with Real Database and Redis
-# ============================================================================
 
 
 class TestValidateUsageE2E:
@@ -838,7 +829,6 @@ class TestValidateUsageE2E:
         raw_key, api_key = test_api_key
         client_id = make_client_id(test_workspace)
 
-        # Get rate limit from pricing rule fixture
         rate_limit = basic_api_plan_pricing_rule.rate_limit_per_minute
 
         # Freeze time to ensure all requests are in the same window
@@ -872,7 +862,6 @@ class TestValidateUsageE2E:
             data = response.json()
             assert data["access"] == AccessStatus.DENIED.value
             assert "rate limit" in data["message"].lower()
-            # Should have Retry-After header
             assert "Retry-After" in response.headers
 
     @pytest.mark.asyncio
@@ -894,9 +883,9 @@ class TestValidateUsageE2E:
         # Should be 422 (validation error) not 400
         assert response.status_code == 422
         # Rate limit headers should NOT be present on validation errors
-        assert "X-RateLimit-Limit" not in response.headers
-        assert "X-RateLimit-Remaining" not in response.headers
-        assert "X-RateLimit-Reset" not in response.headers
+        assert "X-RateLimit-Limit-Minute" not in response.headers
+        assert "X-RateLimit-Remaining-Minute" not in response.headers
+        assert "X-RateLimit-Reset-Minute" not in response.headers
 
     @pytest.mark.asyncio
     async def test_validate_usage_rate_limit_headers_present(
@@ -923,12 +912,12 @@ class TestValidateUsageE2E:
 
         assert response.status_code == 200
         # Rate limit headers should be present
-        assert "X-RateLimit-Limit" in response.headers
-        assert "X-RateLimit-Remaining" in response.headers
-        assert "X-RateLimit-Reset" in response.headers
+        assert "X-RateLimit-Limit-Minute" in response.headers
+        assert "X-RateLimit-Remaining-Minute" in response.headers
+        assert "X-RateLimit-Reset-Minute" in response.headers
         # Remaining should be less than limit (we just used one)
-        limit = int(response.headers["X-RateLimit-Limit"])
-        remaining = int(response.headers["X-RateLimit-Remaining"])
+        limit = int(response.headers["X-RateLimit-Limit-Minute"])
+        remaining = int(response.headers["X-RateLimit-Remaining-Minute"])
         assert remaining < limit
 
     @pytest.mark.asyncio
@@ -946,7 +935,6 @@ class TestValidateUsageE2E:
         """
         import time
         from statistics import mean, stdev
-        from unittest.mock import AsyncMock, patch
 
         from tests.conftest import make_client_id
 
@@ -958,9 +946,14 @@ class TestValidateUsageE2E:
 
         # Mock rate limit to 1000 to avoid hitting limits during benchmark
         with patch(
-            "app.apps.cubex_api.services.quota.QuotaCacheService.get_plan_rate_limit",
+            "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
             new_callable=AsyncMock,
-            return_value=1000,
+            return_value=PlanConfig(
+                multiplier=Decimal("1.0"),
+                credits_allocation=Decimal("5000.0"),
+                rate_limit_per_minute=1000,
+                rate_limit_per_day=None,
+            ),
         ):
             # Warm-up request (not counted in stats)
             await client.post(
@@ -992,7 +985,6 @@ class TestValidateUsageE2E:
                 ), f"Request {i+1} got {response.status_code}: {response.json()}"
                 latencies.append(elapsed)
 
-        # Calculate statistics
         avg_latency = mean(latencies)
         min_latency = min(latencies)
         max_latency = max(latencies)

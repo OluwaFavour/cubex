@@ -1,7 +1,6 @@
 """
 Test suite for WorkspaceService.
 
-This module contains comprehensive tests for the WorkspaceService including:
 - Personal workspace creation on signup
 - Workspace CRUD operations
 - Member management (invite, enable, disable)
@@ -21,7 +20,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.shared.enums import (
+from app.core.enums import (
     MemberRole,
     MemberStatus,
     WorkspaceStatus,
@@ -31,32 +30,26 @@ from app.shared.enums import (
 
 
 class TestWorkspaceServiceInit:
-    """Test suite for WorkspaceService initialization."""
 
     def test_service_import(self):
-        """Test that WorkspaceService can be imported."""
         from app.apps.cubex_api.services.workspace import WorkspaceService
 
         assert WorkspaceService is not None
 
     def test_service_singleton_exists(self):
-        """Test that workspace_service singleton is accessible."""
         from app.apps.cubex_api.services.workspace import workspace_service
 
         assert workspace_service is not None
 
 
 class TestSlugGeneration:
-    """Test suite for slug generation logic."""
 
     def test_slug_prefix(self):
-        """Test that slug prefix is correctly defined."""
         # The slug prefix is "ws-"
         expected_prefix = "ws-"
         assert expected_prefix == "ws-"
 
     def test_slug_pattern(self):
-        """Test expected slug pattern."""
         # Slug should be: ws-{slugified_name}-{short_uuid}
         # e.g., ws-my-workspace-abc123
         import re
@@ -67,45 +60,38 @@ class TestSlugGeneration:
 
 
 class TestWorkspaceExceptions:
-    """Test suite for workspace-related exceptions."""
 
     def test_workspace_not_found_exception(self):
-        """Test WorkspaceNotFoundException."""
         from app.apps.cubex_api.services.workspace import WorkspaceNotFoundException
 
         exc = WorkspaceNotFoundException()
         assert exc is not None
 
     def test_workspace_frozen_exception(self):
-        """Test WorkspaceFrozenException."""
         from app.apps.cubex_api.services.workspace import WorkspaceFrozenException
 
         exc = WorkspaceFrozenException()
         assert exc is not None
 
     def test_insufficient_seats_exception(self):
-        """Test InsufficientSeatsException."""
         from app.apps.cubex_api.services.workspace import InsufficientSeatsException
 
         exc = InsufficientSeatsException()
         assert exc is not None
 
     def test_member_not_found_exception(self):
-        """Test MemberNotFoundException."""
         from app.apps.cubex_api.services.workspace import MemberNotFoundException
 
         exc = MemberNotFoundException()
         assert exc is not None
 
     def test_invitation_not_found_exception(self):
-        """Test InvitationNotFoundException."""
         from app.apps.cubex_api.services.workspace import InvitationNotFoundException
 
         exc = InvitationNotFoundException()
         assert exc is not None
 
     def test_invitation_already_exists_exception(self):
-        """Test InvitationAlreadyExistsException."""
         from app.apps.cubex_api.services.workspace import (
             InvitationAlreadyExistsException,
         )
@@ -115,27 +101,22 @@ class TestWorkspaceExceptions:
 
 
 class TestWorkspaceServiceEnums:
-    """Test that the service correctly uses enums."""
 
     def test_workspace_status_values(self):
-        """Test WorkspaceStatus enum values are correctly used."""
         assert WorkspaceStatus.ACTIVE.value == "active"
         assert WorkspaceStatus.FROZEN.value == "frozen"
         assert WorkspaceStatus.SUSPENDED.value == "suspended"
 
     def test_member_status_values(self):
-        """Test MemberStatus enum values are correctly used."""
         assert MemberStatus.ENABLED.value == "enabled"
         assert MemberStatus.DISABLED.value == "disabled"
 
     def test_member_role_values(self):
-        """Test MemberRole enum values are correctly used."""
         assert MemberRole.OWNER.value == "owner"
         assert MemberRole.ADMIN.value == "admin"
         assert MemberRole.MEMBER.value == "member"
 
     def test_invitation_status_values(self):
-        """Test InvitationStatus enum values are correctly used."""
         assert InvitationStatus.PENDING.value == "pending"
         assert InvitationStatus.ACCEPTED.value == "accepted"
         assert InvitationStatus.EXPIRED.value == "expired"
@@ -143,7 +124,6 @@ class TestWorkspaceServiceEnums:
 
 
 class TestWorkspaceServiceMethods:
-    """Test suite for WorkspaceService method signatures."""
 
     @pytest.fixture
     def service(self):
@@ -153,85 +133,70 @@ class TestWorkspaceServiceMethods:
         return WorkspaceService()
 
     def test_has_create_personal_workspace_method(self, service):
-        """Test that create_personal_workspace method exists."""
         assert hasattr(service, "create_personal_workspace")
         assert callable(service.create_personal_workspace)
 
     def test_has_create_workspace_method(self, service):
-        """Test that create_workspace method exists."""
         assert hasattr(service, "create_workspace")
         assert callable(service.create_workspace)
 
     def test_has_get_workspace_method(self, service):
-        """Test that get_workspace method exists."""
         assert hasattr(service, "get_workspace")
         assert callable(service.get_workspace)
 
     def test_has_get_workspace_by_slug_method(self, service):
-        """Test that get_workspace_by_slug method exists."""
         assert hasattr(service, "get_workspace_by_slug")
         assert callable(service.get_workspace_by_slug)
 
     def test_has_get_user_workspaces_method(self, service):
-        """Test that get_user_workspaces method exists."""
         assert hasattr(service, "get_user_workspaces")
         assert callable(service.get_user_workspaces)
 
     def test_has_invite_member_method(self, service):
-        """Test that invite_member method exists."""
         assert hasattr(service, "invite_member")
         assert callable(service.invite_member)
 
     def test_has_accept_invitation_method(self, service):
-        """Test that accept_invitation method exists."""
         assert hasattr(service, "accept_invitation")
         assert callable(service.accept_invitation)
 
     def test_has_transfer_ownership_method(self, service):
-        """Test that transfer_ownership method exists."""
         assert hasattr(service, "transfer_ownership")
         assert callable(service.transfer_ownership)
 
 
 class TestWorkspaceModelIntegration:
-    """Test workspace model integration."""
 
     def test_workspace_model_import(self):
-        """Test that Workspace model can be imported."""
         from app.apps.cubex_api.db.models.workspace import Workspace
 
         assert Workspace is not None
 
     def test_workspace_member_model_import(self):
-        """Test that WorkspaceMember model can be imported."""
         from app.apps.cubex_api.db.models.workspace import WorkspaceMember
 
         assert WorkspaceMember is not None
 
     def test_workspace_invitation_model_import(self):
-        """Test that WorkspaceInvitation model can be imported."""
         from app.apps.cubex_api.db.models.workspace import WorkspaceInvitation
 
         assert WorkspaceInvitation is not None
 
 
 class TestWorkspaceCRUDIntegration:
-    """Test workspace CRUD integration."""
 
     def test_workspace_db_import(self):
-        """Test that workspace_db can be imported."""
         from app.apps.cubex_api.db.crud.workspace import workspace_db
 
         assert workspace_db is not None
 
     def test_workspace_member_db_import(self):
-        """Test that workspace_member_db can be imported."""
         from app.apps.cubex_api.db.crud.workspace import workspace_member_db
 
         assert workspace_member_db is not None
 
     def test_workspace_invitation_db_import(self):
-        """Test that workspace_invitation_db can be imported."""
         from app.apps.cubex_api.db.crud.workspace import workspace_invitation_db
 
         assert workspace_invitation_db is not None
+

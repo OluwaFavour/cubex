@@ -1,15 +1,13 @@
 """
 Email message handlers for async email processing.
 
-This module contains handlers for processing email-related messages from queues.
-Emails are sent asynchronously to avoid blocking the main request flow.
 """
 
 from typing import Any
 
-from app.shared.config import auth_logger, stripe_logger, workspace_logger
-from app.shared.enums import OTPPurpose
-from app.shared.services.email_manager import EmailManagerService
+from app.core.config import auth_logger, stripe_logger, workspace_logger
+from app.core.enums import OTPPurpose
+from app.core.services.email_manager import EmailManagerService
 
 
 async def handle_otp_email(event: dict[str, Any]) -> None:
@@ -319,3 +317,4 @@ async def handle_workspace_invitation_email(event: dict[str, Any]) -> None:
             f"Failed to send workspace invitation email: email={email}, error={e}"
         )
         raise  # Re-raise to trigger retry mechanism
+

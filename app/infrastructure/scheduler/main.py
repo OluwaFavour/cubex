@@ -1,10 +1,6 @@
 """
 Scheduler Module for CubeX Application.
 
-This module provides the APScheduler-based task scheduler for running
-background jobs. It can be run standalone via Docker or integrated
-into the FastAPI lifespan.
-
 Standalone Usage:
     python -m app.infrastructure.scheduler.main
 
@@ -21,26 +17,37 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from app.shared.config import scheduler_logger, settings
-from app.shared.services import BrevoService, RedisService, Renderer
+from app.core.config import scheduler_logger, settings
+from app.core.services import BrevoService, RedisService, Renderer
 
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("apscheduler").setLevel(logging.DEBUG)
 
+
+def _sync_database_url() -> str:
+    """Convert the async DATABASE_URL to a synchronous one for APScheduler.
+
+    Only modifies the driver scheme (before ://) so the rest of the URL
+    — including any percent-encoded password — is preserved exactly.
+    """
+    scheme, rest = settings.DATABASE_URL.split("://", 1)
+    return f"{scheme.replace('+asyncpg', '')}://{rest}"
+
+
+_sync_url = _sync_database_url()
+
 scheduler = AsyncIOScheduler(
-    # Create jobstores per job
     jobstores={
         "cleanups": SQLAlchemyJobStore(
-            url=settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql"),
+            url=_sync_url,
             tablename="scheduler_cleanup_jobs",
         ),
         "usage_logs": SQLAlchemyJobStore(
-            url=settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql"),
+            url=_sync_url,
             tablename="scheduler_usage_log_jobs",
         ),
     },
-    # jobstores={
     timezone=timezone.utc,
 )
 
@@ -90,6 +97,30 @@ def schedule_expire_pending_usage_logs_job(interval_minutes: int = 5) -> None:
     scheduler_logger.info("'expire_pending_usage_logs' job scheduled successfully.")
 
 
+def schedule_expire_pending_career_usage_logs_job(interval_minutes: int = 5) -> None:
+    """
+    Schedule the expire_pending_career_usage_logs job to run at specified intervals.
+    """
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    from app.infrastructure.scheduler.jobs import expire_pending_career_usage_logs
+
+    scheduler_logger.info(
+        f"Scheduling 'expire_pending_career_usage_logs' job to run every {interval_minutes} minutes"
+    )
+    scheduler.add_job(
+        expire_pending_career_usage_logs,
+        trigger=IntervalTrigger(minutes=interval_minutes, timezone=timezone.utc),
+        replace_existing=True,
+        id="expire_pending_career_usage_logs_job",
+        jobstore="usage_logs",
+        misfire_grace_time=60 * 5,  # 5 minutes grace time
+    )
+    scheduler_logger.info(
+        "'expire_pending_career_usage_logs' job scheduled successfully."
+    )
+
+
 def initialize_scheduler() -> None:
     """
     Initialize the scheduler by scheduling all required jobs.
@@ -101,6 +132,7 @@ def initialize_scheduler() -> None:
         days_threshold=settings.USER_SOFT_DELETE_RETENTION_DAYS
     )
     schedule_expire_pending_usage_logs_job(interval_minutes=5)
+    schedule_expire_pending_career_usage_logs_job(interval_minutes=5)
 
 
 async def main() -> None:
@@ -124,12 +156,10 @@ async def main() -> None:
     scheduler_logger.info("Starting standalone scheduler...")
 
     try:
-        # Initialize Redis service
         scheduler_logger.info("Initializing Redis service...")
         await RedisService.init(settings.REDIS_URL)
         scheduler_logger.info("Redis service initialized successfully.")
 
-        # Initialize Brevo Service
         scheduler_logger.info("Initializing Brevo service...")
         await BrevoService.init(
             api_key=settings.BREVO_API_KEY,
@@ -138,7 +168,6 @@ async def main() -> None:
         )
         scheduler_logger.info("Brevo service initialized successfully.")
 
-        # Initialize template renderer
         scheduler_logger.info("Initializing template renderer...")
         Renderer.initialize("app/templates")
         scheduler_logger.info("Template renderer initialized successfully.")
@@ -156,7 +185,6 @@ async def main() -> None:
         raise
 
     finally:
-        # Cleanup
         scheduler_logger.info("Shutting down scheduler...")
 
         if scheduler.running:

@@ -1,9 +1,8 @@
 """
 SQLAdmin configuration for Cubex.
 
-This module provides an admin interface for managing:
 - Plans (subscription plans)
-- EndpointCostConfig (API endpoint pricing)
+- FeatureCostConfig (API endpoint pricing)
 - PlanPricingRule (plan multipliers and rate limits)
 - Users (read-only view)
 - Workspaces (read-only view)
@@ -13,3 +12,4 @@ This module provides an admin interface for managing:
 from app.admin.setup import admin, init_admin
 
 __all__ = ["admin", "init_admin"]
+

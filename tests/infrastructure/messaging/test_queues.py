@@ -19,33 +19,27 @@ from app.infrastructure.messaging.queues import (
 
 
 class TestRetryQueue:
-    """Test suite for RetryQueue model."""
 
     def test_retry_queue_creation(self):
-        """Test creating a RetryQueue with valid data."""
         retry_queue = RetryQueue(name="test_retry", ttl=30000)
 
         assert retry_queue.name == "test_retry"
         assert retry_queue.ttl == 30000
 
     def test_retry_queue_ttl_must_be_positive(self):
-        """Test that TTL must be greater than 0."""
         with pytest.raises(ValidationError) as exc_info:
             RetryQueue(name="test", ttl=0)
 
         assert "greater than 0" in str(exc_info.value).lower()
 
     def test_retry_queue_ttl_negative_rejected(self):
-        """Test that negative TTL is rejected."""
         with pytest.raises(ValidationError):
             RetryQueue(name="test", ttl=-1000)
 
 
 class TestQueueConfig:
-    """Test suite for QueueConfig model."""
 
     def test_queue_config_minimal(self):
-        """Test creating QueueConfig with minimal required fields."""
 
         def sample_handler(msg):
             pass
@@ -61,7 +55,6 @@ class TestQueueConfig:
         assert config.dead_letter_queue is None
 
     def test_queue_config_with_single_retry(self):
-        """Test QueueConfig with single retry queue."""
 
         def sample_handler(msg):
             pass
@@ -82,7 +75,6 @@ class TestQueueConfig:
         assert config.dead_letter_queue == "test_dead"
 
     def test_queue_config_with_multiple_retries(self):
-        """Test QueueConfig with multiple retry queues."""
 
         def sample_handler(msg):
             pass
@@ -105,7 +97,6 @@ class TestQueueConfig:
         assert config.retry_queues[1].ttl == 300000
 
     def test_queue_config_both_retry_types_raises_error(self):
-        """Test that using both retry_queue and retry_queues raises ValueError."""
 
         def sample_handler(msg):
             pass
@@ -122,7 +113,6 @@ class TestQueueConfig:
         assert "retry_queue" in error_msg or "retry_queues" in error_msg
 
     def test_queue_config_retry_queue_without_ttl_raises_error(self):
-        """Test that retry_queue without retry_ttl raises ValueError."""
 
         def sample_handler(msg):
             pass
@@ -139,7 +129,6 @@ class TestQueueConfig:
         assert "retry_ttl" in error_msg
 
     def test_queue_config_empty_retry_queues_raises_error(self):
-        """Test that empty retry_queues list raises ValueError."""
 
         def sample_handler(msg):
             pass
@@ -151,7 +140,6 @@ class TestQueueConfig:
         assert "retry_queues" in error_msg or "at least one" in error_msg
 
     def test_queue_config_max_retries_must_be_positive(self):
-        """Test that max_retries must be greater than 0."""
 
         def sample_handler(msg):
             pass
@@ -166,7 +154,6 @@ class TestQueueConfig:
             )
 
     def test_queue_config_retry_ttl_must_be_positive(self):
-        """Test that retry_ttl must be greater than 0."""
 
         def sample_handler(msg):
             pass
@@ -181,36 +168,29 @@ class TestQueueConfig:
 
 
 class TestGetQueueConfigs:
-    """Test suite for get_queue_configs function."""
 
     def test_get_queue_configs_returns_list(self):
-        """Test that get_queue_configs returns a list."""
         configs = get_queue_configs()
 
         assert isinstance(configs, list)
 
     def test_get_queue_configs_returns_configured_queues(self):
-        """Test that get_queue_configs returns configured queues."""
         configs = get_queue_configs()
 
         # We have at least the otp_emails queue configured
         assert len(configs) >= 1
 
-        # Check the otp_emails queue is present
         queue_names = [config.name for config in configs]
         assert "otp_emails" in queue_names
 
     def test_get_queue_configs_cached(self):
-        """Test that get_queue_configs uses lru_cache."""
         # Call twice and check they return the same object
         configs1 = get_queue_configs()
         configs2 = get_queue_configs()
 
-        # Should be same instance due to caching
         assert configs1 is configs2
 
     def test_get_queue_configs_with_data(self):
-        """Test get_queue_configs with actual queue configurations."""
         from app.infrastructure.messaging import queues as queues_module
 
         def test_handler(msg):
@@ -246,7 +226,6 @@ class TestGetQueueConfigs:
             get_queue_configs.cache_clear()
 
     def test_queue_config_model_validate_with_dict(self):
-        """Test that QueueConfig can be validated from a dictionary."""
 
         def test_handler(msg):
             pass
@@ -262,3 +241,4 @@ class TestGetQueueConfigs:
         assert config.name == "test_queue"
         assert config.handler == test_handler
         assert config.dead_letter_queue == "test_dead"
+

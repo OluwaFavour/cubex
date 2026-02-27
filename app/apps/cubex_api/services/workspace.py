@@ -1,8 +1,6 @@
 """
 Workspace service for cubex_api.
 
-This module provides business logic for workspace management including
-creating workspaces, managing members, and handling invitations.
 """
 
 from decimal import Decimal
@@ -23,16 +21,16 @@ from app.apps.cubex_api.db.models import (
     WorkspaceMember,
     WorkspaceInvitation,
 )
-from app.apps.cubex_api.services.quota_cache import QuotaCacheService
-from app.shared.config import settings, workspace_logger
-from app.shared.db.crud import (
+from app.core.services.quota_cache import QuotaCacheService
+from app.core.config import settings, workspace_logger
+from app.core.db.crud import (
     api_subscription_context_db,
     plan_db,
     subscription_db,
     user_db,
 )
-from app.shared.db.models import User, Subscription, Plan
-from app.shared.enums import (
+from app.core.db.models import User, Subscription, Plan
+from app.core.enums import (
     InvitationStatus,
     MemberRole,
     MemberStatus,
@@ -40,18 +38,13 @@ from app.shared.enums import (
     SubscriptionStatus,
     WorkspaceStatus,
 )
-from app.shared.exceptions.types import (
+from app.core.exceptions.types import (
     AppException,
     ConflictException,
     NotFoundException,
 )
-from app.shared.utils import hmac_hash_otp
+from app.core.utils import hmac_hash_otp
 from app.infrastructure.messaging.publisher import publish_event
-
-
-# ============================================================================
-# Exceptions
-# ============================================================================
 
 
 class WorkspaceNotFoundException(NotFoundException):
@@ -128,20 +121,11 @@ class FreeWorkspaceNoInvitesException(AppException):
         super().__init__(message, status_code=402)
 
 
-# ============================================================================
-# Service
-# ============================================================================
-
-
 class WorkspaceService:
     """Service for workspace management."""
 
     # Default invitation expiry (7 days)
     INVITATION_EXPIRY_DAYS = 7
-
-    # ========================================================================
-    # Private Helper Methods
-    # ========================================================================
 
     async def _generate_workspace_identity(
         self,
@@ -352,10 +336,6 @@ class WorkspaceService:
         """
         return datetime.now(timezone.utc) + timedelta(days=self.INVITATION_EXPIRY_DAYS)
 
-    # ========================================================================
-    # Public Methods
-    # ========================================================================
-
     async def create_personal_workspace(
         self,
         session: AsyncSession,
@@ -379,7 +359,6 @@ class WorkspaceService:
         # Check if user already has a personal workspace (idempotent)
         existing_workspace = await workspace_db.get_personal_workspace(session, user.id)
         if existing_workspace:
-            # Get the owner member
             owner_member = next(
                 (m for m in existing_workspace.members if m.is_owner), None
             )
@@ -388,7 +367,6 @@ class WorkspaceService:
                     f"Personal workspace {existing_workspace.id} has no owner member"
                 )
 
-            # Get the subscription
             existing_sub = await subscription_db.get_by_workspace(
                 session, existing_workspace.id, active_only=False
             )
@@ -402,10 +380,8 @@ class WorkspaceService:
             )
             return existing_workspace, owner_member, existing_sub
 
-        # Generate workspace identity
         display_name, slug = await self._generate_workspace_identity(session, user)
 
-        # Create workspace
         workspace = await workspace_db.create(
             session,
             {
@@ -446,7 +422,6 @@ class WorkspaceService:
             commit_self=False,
         )
 
-        # Create API subscription context to link subscription to workspace
         await api_subscription_context_db.create(
             session,
             {
@@ -536,6 +511,7 @@ class WorkspaceService:
         self,
         session: AsyncSession,
         workspace_id: UUID,
+        options: list | None = None,
     ) -> Workspace:
         """
         Get workspace by ID.
@@ -543,6 +519,7 @@ class WorkspaceService:
         Args:
             session: Database session.
             workspace_id: Workspace ID.
+            options: Optional SQLAlchemy loader options (e.g. selectinload).
 
         Returns:
             Workspace.
@@ -550,7 +527,9 @@ class WorkspaceService:
         Raises:
             WorkspaceNotFoundException: If workspace not found.
         """
-        workspace = await workspace_db.get_by_id(session, workspace_id)
+        workspace = await workspace_db.get_by_id(
+            session, workspace_id, options=options or []
+        )
         if not workspace or workspace.is_deleted:
             raise WorkspaceNotFoundException()
         return workspace
@@ -638,7 +617,6 @@ class WorkspaceService:
         if description is not None:
             updates["description"] = description
         if slug is not None:
-            # Validate slug uniqueness
             existing = await workspace_db.get_by_slug(session, slug)
             if existing and existing.id != workspace_id:
                 raise ConflictException("Slug already in use.")
@@ -715,12 +693,10 @@ class WorkspaceService:
         subscription = await subscription_db.get_by_workspace(session, workspace_id)
         if not subscription:
             return Decimal("0.00")
-        credits_limit = (
-            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-                session, subscription.plan_id
-            )
+        plan_config = await QuotaCacheService.get_plan_config(
+            session, subscription.plan_id
         )
-        return credits_limit
+        return plan_config.credits_allocation if plan_config else Decimal("0.00")
 
     async def _check_can_add_member(
         self,
@@ -746,12 +722,10 @@ class WorkspaceService:
         if not subscription:
             raise InsufficientSeatsException("No active subscription.")
 
-        # Check if free plan
         plan = subscription.plan
         if plan.is_free:
             raise FreeWorkspaceNoInvitesException()
 
-        # Check seat availability
         available_seats = await self.get_available_seats(session, workspace.id)
         if available_seats <= 0:
             raise InsufficientSeatsException(
@@ -793,10 +767,8 @@ class WorkspaceService:
         """
         email = email.lower()
 
-        # Get workspace
         workspace = await self.get_workspace(session, workspace_id)
 
-        # Check inviter permission
         await self._require_admin_member(
             session, workspace_id, inviter_id, "Only admins can invite members."
         )
@@ -805,26 +777,20 @@ class WorkspaceService:
         if role == MemberRole.OWNER:
             raise CannotInviteOwnerException("Cannot invite with owner role.")
 
-        # Check if email is owner's email
         await self._check_email_not_owner(session, workspace.owner_id, email)
 
-        # Check if already a member
         await self._check_email_not_member(session, workspace_id, email)
 
-        # Check if pending invitation exists
         existing_invitation = await workspace_invitation_db.get_pending_invitation(
             session, workspace_id, email
         )
         if existing_invitation:
             raise InvitationAlreadyExistsException()
 
-        # Check seat availability
         await self._check_can_add_member(session, workspace)
 
-        # Generate secure token
         raw_token, token_hash = self._generate_secure_token()
 
-        # Create invitation
         invitation = await workspace_invitation_db.create(
             session,
             {
@@ -892,26 +858,21 @@ class WorkspaceService:
         if not invitation:
             raise InvitationNotFoundException()
 
-        # Check if expired
         if invitation.is_expired or invitation.status != InvitationStatus.PENDING:
             raise InvitationNotFoundException()
-            
-        # Check if current user is the owner of the invitation
+
         if user.email.lower() != invitation.email.lower():
             raise InvitationNotFoundException()
 
-        # Check if already a member
         is_member = await workspace_member_db.is_user_member(
             session, invitation.workspace_id, user.id
         )
         if is_member:
             raise MemberAlreadyExistsException()
 
-        # Check seat availability
         workspace = await self.get_workspace(session, invitation.workspace_id)
         await self._check_can_add_member(session, workspace)
 
-        # Create member
         member = await workspace_member_db.create(
             session,
             {
@@ -965,7 +926,6 @@ class WorkspaceService:
         members = []
         for invitation in invitations:
             try:
-                # Check seat availability
                 workspace = await workspace_db.get_by_id(
                     session, invitation.workspace_id
                 )
@@ -984,7 +944,6 @@ class WorkspaceService:
                 if available_seats <= 0:
                     continue
 
-                # Create member
                 member = await workspace_member_db.create(
                     session,
                     {
@@ -1045,7 +1004,6 @@ class WorkspaceService:
             PermissionDeniedException: If user lacks permission.
             InvitationNotFoundException: If invitation not found.
         """
-        # Check permission
         await self._require_admin_member(
             session, workspace_id, user_id, "Only admins can revoke invitations."
         )
@@ -1094,12 +1052,10 @@ class WorkspaceService:
             MemberNotFoundException: If member not found.
             InsufficientSeatsException: If enabling would exceed seats.
         """
-        # Check admin permission
         await self._require_admin_member(
             session, workspace_id, admin_user_id, "Only admins can manage members."
         )
 
-        # Get target member
         target_member = await workspace_member_db.get_member(
             session, workspace_id, member_user_id
         )
@@ -1110,7 +1066,6 @@ class WorkspaceService:
         if target_member.is_owner and status == MemberStatus.DISABLED:
             raise PermissionDeniedException("Cannot disable workspace owner.")
 
-        # Check seat availability when enabling
         if (
             status == MemberStatus.ENABLED
             and target_member.status == MemberStatus.DISABLED
@@ -1216,7 +1171,6 @@ class WorkspaceService:
             PermissionDeniedException: If user lacks permission or trying to remove owner.
             MemberNotFoundException: If member not found.
         """
-        # Check admin permission
         await self._require_admin_member(
             session, workspace_id, admin_user_id, "Only admins can remove members."
         )
@@ -1309,14 +1263,12 @@ class WorkspaceService:
         if workspace.owner_id != current_owner_id:
             raise PermissionDeniedException("Only owner can transfer ownership.")
 
-        # Check new owner is a member
         new_owner_member = await workspace_member_db.get_member(
             session, workspace_id, new_owner_id
         )
         if not new_owner_member:
             raise MemberNotFoundException("New owner must be a workspace member.")
 
-        # Update current owner's role to admin
         current_owner_member = await workspace_member_db.get_member(
             session, workspace_id, current_owner_id
         )
@@ -1328,7 +1280,6 @@ class WorkspaceService:
                 commit_self=False,
             )
 
-        # Update new owner's role
         await workspace_member_db.update(
             session,
             new_owner_member.id,
@@ -1336,7 +1287,6 @@ class WorkspaceService:
             commit_self=False,
         )
 
-        # Update workspace owner_id
         workspace = await workspace_db.update(
             session,
             workspace_id,

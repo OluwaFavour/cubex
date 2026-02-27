@@ -1,21 +1,18 @@
 """
 Tests for the Stripe service.
 
-This module contains tests for the Stripe payment service, including
-the _flatten_to_payload helper function.
 """
 
 import pytest
 from typing import Any
 
-from app.shared.services.payment.stripe.main import Stripe
+from app.core.exceptions.types import StripeAPIException
+from app.core.services.payment.stripe.main import Stripe
 
 
 class TestFlattenToPayload:
-    """Tests for the _flatten_to_payload helper method."""
 
     def test_simple_flat_dict(self):
-        """Test flattening a simple flat dictionary."""
         payload: dict[str, Any] = {}
         data = {"key1": "value1", "key2": "value2"}
 
@@ -27,7 +24,6 @@ class TestFlattenToPayload:
         }
 
     def test_metadata_flattening(self):
-        """Test flattening metadata dict (common Stripe use case)."""
         payload: dict[str, Any] = {}
         data = {"user_id": "123", "plan_id": "456"}
 
@@ -39,7 +35,6 @@ class TestFlattenToPayload:
         }
 
     def test_nested_dict(self):
-        """Test flattening nested dictionaries."""
         payload: dict[str, Any] = {}
         data = {
             "metadata": {
@@ -56,7 +51,6 @@ class TestFlattenToPayload:
         }
 
     def test_deeply_nested_dict(self):
-        """Test flattening deeply nested dictionaries."""
         payload: dict[str, Any] = {}
         data = {
             "level1": {
@@ -73,9 +67,7 @@ class TestFlattenToPayload:
         }
 
     def test_max_depth_limit(self):
-        """Test that max_depth prevents infinite recursion."""
         payload: dict[str, Any] = {}
-        # Create a 5-level deep dict, but set max_depth to 2
         data = {
             "l1": {
                 "l2": {
@@ -94,7 +86,6 @@ class TestFlattenToPayload:
         assert payload["root[l1][l2][l3]"] == "{'l4': 'too_deep'}"
 
     def test_list_of_dicts(self):
-        """Test flattening a list of dictionaries (like line_items)."""
         payload: dict[str, Any] = {}
         data = {
             "items": [
@@ -113,7 +104,6 @@ class TestFlattenToPayload:
         }
 
     def test_list_of_primitives(self):
-        """Test flattening a list of primitive values."""
         payload: dict[str, Any] = {}
         data = {"tags": ["tag1", "tag2", "tag3"]}
 
@@ -126,7 +116,6 @@ class TestFlattenToPayload:
         }
 
     def test_none_values_become_empty_string(self):
-        """Test that None values are converted to empty strings."""
         payload: dict[str, Any] = {}
         data = {"key1": "value1", "key2": None, "key3": "value3"}
 
@@ -139,7 +128,6 @@ class TestFlattenToPayload:
         }
 
     def test_numeric_values_become_strings(self):
-        """Test that numeric values are converted to strings."""
         payload: dict[str, Any] = {}
         data = {"count": 5, "price": 19.99, "active": True}
 
@@ -152,7 +140,6 @@ class TestFlattenToPayload:
         }
 
     def test_empty_dict(self):
-        """Test flattening an empty dictionary."""
         payload: dict[str, Any] = {}
         data: dict[str, Any] = {}
 
@@ -161,7 +148,6 @@ class TestFlattenToPayload:
         assert payload == {}
 
     def test_preserves_existing_payload_keys(self):
-        """Test that existing payload keys are preserved."""
         payload: dict[str, Any] = {"existing_key": "existing_value"}
         data = {"new_key": "new_value"}
 
@@ -173,7 +159,6 @@ class TestFlattenToPayload:
         }
 
     def test_subscription_data_with_metadata(self):
-        """Test real-world subscription_data flattening."""
         payload: dict[str, Any] = {}
         subscription_data = {
             "trial_period_days": 14,
@@ -196,7 +181,6 @@ class TestFlattenToPayload:
         }
 
     def test_payment_intent_data_with_metadata(self):
-        """Test real-world payment_intent_data flattening."""
         payload: dict[str, Any] = {}
         payment_intent_data = {
             "description": "One-time payment",
@@ -215,7 +199,6 @@ class TestFlattenToPayload:
         }
 
     def test_currency_options_nested_structure(self):
-        """Test currency_options nested structure flattening."""
         payload: dict[str, Any] = {}
         # Simulating: currency_options[usd][unit_amount] = 1000
         options = {"unit_amount": 1000, "tax_behavior": "exclusive"}
@@ -228,7 +211,6 @@ class TestFlattenToPayload:
         }
 
     def test_mixed_nested_and_flat_keys(self):
-        """Test a dict with both nested and flat keys."""
         payload: dict[str, Any] = {}
         data = {
             "simple_key": "simple_value",
@@ -247,7 +229,6 @@ class TestFlattenToPayload:
         }
 
     def test_uuid_values_converted_to_string(self):
-        """Test that UUID values are properly converted to strings."""
         from uuid import UUID
 
         payload: dict[str, Any] = {}
@@ -262,21 +243,18 @@ class TestFlattenToPayload:
 
 
 class TestUpdateSubscriptionWithSeatPriceId:
-    """Tests for update_subscription with seat_price_id parameter."""
 
     @pytest.fixture
     def mock_subscription_items(self):
         """Create mock subscription items for testing."""
         from unittest.mock import MagicMock
 
-        # Create mock price objects
         base_price = MagicMock()
         base_price.id = "price_base_123"
 
         seat_price = MagicMock()
         seat_price.id = "price_seat_456"
 
-        # Create mock subscription items
         base_item = MagicMock()
         base_item.id = "si_base_item"
         base_item.price = base_price
@@ -287,11 +265,9 @@ class TestUpdateSubscriptionWithSeatPriceId:
         seat_item.price = seat_price
         seat_item.quantity = 5
 
-        # Create mock items container
         items = MagicMock()
         items.data = [base_item, seat_item]
 
-        # Create mock subscription
         subscription = MagicMock()
         subscription.id = "sub_test123"
         subscription.items = items
@@ -302,7 +278,6 @@ class TestUpdateSubscriptionWithSeatPriceId:
     async def test_update_subscription_finds_seat_item_by_price_id(
         self, mock_subscription_items
     ):
-        """Test that update_subscription finds the correct item by seat_price_id."""
         from unittest.mock import patch, AsyncMock
 
         with patch.object(
@@ -316,7 +291,7 @@ class TestUpdateSubscriptionWithSeatPriceId:
 
             # Patch model_validate to skip validation for the update response
             with patch(
-                "app.shared.services.payment.stripe.main.Subscription.model_validate"
+                "app.core.services.payment.stripe.main.Subscription.model_validate"
             ) as mock_validate:
                 mock_validate.return_value = mock_subscription_items
 
@@ -326,10 +301,8 @@ class TestUpdateSubscriptionWithSeatPriceId:
                     seat_price_id="price_seat_456",
                 )
 
-                # Verify get_subscription was called
                 mock_get_sub.assert_called_once_with("sub_test123")
 
-                # Verify _request was called for the update
                 mock_request.assert_called_once()
                 call_args = mock_request.call_args
                 payload = call_args.kwargs.get("data", {})
@@ -339,10 +312,7 @@ class TestUpdateSubscriptionWithSeatPriceId:
                 assert payload.get("items[0][quantity]") == 10
 
     @pytest.mark.asyncio
-    async def test_update_subscription_falls_back_to_first_item(
-        self, mock_subscription_items
-    ):
-        """Test that update_subscription falls back to first item if seat_price_id not found."""
+    async def test_update_subscription_fails(self, mock_subscription_items):
         from unittest.mock import patch, AsyncMock
 
         with patch.object(
@@ -354,30 +324,27 @@ class TestUpdateSubscriptionWithSeatPriceId:
             mock_request.return_value = {"id": "sub_test123", "object": "subscription"}
 
             with patch(
-                "app.shared.services.payment.stripe.main.Subscription.model_validate"
+                "app.core.services.payment.stripe.main.Subscription.model_validate"
             ) as mock_validate:
                 mock_validate.return_value = mock_subscription_items
 
-                await Stripe.update_subscription(
-                    "sub_test123",
-                    quantity=10,
-                    seat_price_id="price_nonexistent",  # Won't be found
+                with pytest.raises(StripeAPIException) as stripe_error:
+                    await Stripe.update_subscription(
+                        "sub_test123",
+                        quantity=10,
+                        seat_price_id="price_nonexistent",  # Won't be found
+                    )
+
+                # Should fail
+                assert (
+                    "Seat subscription item not found for seat_price_id='price_nonexistent'"
+                    in str(stripe_error.value)
                 )
-
-                # Verify _request was called for the update
-                mock_request.assert_called_once()
-                call_args = mock_request.call_args
-                payload = call_args.kwargs.get("data", {})
-
-                # Should fall back to first item (si_base_item)
-                assert payload.get("items[0][id]") == "si_base_item"
-                assert payload.get("items[0][quantity]") == 10
 
     @pytest.mark.asyncio
     async def test_update_subscription_without_seat_price_id_uses_first_item(
         self, mock_subscription_items
     ):
-        """Test that update_subscription without seat_price_id uses first item."""
         from unittest.mock import patch, AsyncMock
 
         with patch.object(
@@ -389,7 +356,7 @@ class TestUpdateSubscriptionWithSeatPriceId:
             mock_request.return_value = {"id": "sub_test123", "object": "subscription"}
 
             with patch(
-                "app.shared.services.payment.stripe.main.Subscription.model_validate"
+                "app.core.services.payment.stripe.main.Subscription.model_validate"
             ) as mock_validate:
                 mock_validate.return_value = mock_subscription_items
 
@@ -399,7 +366,6 @@ class TestUpdateSubscriptionWithSeatPriceId:
                     # No seat_price_id provided
                 )
 
-                # Verify _request was called for the update
                 mock_request.assert_called_once()
                 call_args = mock_request.call_args
                 payload = call_args.kwargs.get("data", {})
@@ -407,3 +373,4 @@ class TestUpdateSubscriptionWithSeatPriceId:
                 # Should use first item (si_base_item)
                 assert payload.get("items[0][id]") == "si_base_item"
                 assert payload.get("items[0][quantity]") == 10
+

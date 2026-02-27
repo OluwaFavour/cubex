@@ -1,7 +1,6 @@
 """
 Test suite for AuthService.
 
-This module contains comprehensive tests for the AuthService including:
 - Email signup with OTP verification
 - Email signin with password
 - OAuth authentication (Google, GitHub)
@@ -13,7 +12,7 @@ Run all tests:
     pytest app/tests/services/test_auth.py -v
 
 Run with coverage:
-    pytest app/tests/services/test_auth.py --cov=app.shared.services.auth --cov-report=term-missing -v
+    pytest app/tests/services/test_auth.py --cov=app.core.services.auth --cov-report=term-missing -v
 """
 
 from datetime import datetime, timedelta, timezone
@@ -22,8 +21,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.shared.enums import OAuthProviders, OTPPurpose
-from app.shared.exceptions.types import (
+from app.core.enums import OAuthProviders, OTPPurpose
+from app.core.exceptions.types import (
     AuthenticationException,
     InvalidCredentialsException,
     OAuthException,
@@ -33,27 +32,24 @@ from app.shared.exceptions.types import (
 
 
 class TestAuthServiceInit:
-    """Test suite for AuthService initialization."""
 
     @pytest.fixture(autouse=True)
     def reset_service(self):
         """Reset AuthService state after each test."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         yield
         AuthService._initialized = False
 
     def test_init_sets_initialized_flag(self):
-        """Test that init sets the initialized flag."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         AuthService.init()
 
         assert AuthService._initialized is True
 
     def test_init_is_idempotent(self):
-        """Test that init can be called multiple times safely."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         AuthService.init()
         AuthService.init()
@@ -61,8 +57,7 @@ class TestAuthServiceInit:
         assert AuthService._initialized is True
 
     def test_is_initialized_returns_correct_state(self):
-        """Test that is_initialized returns correct state."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         assert AuthService.is_initialized() is False
 
@@ -72,20 +67,17 @@ class TestAuthServiceInit:
 
 
 class TestGenerateOTP:
-    """Test suite for OTP generation."""
 
     def test_generate_otp_returns_string(self):
-        """Test that generate_otp returns a string."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         otp = AuthService.generate_otp()
         assert isinstance(otp, str)
 
     def test_generate_otp_default_length(self):
-        """Test that generate_otp uses default length from settings."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.settings") as mock_settings:
+        with patch("app.core.services.auth.settings") as mock_settings:
             mock_settings.OTP_LENGTH = 6
 
             otp = AuthService.generate_otp()
@@ -93,23 +85,20 @@ class TestGenerateOTP:
             assert len(otp) == 6
 
     def test_generate_otp_custom_length(self):
-        """Test that generate_otp respects custom length."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         otp = AuthService.generate_otp(length=8)
         assert len(otp) == 8
 
     def test_generate_otp_only_digits(self):
-        """Test that generate_otp returns only digits."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         for _ in range(100):
             otp = AuthService.generate_otp()
             assert otp.isdigit()
 
     def test_generate_otp_is_random(self):
-        """Test that generate_otp produces random values."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         otps = [AuthService.generate_otp() for _ in range(100)]
         # With 6 digits, should have many unique values
@@ -117,26 +106,22 @@ class TestGenerateOTP:
 
 
 class TestHashPassword:
-    """Test suite for password hashing."""
 
     def test_hash_password_returns_string(self):
-        """Test that hash_password returns a string."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         hashed = AuthService.hash_password("password123")
         assert isinstance(hashed, str)
 
     def test_hash_password_different_from_input(self):
-        """Test that hashed password differs from input."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         password = "password123"
         hashed = AuthService.hash_password(password)
         assert hashed != password
 
     def test_hash_password_different_for_same_input(self):
-        """Test that same password produces different hashes (salt)."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         password = "password123"
         hash1 = AuthService.hash_password(password)
@@ -145,11 +130,9 @@ class TestHashPassword:
 
 
 class TestVerifyPassword:
-    """Test suite for password verification."""
 
     def test_verify_password_correct(self):
-        """Test that verify_password returns True for correct password."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         password = "password123"
         hashed = AuthService.hash_password(password)
@@ -157,8 +140,7 @@ class TestVerifyPassword:
         assert AuthService.verify_password(password, hashed) is True
 
     def test_verify_password_incorrect(self):
-        """Test that verify_password returns False for incorrect password."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         password = "password123"
         hashed = AuthService.hash_password(password)
@@ -166,15 +148,13 @@ class TestVerifyPassword:
         assert AuthService.verify_password("wrongpassword", hashed) is False
 
     def test_verify_password_empty(self):
-        """Test that verify_password handles empty password."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         hashed = AuthService.hash_password("password123")
         assert AuthService.verify_password("", hashed) is False
 
 
 class TestSendOTP:
-    """Test suite for OTP sending."""
 
     @pytest.fixture
     def mock_session(self):
@@ -186,12 +166,11 @@ class TestSendOTP:
 
     @pytest.mark.asyncio
     async def test_send_otp_creates_token(self, mock_session):
-        """Test that send_otp creates an OTP token."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.shared.services.auth.publish_event"
-        ) as mock_publish, patch("app.shared.services.auth.hmac_hash_otp") as mock_hash:
+        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
+            "app.core.services.auth.publish_event"
+        ) as mock_publish, patch("app.core.services.auth.hmac_hash_otp") as mock_hash:
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=0)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
 
@@ -210,12 +189,11 @@ class TestSendOTP:
 
     @pytest.mark.asyncio
     async def test_send_otp_invalidates_previous_tokens(self, mock_session):
-        """Test that send_otp invalidates previous tokens."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.shared.services.auth.publish_event"
-        ) as mock_publish, patch("app.shared.services.auth.hmac_hash_otp"):
+        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
+            "app.core.services.auth.publish_event"
+        ) as mock_publish, patch("app.core.services.auth.hmac_hash_otp"):
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=2)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
 
@@ -236,12 +214,11 @@ class TestSendOTP:
 
     @pytest.mark.asyncio
     async def test_send_otp_publishes_email_event(self, mock_session):
-        """Test that send_otp publishes email event to message queue."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.shared.services.auth.publish_event"
-        ) as mock_publish, patch("app.shared.services.auth.hmac_hash_otp"):
+        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
+            "app.core.services.auth.publish_event"
+        ) as mock_publish, patch("app.core.services.auth.hmac_hash_otp"):
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=0)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
 
@@ -264,14 +241,13 @@ class TestSendOTP:
 
     @pytest.mark.asyncio
     async def test_send_otp_with_user_id(self, mock_session):
-        """Test that send_otp associates token with user_id."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         user_id = uuid4()
 
-        with patch("app.shared.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.shared.services.auth.publish_event"
-        ) as mock_publish, patch("app.shared.services.auth.hmac_hash_otp"):
+        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
+            "app.core.services.auth.publish_event"
+        ) as mock_publish, patch("app.core.services.auth.hmac_hash_otp"):
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=0)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
 
@@ -289,7 +265,6 @@ class TestSendOTP:
 
 
 class TestVerifyOTP:
-    """Test suite for OTP verification."""
 
     @pytest.fixture
     def mock_session(self):
@@ -311,11 +286,10 @@ class TestVerifyOTP:
 
     @pytest.mark.asyncio
     async def test_verify_otp_success(self, mock_session, valid_token):
-        """Test successful OTP verification."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.shared.services.auth.hmac_hash_otp"
+        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
+            "app.core.services.auth.hmac_hash_otp"
         ) as mock_hash:
             mock_hash.return_value = "hashed_otp"
 
@@ -334,11 +308,10 @@ class TestVerifyOTP:
 
     @pytest.mark.asyncio
     async def test_verify_otp_invalid_code(self, mock_session):
-        """Test OTP verification with invalid code."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.shared.services.auth.hmac_hash_otp"
+        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
+            "app.core.services.auth.hmac_hash_otp"
         ) as mock_hash:
             mock_hash.return_value = "hashed_otp"
 
@@ -354,14 +327,13 @@ class TestVerifyOTP:
 
     @pytest.mark.asyncio
     async def test_verify_otp_too_many_attempts(self, mock_session, valid_token):
-        """Test OTP verification with too many attempts."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         valid_token.attempts = 5  # Max attempts reached
 
-        with patch("app.shared.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.shared.services.auth.hmac_hash_otp"
-        ) as mock_hash, patch("app.shared.services.auth.settings") as mock_settings:
+        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
+            "app.core.services.auth.hmac_hash_otp"
+        ) as mock_hash, patch("app.core.services.auth.settings") as mock_settings:
             mock_settings.OTP_MAX_ATTEMPTS = 5
             mock_hash.return_value = "hashed_otp"
 
@@ -377,7 +349,6 @@ class TestVerifyOTP:
 
 
 class TestEmailSignup:
-    """Test suite for email signup."""
 
     @pytest.fixture
     def mock_session(self):
@@ -387,15 +358,14 @@ class TestEmailSignup:
 
     @pytest.mark.asyncio
     async def test_email_signup_creates_user(self, mock_session):
-        """Test that email_signup creates a new user."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         new_user = MagicMock()
         new_user.id = uuid4()
         new_user.email = "newuser@example.com"
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.AuthService.hash_password"
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.AuthService.hash_password"
         ) as mock_hash:
             mock_hash.return_value = "hashed_password"
 
@@ -416,13 +386,12 @@ class TestEmailSignup:
 
     @pytest.mark.asyncio
     async def test_email_signup_existing_user_raises(self, mock_session):
-        """Test that email_signup raises for existing user."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         existing_user = MagicMock()
         existing_user.email = "existing@example.com"
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db:
+        with patch("app.core.services.auth.user_db") as mock_user_db:
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=existing_user)
@@ -438,14 +407,13 @@ class TestEmailSignup:
 
     @pytest.mark.asyncio
     async def test_email_signup_hashes_password(self, mock_session):
-        """Test that email_signup hashes the password."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         new_user = MagicMock()
         new_user.id = uuid4()
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.AuthService.hash_password"
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.AuthService.hash_password"
         ) as mock_hash:
             mock_hash.return_value = "hashed_password_xyz"
 
@@ -466,7 +434,6 @@ class TestEmailSignup:
 
 
 class TestEmailSignin:
-    """Test suite for email signin."""
 
     @pytest.fixture
     def mock_session(self):
@@ -487,11 +454,10 @@ class TestEmailSignin:
 
     @pytest.mark.asyncio
     async def test_email_signin_success(self, mock_session, valid_user):
-        """Test successful email signin."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.AuthService.verify_password"
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.AuthService.verify_password"
         ) as mock_verify:
             mock_verify.return_value = True
 
@@ -509,10 +475,9 @@ class TestEmailSignin:
 
     @pytest.mark.asyncio
     async def test_email_signin_user_not_found(self, mock_session):
-        """Test email signin with non-existent user."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db:
+        with patch("app.core.services.auth.user_db") as mock_user_db:
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=None)
@@ -526,11 +491,10 @@ class TestEmailSignin:
 
     @pytest.mark.asyncio
     async def test_email_signin_wrong_password(self, mock_session, valid_user):
-        """Test email signin with wrong password."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.AuthService.verify_password"
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.AuthService.verify_password"
         ) as mock_verify:
             mock_verify.return_value = False
 
@@ -547,13 +511,12 @@ class TestEmailSignin:
 
     @pytest.mark.asyncio
     async def test_email_signin_inactive_user(self, mock_session, valid_user):
-        """Test email signin with inactive user."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         valid_user.is_active = False
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.AuthService.verify_password"
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.AuthService.verify_password"
         ) as mock_verify:
             mock_verify.return_value = True
 
@@ -572,12 +535,11 @@ class TestEmailSignin:
 
     @pytest.mark.asyncio
     async def test_email_signin_no_password_set(self, mock_session, valid_user):
-        """Test email signin for OAuth-only user (no password)."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         valid_user.password_hash = None
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db:
+        with patch("app.core.services.auth.user_db") as mock_user_db:
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=valid_user)
@@ -593,7 +555,6 @@ class TestEmailSignin:
 
 
 class TestOAuthAuthenticate:
-    """Test suite for OAuth authentication."""
 
     @pytest.fixture
     def mock_session(self):
@@ -604,7 +565,7 @@ class TestOAuthAuthenticate:
     @pytest.fixture
     def oauth_user_info(self):
         """Create OAuth user info mock."""
-        from app.shared.services.oauth.base import OAuthUserInfo
+        from app.core.services.oauth.base import OAuthUserInfo
 
         return OAuthUserInfo(
             provider="google",
@@ -617,15 +578,14 @@ class TestOAuthAuthenticate:
 
     @pytest.mark.asyncio
     async def test_oauth_authenticate_new_user(self, mock_session, oauth_user_info):
-        """Test OAuth authentication creates new user."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         new_user = MagicMock()
         new_user.id = uuid4()
         new_user.email = oauth_user_info.email
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.oauth_account_db"
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.oauth_account_db"
         ) as mock_oauth_db:
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
@@ -652,8 +612,7 @@ class TestOAuthAuthenticate:
     async def test_oauth_authenticate_existing_user_new_provider(
         self, mock_session, oauth_user_info
     ):
-        """Test OAuth adds new provider to existing user."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         existing_user = MagicMock()
         existing_user.id = uuid4()
@@ -662,8 +621,8 @@ class TestOAuthAuthenticate:
         existing_user.avatar_url = "https://example.com/avatar.jpg"
         existing_user.email_verified = True
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.oauth_account_db"
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.oauth_account_db"
         ) as mock_oauth_db:
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
@@ -688,8 +647,7 @@ class TestOAuthAuthenticate:
     async def test_oauth_authenticate_existing_oauth_account(
         self, mock_session, oauth_user_info
     ):
-        """Test OAuth with existing OAuth account."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         existing_user = MagicMock()
         existing_user.id = uuid4()
@@ -702,8 +660,8 @@ class TestOAuthAuthenticate:
         existing_oauth.user_id = existing_user.id
         existing_oauth.user = existing_user
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.oauth_account_db"
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.oauth_account_db"
         ) as mock_oauth_db:
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
@@ -728,8 +686,7 @@ class TestOAuthAuthenticate:
     async def test_oauth_authenticate_updates_user_info(
         self, mock_session, oauth_user_info
     ):
-        """Test OAuth updates user info from provider."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         existing_user = MagicMock()
         existing_user.id = uuid4()
@@ -741,8 +698,8 @@ class TestOAuthAuthenticate:
         existing_oauth = MagicMock()
         existing_oauth.user = existing_user
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.oauth_account_db"
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.oauth_account_db"
         ) as mock_oauth_db:
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
@@ -765,34 +722,29 @@ class TestOAuthAuthenticate:
 
 
 class TestGetOAuthProvider:
-    """Test suite for OAuth provider retrieval."""
 
     def test_get_oauth_provider_google(self):
-        """Test getting Google OAuth provider."""
-        from app.shared.services.auth import AuthService
-        from app.shared.services.oauth import GoogleOAuthService
+        from app.core.services.auth import AuthService
+        from app.core.services.oauth import GoogleOAuthService
 
         provider = AuthService.get_oauth_provider(OAuthProviders.GOOGLE)
         assert provider == GoogleOAuthService
 
     def test_get_oauth_provider_github(self):
-        """Test getting GitHub OAuth provider."""
-        from app.shared.services.auth import AuthService
-        from app.shared.services.oauth import GitHubOAuthService
+        from app.core.services.auth import AuthService
+        from app.core.services.oauth import GitHubOAuthService
 
         provider = AuthService.get_oauth_provider(OAuthProviders.GITHUB)
         assert provider == GitHubOAuthService
 
     def test_get_oauth_provider_invalid(self):
-        """Test getting invalid OAuth provider."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
         with pytest.raises(OAuthException):
             AuthService.get_oauth_provider("invalid_provider")
 
 
 class TestPasswordReset:
-    """Test suite for password reset flow."""
 
     @pytest.fixture
     def mock_session(self):
@@ -812,12 +764,11 @@ class TestPasswordReset:
 
     @pytest.mark.asyncio
     async def test_reset_password_success(self, mock_session, valid_user):
-        """Test successful password reset."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.AuthService.hash_password"
-        ) as mock_hash, patch("app.shared.services.auth.publish_event") as mock_publish:
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.AuthService.hash_password"
+        ) as mock_hash, patch("app.core.services.auth.publish_event") as mock_publish:
             mock_hash.return_value = "new_hashed_password"
 
             mock_user_db.model = MagicMock()
@@ -840,12 +791,11 @@ class TestPasswordReset:
     async def test_reset_password_publishes_confirmation_email_event(
         self, mock_session, valid_user
     ):
-        """Test that password reset publishes confirmation email event."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db, patch(
-            "app.shared.services.auth.AuthService.hash_password"
-        ), patch("app.shared.services.auth.publish_event") as mock_publish:
+        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
+            "app.core.services.auth.AuthService.hash_password"
+        ), patch("app.core.services.auth.publish_event") as mock_publish:
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=valid_user)
@@ -866,10 +816,9 @@ class TestPasswordReset:
 
     @pytest.mark.asyncio
     async def test_reset_password_user_not_found(self, mock_session):
-        """Test password reset for non-existent user."""
-        from app.shared.services.auth import AuthService
+        from app.core.services.auth import AuthService
 
-        with patch("app.shared.services.auth.user_db") as mock_user_db:
+        with patch("app.core.services.auth.user_db") as mock_user_db:
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=None)
@@ -883,11 +832,10 @@ class TestPasswordReset:
 
 
 class TestModuleExports:
-    """Test suite for module exports."""
 
     def test_all_exports(self):
-        """Test that __all__ contains expected exports."""
-        from app.shared.services import auth
+        from app.core.services import auth
 
         assert hasattr(auth, "__all__")
         assert "AuthService" in auth.__all__
+

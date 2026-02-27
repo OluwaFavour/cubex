@@ -17,3 +17,4 @@ async def start_consumers(keep_alive: bool):
 
 
 __all__ = ["publish_event", "start_consumers"]
+

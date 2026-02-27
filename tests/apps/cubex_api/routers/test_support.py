@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from app.shared.enums import SalesRequestStatus
+from app.core.enums import SalesRequestStatus
 
 
 class TestSupportRouterSetup:
@@ -200,7 +200,6 @@ class TestContactSalesRateLimiting:
             )
 
             assert response.status_code == 201
-            # Verify rate limit was called with lowercase email
             mock_rate_limit.assert_called_once()
             call_args = mock_rate_limit.call_args
             assert call_args[0][0] == "test@example.com"
@@ -209,7 +208,7 @@ class TestContactSalesRateLimiting:
     @pytest.mark.asyncio
     async def test_rate_limit_exceeded_returns_429(self, client: AsyncClient):
         """Test that rate limit exceeded returns 429."""
-        from app.shared.exceptions.types import RateLimitExceededException
+        from app.core.exceptions.types import RateLimitExceededException
 
         with patch(
             "app.apps.cubex_api.routers.support._check_email_rate_limit",
@@ -358,3 +357,4 @@ class TestSupportSchemas:
 
         assert ContactSalesRequest is not None
         assert ContactSalesResponse is not None
+
