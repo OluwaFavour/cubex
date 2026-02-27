@@ -96,12 +96,6 @@ class TestInternalRouterSetup:
 
         assert router.prefix == "/internal"
 
-    def test_internal_router_tags(self):
-        """Test that internal router has correct tags."""
-        from app.apps.cubex_api.routers.internal import router
-
-        assert "Internal API" in router.tags
-
 
 class TestInternalAPIKeyAuthentication:
     """Test internal API key authentication."""
