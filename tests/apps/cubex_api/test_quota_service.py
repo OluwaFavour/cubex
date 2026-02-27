@@ -747,36 +747,34 @@ class TestUsageLogSumCredits:
         assert "period_end" in params
 
 
-class TestQuotaCacheServiceFallback:
+class TestQuotaCacheServicePlanConfig:
 
-    def test_fallback_method_exists(self):
+    def test_get_plan_config_method_exists(self):
         from app.core.services.quota_cache import QuotaCacheService
 
-        assert hasattr(QuotaCacheService, "get_plan_credits_allocation_with_fallback")
-        assert callable(QuotaCacheService.get_plan_credits_allocation_with_fallback)
+        assert hasattr(QuotaCacheService, "get_plan_config")
+        assert callable(QuotaCacheService.get_plan_config)
 
-    def test_fallback_method_signature(self):
+    def test_get_plan_config_method_signature(self):
         import inspect
 
         from app.core.services.quota_cache import QuotaCacheService
 
-        sig = inspect.signature(
-            QuotaCacheService.get_plan_credits_allocation_with_fallback
-        )
+        sig = inspect.signature(QuotaCacheService.get_plan_config)
         params = list(sig.parameters.keys())
 
         assert "session" in params
         assert "plan_id" in params
 
     @pytest.mark.asyncio
-    async def test_returns_default_when_plan_id_is_none(self):
+    async def test_returns_none_when_plan_id_is_none(self):
+        from unittest.mock import AsyncMock
+
         from app.core.services.quota_cache import QuotaCacheService
 
-        # Mock session not needed when plan_id is None
-        result = await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-            session=None,  # type: ignore
+        result = await QuotaCacheService.get_plan_config(
+            session=AsyncMock(),
             plan_id=None,
         )
 
-        assert result == QuotaCacheService.DEFAULT_PLAN_CREDITS
-
+        assert result is None

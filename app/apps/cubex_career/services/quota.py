@@ -44,23 +44,26 @@ from app.core.utils import create_request_fingerprint
 class RateLimitInfo:
     """Rate limiting information for Career API responses.
 
+    Fields are ``None`` when the corresponding rate-limit window is
+    unlimited (i.e. no cap configured for that window).
+
     Attributes:
-        limit_per_minute: Maximum requests allowed per minute.
-        remaining_per_minute: Requests remaining in the current minute window.
-        reset_per_minute: Unix timestamp when the per-minute window resets.
-        limit_per_day: Maximum requests allowed per day.
-        remaining_per_day: Requests remaining in the current day window.
-        reset_per_day: Unix timestamp when the per-day window resets.
+        limit_per_minute: Maximum requests per minute, or ``None`` (unlimited).
+        remaining_per_minute: Requests remaining in the minute window.
+        reset_per_minute: Unix timestamp when the minute window resets.
+        limit_per_day: Maximum requests per day, or ``None`` (unlimited).
+        remaining_per_day: Requests remaining in the day window.
+        reset_per_day: Unix timestamp when the day window resets.
         is_exceeded: Whether any rate limit has been exceeded.
         exceeded_window: Which window was exceeded ('minute', 'day', or None).
     """
 
-    limit_per_minute: int
-    remaining_per_minute: int
-    reset_per_minute: int
-    limit_per_day: int
-    remaining_per_day: int
-    reset_per_day: int
+    limit_per_minute: int | None = None
+    remaining_per_minute: int | None = None
+    reset_per_minute: int | None = None
+    limit_per_day: int | None = None
+    remaining_per_day: int | None = None
+    reset_per_day: int | None = None
     is_exceeded: bool = False
     exceeded_window: str | None = None
 
@@ -124,79 +127,77 @@ class CareerQuotaService:
         return (period_start, period_end)
 
     async def _check_rate_limit(
-        self, user_id: UUID, plan_id: UUID | None
-    ) -> RateLimitInfo:
+        self,
+        user_id: UUID,
+        rate_limit_per_minute: int | None,
+        rate_limit_per_day: int | None,
+    ) -> RateLimitInfo | None:
         """
         Check and update rate limit counters for a user.
 
-        Checks both per-minute and per-day rate limits.
-        Uses Redis sliding windows:
-        - Per-minute: rate_limit:career:{user_id}:min (60s window)
-        - Per-day: rate_limit:career:{user_id}:day (86400s window)
+        Checks per-minute and/or per-day rate limits depending on which
+        are configured (non-None).  Returns ``None`` when both windows
+        are unlimited.
 
         Args:
             user_id: The user UUID to check rate limit for.
-            plan_id: The plan UUID for rate limit configuration.
+            rate_limit_per_minute: Max requests/minute, or ``None`` (unlimited).
+            rate_limit_per_day: Max requests/day, or ``None`` (unlimited).
 
         Returns:
-            RateLimitInfo with current rate limit status.
+            RateLimitInfo with current rate limit status, or ``None``
+            if both windows are unlimited.
         """
-        rate_limit_per_minute = await QuotaCacheService.get_plan_rate_limit(plan_id)
-        rate_limit_per_day = await QuotaCacheService.get_plan_rate_day_limit(plan_id)
+        if rate_limit_per_minute is None and rate_limit_per_day is None:
+            return None
 
         now_ts = int(time.time())
 
-        # Per-minute check
-        minute_key = f"rate_limit:career:{user_id}:min"
-        minute_result = await RedisService.rate_limit_incr(minute_key, 60)
+        # -- Per-minute window -----------------------------------------------
+        minute_exceeded = False
+        minute_remaining: int | None = None
+        minute_reset: int | None = None
 
-        if minute_result is None:
-            # Redis unavailable - allow request but log warning
-            career_logger.warning(
-                f"Rate limit check failed (Redis unavailable) for user {user_id}"
-            )
-            return RateLimitInfo(
-                limit_per_minute=rate_limit_per_minute,
-                remaining_per_minute=rate_limit_per_minute - 1,
-                reset_per_minute=now_ts + 60,
-                limit_per_day=rate_limit_per_day,
-                remaining_per_day=rate_limit_per_day - 1,
-                reset_per_day=now_ts + 86400,
-                is_exceeded=False,
-            )
+        if rate_limit_per_minute is not None:
+            minute_key = f"rate_limit:career:{user_id}:min"
+            minute_result = await RedisService.rate_limit_incr(minute_key, 60)
 
-        minute_count, minute_ttl = minute_result
-        if minute_ttl < 0:
-            minute_ttl = 60
-        minute_reset = now_ts + minute_ttl
-        minute_remaining = max(0, rate_limit_per_minute - minute_count)
-        minute_exceeded = minute_count > rate_limit_per_minute
+            if minute_result is None:
+                career_logger.warning(
+                    f"Rate limit check failed (Redis unavailable) for user {user_id}"
+                )
+                minute_remaining = rate_limit_per_minute - 1
+                minute_reset = now_ts + 60
+            else:
+                minute_count, minute_ttl = minute_result
+                if minute_ttl < 0:
+                    minute_ttl = 60
+                minute_reset = now_ts + minute_ttl
+                minute_remaining = max(0, rate_limit_per_minute - minute_count)
+                minute_exceeded = minute_count > rate_limit_per_minute
 
-        # Per-day check
-        day_key = f"rate_limit:career:{user_id}:day"
-        day_result = await RedisService.rate_limit_incr(day_key, 86400)
+        # -- Per-day window --------------------------------------------------
+        day_exceeded = False
+        day_remaining: int | None = None
+        day_reset: int | None = None
 
-        if day_result is None:
-            career_logger.warning(
-                f"Day rate limit check failed (Redis unavailable) for user {user_id}"
-            )
-            return RateLimitInfo(
-                limit_per_minute=rate_limit_per_minute,
-                remaining_per_minute=minute_remaining,
-                reset_per_minute=minute_reset,
-                limit_per_day=rate_limit_per_day,
-                remaining_per_day=rate_limit_per_day - 1,
-                reset_per_day=now_ts + 86400,
-                is_exceeded=minute_exceeded,
-                exceeded_window="minute" if minute_exceeded else None,
-            )
+        if rate_limit_per_day is not None:
+            day_key = f"rate_limit:career:{user_id}:day"
+            day_result = await RedisService.rate_limit_incr(day_key, 86400)
 
-        day_count, day_ttl = day_result
-        if day_ttl < 0:
-            day_ttl = 86400
-        day_reset = now_ts + day_ttl
-        day_remaining = max(0, rate_limit_per_day - day_count)
-        day_exceeded = day_count > rate_limit_per_day
+            if day_result is None:
+                career_logger.warning(
+                    f"Day rate limit check failed (Redis unavailable) for user {user_id}"
+                )
+                day_remaining = rate_limit_per_day - 1
+                day_reset = now_ts + 86400
+            else:
+                day_count, day_ttl = day_result
+                if day_ttl < 0:
+                    day_ttl = 86400
+                day_reset = now_ts + day_ttl
+                day_remaining = max(0, rate_limit_per_day - day_count)
+                day_exceeded = day_count > rate_limit_per_day
 
         is_exceeded = minute_exceeded or day_exceeded
         exceeded_window = None
@@ -207,8 +208,8 @@ class CareerQuotaService:
 
         career_logger.debug(
             f"Rate limit check: user={user_id}, "
-            f"minute={minute_count}/{rate_limit_per_minute}, "
-            f"day={day_count}/{rate_limit_per_day}, "
+            f"minute={'unlimited' if rate_limit_per_minute is None else f'{minute_remaining}/{rate_limit_per_minute}'}, "
+            f"day={'unlimited' if rate_limit_per_day is None else f'{day_remaining}/{rate_limit_per_day}'}, "
             f"exceeded={is_exceeded}"
         )
 
@@ -272,7 +273,7 @@ class CareerQuotaService:
         self,
         session: AsyncSession,
         user_id: UUID,
-        plan_id: UUID | None,
+        credits_limit: Decimal,
         credits_reserved: Decimal,
     ) -> tuple[AccessStatus, str, int]:
         """
@@ -281,19 +282,12 @@ class CareerQuotaService:
         Args:
             session: Database session.
             user_id: The user UUID.
-            plan_id: The plan UUID (or None for default).
+            credits_limit: The credits allocation for the plan.
             credits_reserved: Credits required for this request.
 
         Returns:
             Tuple of (access_status, message, http_status_code).
         """
-        # Get credits limit for the plan (with DB fallback if cache unavailable)
-        credits_limit = (
-            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-                session, plan_id
-            )
-        )
-
         # Get current usage from subscription context (O(1) lookup)
         context = await career_subscription_context_db.get_by_user(session, user_id)
         current_usage = context.credits_used if context else Decimal("0.00")
@@ -373,14 +367,34 @@ class CareerQuotaService:
         if idempotent_result is not None:
             return idempotent_result
 
-        rate_limit_info = await self._check_rate_limit(user_id, plan_id)
-        if rate_limit_info.is_exceeded:
+        # Get plan config (fail-fast if missing)
+        plan_config = await QuotaCacheService.get_plan_config(session, plan_id)
+        if plan_config is None:
+            career_logger.error(
+                f"Plan pricing not configured: plan_id={plan_id}, " f"user={user_id}"
+            )
+            return (
+                AccessStatus.DENIED,
+                None,
+                "Service configuration error. Please contact support.",
+                None,
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                None,
+            )
+
+        # Rate limit (returns None when both windows are unlimited)
+        rate_limit_info = await self._check_rate_limit(
+            user_id,
+            plan_config.rate_limit_per_minute,
+            plan_config.rate_limit_per_day,
+        )
+        if rate_limit_info is not None and rate_limit_info.is_exceeded:
             window = rate_limit_info.exceeded_window or "minute"
             if window == "minute":
-                retry_after = rate_limit_info.reset_per_minute - int(time.time())
+                retry_after = (rate_limit_info.reset_per_minute or 0) - int(time.time())
                 limit_str = f"{rate_limit_info.limit_per_minute} requests/minute"
             else:
-                retry_after = rate_limit_info.reset_per_day - int(time.time())
+                retry_after = (rate_limit_info.reset_per_day or 0) - int(time.time())
                 limit_str = f"{rate_limit_info.limit_per_day} requests/day"
 
             career_logger.warning(
@@ -398,10 +412,22 @@ class CareerQuotaService:
             )
 
         credits_reserved = await QuotaCacheService.calculate_billable_cost(
-            feature_key, plan_id
+            session, feature_key, plan_id
         )
+        if credits_reserved is None:
+            career_logger.error(
+                f"Feature pricing not configured: feature_key={feature_key}"
+            )
+            return (
+                AccessStatus.DENIED,
+                None,
+                "Service configuration error. Please contact support.",
+                None,
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                rate_limit_info,
+            )
         access_status, message, response_status_code = await self._check_quota(
-            session, user_id, plan_id, credits_reserved
+            session, user_id, plan_config.credits_allocation, credits_reserved
         )
 
         usage_log = await career_usage_log_db.create(

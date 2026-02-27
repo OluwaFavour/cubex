@@ -106,10 +106,9 @@ async def _get_credits_info(
     Returns:
         Tuple of (credits_allocation, credits_used)
     """
+    plan_config = await APIQuotaCacheService.get_plan_config(session, plan_id)
     credits_allocation = (
-        await APIQuotaCacheService.get_plan_credits_allocation_with_fallback(
-            session, plan_id
-        )
+        plan_config.credits_allocation if plan_config else Decimal("0.00")
     )
 
     context = await api_subscription_context_db.get_by_workspace(session, workspace_id)
@@ -1024,4 +1023,3 @@ async def upgrade_plan(
 
 
 __all__ = ["router"]
-

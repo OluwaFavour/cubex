@@ -254,8 +254,7 @@ class FeatureCostConfigAdmin(ModelView, model=FeatureCostConfig):
     form_args = {
         "feature_key": {"description": "Feature key (e.g., api.resume)."},
         "internal_cost_credits": {
-            "description": "Internal credit cost for calling this endpoint. "
-            "Default is 1.0 credit per call.",
+            "description": "Internal credit cost for calling this endpoint.",
         },
     }
 
@@ -279,6 +278,7 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
         PlanPricingRule.multiplier,
         PlanPricingRule.credits_allocation,
         PlanPricingRule.rate_limit_per_minute,
+        PlanPricingRule.rate_limit_per_day,
         PlanPricingRule.created_at,
     ]
 
@@ -286,6 +286,7 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
         PlanPricingRule.multiplier,
         PlanPricingRule.credits_allocation,
         PlanPricingRule.rate_limit_per_minute,
+        PlanPricingRule.rate_limit_per_day,
         PlanPricingRule.created_at,
     ]
 
@@ -294,6 +295,7 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
         PlanPricingRule.multiplier,
         PlanPricingRule.credits_allocation,
         PlanPricingRule.rate_limit_per_minute,
+        PlanPricingRule.rate_limit_per_day,
     ]
 
     column_labels = {
@@ -302,6 +304,7 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
         PlanPricingRule.multiplier: "Price Multiplier",
         PlanPricingRule.credits_allocation: "Credits Allocation",
         PlanPricingRule.rate_limit_per_minute: "Rate Limit/min",
+        PlanPricingRule.rate_limit_per_day: "Rate Limit/day",
         PlanPricingRule.created_at: "Created",
     }
 
@@ -315,10 +318,13 @@ class PlanPricingRuleAdmin(ModelView, model=PlanPricingRule):
             "description": "Pricing multiplier (1.0 = standard rate, 0.8 = 20% discount)",
         },
         "credits_allocation": {
-            "description": "Total credits allocated to workspaces on this plan per billing period",
+            "description": "Total credits allocated per billing period",
         },
         "rate_limit_per_minute": {
-            "description": "Maximum API requests allowed per minute",
+            "description": "Maximum requests per minute (leave empty for unlimited)",
+        },
+        "rate_limit_per_day": {
+            "description": "Maximum requests per day (leave empty for unlimited)",
         },
     }
 
@@ -766,4 +772,3 @@ __all__ = [
     "SubscriptionAdmin",
     "UsageLogAdmin",
 ]
-

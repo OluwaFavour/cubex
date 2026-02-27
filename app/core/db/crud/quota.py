@@ -172,6 +172,7 @@ class PlanPricingRuleDB(BaseDB[PlanPricingRule]):
         multiplier: Decimal | None = None,
         credits_allocation: Decimal | None = None,
         rate_limit_per_minute: int | None = None,
+        rate_limit_per_day: int | None = None,
     ) -> PlanPricingRule:
         """
         Create or update a plan pricing rule.
@@ -181,9 +182,10 @@ class PlanPricingRuleDB(BaseDB[PlanPricingRule]):
         Args:
             session: Database session.
             plan_id: The plan UUID.
-            multiplier: The pricing multiplier (optional).
-            credits_allocation: The credits allocation (optional).
-            rate_limit_per_minute: The rate limit per minute (optional).
+            multiplier: The pricing multiplier (optional on update).
+            credits_allocation: The credits allocation (optional on update).
+            rate_limit_per_minute: Max requests/minute (None = unlimited).
+            rate_limit_per_day: Max requests/day (None = unlimited).
 
         Returns:
             Created or updated PlanPricingRule.
@@ -200,6 +202,8 @@ class PlanPricingRuleDB(BaseDB[PlanPricingRule]):
             update_data["credits_allocation"] = credits_allocation
         if rate_limit_per_minute is not None:
             update_data["rate_limit_per_minute"] = rate_limit_per_minute
+        if rate_limit_per_day is not None:
+            update_data["rate_limit_per_day"] = rate_limit_per_day
 
         if existing:
             if update_data:
@@ -211,7 +215,6 @@ class PlanPricingRuleDB(BaseDB[PlanPricingRule]):
                 return updated
             return existing
 
-        # For new creation, use defaults for non-provided values
         create_data: dict = {"plan_id": plan_id}
         if multiplier is not None:
             create_data["multiplier"] = multiplier
@@ -219,6 +222,8 @@ class PlanPricingRuleDB(BaseDB[PlanPricingRule]):
             create_data["credits_allocation"] = credits_allocation
         if rate_limit_per_minute is not None:
             create_data["rate_limit_per_minute"] = rate_limit_per_minute
+        if rate_limit_per_day is not None:
+            create_data["rate_limit_per_day"] = rate_limit_per_day
 
         return await self.create(session, create_data)
 
@@ -234,4 +239,3 @@ __all__ = [
     "feature_cost_config_db",
     "plan_pricing_rule_db",
 ]
-

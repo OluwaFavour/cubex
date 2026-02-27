@@ -3,7 +3,7 @@ Quota service for API usage tracking and validation.
 
 - Validating API keys and logging usage
 - Committing usage logs (idempotent)
-- Future: Quota checking and enforcement
+- Quota checking and enforcement
 
 Usage flow:
 1. External API calls /internal/usage/validate with API key and client_id
@@ -67,17 +67,28 @@ class UsageLogNotFoundException(NotFoundException):
 class RateLimitInfo:
     """Rate limiting information for API responses.
 
+    Fields are ``None`` when the corresponding rate-limit window is
+    unlimited (i.e. no cap configured for that window).
+
     Attributes:
-        limit: Maximum requests allowed per minute.
-        remaining: Number of requests remaining in the current window.
-        reset_timestamp: Unix timestamp when the rate limit window resets.
-        is_exceeded: Whether the rate limit has been exceeded.
+        limit_per_minute: Maximum requests per minute, or ``None`` (unlimited).
+        remaining_per_minute: Requests remaining in the minute window.
+        reset_per_minute: Unix timestamp when the minute window resets.
+        limit_per_day: Maximum requests per day, or ``None`` (unlimited).
+        remaining_per_day: Requests remaining in the day window.
+        reset_per_day: Unix timestamp when the day window resets.
+        is_exceeded: Whether any rate limit has been exceeded.
+        exceeded_window: Which window was exceeded ('minute', 'day', or None).
     """
 
-    limit: int
-    remaining: int
-    reset_timestamp: int
+    limit_per_minute: int | None = None
+    remaining_per_minute: int | None = None
+    reset_per_minute: int | None = None
+    limit_per_day: int | None = None
+    remaining_per_day: int | None = None
+    reset_per_day: int | None = None
     is_exceeded: bool = False
+    exceeded_window: str | None = None
 
 
 @dataclass
@@ -233,63 +244,101 @@ class QuotaService:
         return (period_start, period_end)
 
     async def _check_rate_limit(
-        self, workspace_id: UUID, plan_id: UUID | None
-    ) -> RateLimitInfo:
+        self,
+        workspace_id: UUID,
+        rate_limit_per_minute: int | None,
+        rate_limit_per_day: int | None,
+    ) -> RateLimitInfo | None:
         """
-        Check and update rate limit counter for a workspace.
+        Check and update rate limit counters for a workspace.
 
-        Uses a sliding window approach with 60-second windows.
-        The counter is stored in Redis with key: rate_limit:{workspace_id}
-
-        Optimized to use a Lua script for atomic INCR + EXPIRE + TTL
-        in a single Redis round trip.
+        Checks per-minute and/or per-day rate limits depending on which
+        are configured (non-None).  Returns ``None`` when both windows
+        are unlimited.
 
         Args:
             workspace_id: The workspace UUID to check rate limit for.
-            plan_id: The plan UUID for rate limit configuration.
+            rate_limit_per_minute: Max requests/minute, or ``None`` (unlimited).
+            rate_limit_per_day: Max requests/day, or ``None`` (unlimited).
 
         Returns:
-            RateLimitInfo with current rate limit status.
+            RateLimitInfo with current rate limit status, or ``None``
+            if both windows are unlimited.
         """
-        rate_limit = await APIQuotaCacheService.get_plan_rate_limit(plan_id)
+        if rate_limit_per_minute is None and rate_limit_per_day is None:
+            return None
 
-        # Redis key for workspace rate limit
-        rate_limit_key = f"rate_limit:{workspace_id}"
+        now_ts = int(time.time())
 
-        # Atomic rate limit operation: INCR + conditional EXPIRE + TTL
-        result = await RedisService.rate_limit_incr(rate_limit_key, 60)
+        # -- Per-minute window -----------------------------------------------
+        minute_exceeded = False
+        minute_remaining: int | None = None
+        minute_reset: int | None = None
 
-        if result is None:
-            # Redis unavailable - allow request but log warning
-            workspace_logger.warning(
-                f"Rate limit check failed (Redis unavailable) for workspace {workspace_id}"
-            )
-            return RateLimitInfo(
-                limit=rate_limit,
-                remaining=rate_limit - 1,
-                reset_timestamp=int(time.time()) + 60,
-                is_exceeded=False,
-            )
+        if rate_limit_per_minute is not None:
+            minute_key = f"rate_limit:{workspace_id}:min"
+            minute_result = await RedisService.rate_limit_incr(minute_key, 60)
 
-        current_count, ttl = result
-        if ttl < 0:
-            ttl = 60  # Default to 60 seconds if TTL lookup fails
+            if minute_result is None:
+                workspace_logger.warning(
+                    f"Rate limit check failed (Redis unavailable) for workspace {workspace_id}"
+                )
+                minute_remaining = rate_limit_per_minute - 1
+                minute_reset = now_ts + 60
+            else:
+                minute_count, minute_ttl = minute_result
+                if minute_ttl < 0:
+                    minute_ttl = 60
+                minute_reset = now_ts + minute_ttl
+                minute_remaining = max(0, rate_limit_per_minute - minute_count)
+                minute_exceeded = minute_count > rate_limit_per_minute
 
-        reset_timestamp = int(time.time()) + ttl
-        remaining = max(0, rate_limit - current_count)
-        is_exceeded = current_count > rate_limit
+        # -- Per-day window --------------------------------------------------
+        day_exceeded = False
+        day_remaining: int | None = None
+        day_reset: int | None = None
+
+        if rate_limit_per_day is not None:
+            day_key = f"rate_limit:{workspace_id}:day"
+            day_result = await RedisService.rate_limit_incr(day_key, 86400)
+
+            if day_result is None:
+                workspace_logger.warning(
+                    f"Day rate limit check failed (Redis unavailable) for workspace {workspace_id}"
+                )
+                day_remaining = rate_limit_per_day - 1
+                day_reset = now_ts + 86400
+            else:
+                day_count, day_ttl = day_result
+                if day_ttl < 0:
+                    day_ttl = 86400
+                day_reset = now_ts + day_ttl
+                day_remaining = max(0, rate_limit_per_day - day_count)
+                day_exceeded = day_count > rate_limit_per_day
+
+        is_exceeded = minute_exceeded or day_exceeded
+        exceeded_window = None
+        if minute_exceeded:
+            exceeded_window = "minute"
+        elif day_exceeded:
+            exceeded_window = "day"
 
         workspace_logger.debug(
             f"Rate limit check: workspace={workspace_id}, "
-            f"count={current_count}/{rate_limit}, remaining={remaining}, "
-            f"reset_in={ttl}s, exceeded={is_exceeded}"
+            f"minute={'unlimited' if rate_limit_per_minute is None else f'{minute_remaining}/{rate_limit_per_minute}'}, "
+            f"day={'unlimited' if rate_limit_per_day is None else f'{day_remaining}/{rate_limit_per_day}'}, "
+            f"exceeded={is_exceeded}"
         )
 
         return RateLimitInfo(
-            limit=rate_limit,
-            remaining=remaining,
-            reset_timestamp=reset_timestamp,
+            limit_per_minute=rate_limit_per_minute,
+            remaining_per_minute=minute_remaining,
+            reset_per_minute=minute_reset,
+            limit_per_day=rate_limit_per_day,
+            remaining_per_day=day_remaining,
+            reset_per_day=day_reset,
             is_exceeded=is_exceeded,
+            exceeded_window=exceeded_window,
         )
 
     async def _check_idempotency(
@@ -485,7 +534,7 @@ class QuotaService:
         self,
         session: AsyncSession,
         workspace_id: UUID,
-        plan_id: UUID | None,
+        credits_limit: Decimal,
         credits_reserved: Decimal,
     ) -> tuple[AccessStatus, str, int]:
         """
@@ -494,19 +543,12 @@ class QuotaService:
         Args:
             session: Database session.
             workspace_id: The workspace UUID.
-            plan_id: The plan UUID (or None for default).
+            credits_limit: The credits allocation for the plan.
             credits_reserved: Credits required for this request.
 
         Returns:
             Tuple of (access_status, message, http_status_code).
         """
-        # Get credits limit for the plan (with DB fallback if cache unavailable)
-        credits_limit = (
-            await APIQuotaCacheService.get_plan_credits_allocation_with_fallback(
-                session, plan_id
-            )
-        )
-
         # Get current usage from subscription context (O(1) lookup)
         context = await api_subscription_context_db.get_by_workspace(
             session, workspace_id
@@ -758,17 +800,47 @@ class QuotaService:
         is_test_key = key_result.is_test_key
         plan_id = key_result.plan_id
 
-        rate_limit_info = await self._check_rate_limit(workspace_id, plan_id)
-        if rate_limit_info.is_exceeded:
-            workspace_logger.warning(
-                f"Rate limit exceeded: workspace={workspace_id}, "
-                f"limit={rate_limit_info.limit}/min"
+        # Get plan config (fail-fast if missing)
+        plan_config = await APIQuotaCacheService.get_plan_config(session, plan_id)
+        if plan_config is None:
+            workspace_logger.error(
+                f"Plan pricing not configured: plan_id={plan_id}, "
+                f"workspace={workspace_id}"
             )
             return (
                 AccessStatus.DENIED,
                 None,
-                f"Rate limit exceeded. Limit: {rate_limit_info.limit} requests/minute. "
-                f"Try again in {rate_limit_info.reset_timestamp - int(time.time())} seconds.",
+                "Service configuration error. Please contact support.",
+                None,
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                is_test_key,
+                None,
+            )
+
+        # Rate limit (returns None when both windows are unlimited)
+        rate_limit_info = await self._check_rate_limit(
+            workspace_id,
+            plan_config.rate_limit_per_minute,
+            plan_config.rate_limit_per_day,
+        )
+        if rate_limit_info is not None and rate_limit_info.is_exceeded:
+            window = rate_limit_info.exceeded_window or "minute"
+            if window == "minute":
+                retry_after = (rate_limit_info.reset_per_minute or 0) - int(time.time())
+                limit_str = f"{rate_limit_info.limit_per_minute} requests/minute"
+            else:
+                retry_after = (rate_limit_info.reset_per_day or 0) - int(time.time())
+                limit_str = f"{rate_limit_info.limit_per_day} requests/day"
+
+            workspace_logger.warning(
+                f"Rate limit exceeded: workspace={workspace_id}, "
+                f"window={window}, limit={limit_str}"
+            )
+            return (
+                AccessStatus.DENIED,
+                None,
+                f"Rate limit exceeded. Limit: {limit_str}. "
+                f"Try again in {max(0, retry_after)} seconds.",
                 None,
                 status.HTTP_429_TOO_MANY_REQUESTS,
                 is_test_key,
@@ -781,12 +853,31 @@ class QuotaService:
             message = "Access granted (test key - no credits charged)."
             response_status_code = status.HTTP_200_OK
         else:
-            credits_reserved = await APIQuotaCacheService.calculate_billable_cost(
-                feature_key, plan_id
+            feature_config = await APIQuotaCacheService.get_feature_config(
+                session, feature_key
+            )
+            if feature_config is None:
+                workspace_logger.error(
+                    f"Feature pricing not configured: feature_key={feature_key}"
+                )
+                return (
+                    AccessStatus.DENIED,
+                    None,
+                    "Service configuration error. Please contact support.",
+                    None,
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    is_test_key,
+                    rate_limit_info,
+                )
+            credits_reserved = (
+                feature_config.internal_cost_credits * plan_config.multiplier
             )
             access_status, message, response_status_code = (
                 await self._check_quota_for_live_key(
-                    session, workspace_id, plan_id, credits_reserved
+                    session,
+                    workspace_id,
+                    plan_config.credits_allocation,
+                    credits_reserved,
                 )
             )
 

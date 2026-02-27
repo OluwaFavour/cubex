@@ -273,23 +273,29 @@ async def validate_usage(
 
     headers: dict[str, str] = {}
     if rate_limit_info is not None:
-        headers["X-RateLimit-Limit-Minute"] = str(rate_limit_info.limit_per_minute)
-        headers["X-RateLimit-Remaining-Minute"] = str(
-            rate_limit_info.remaining_per_minute
-        )
-        headers["X-RateLimit-Reset-Minute"] = str(rate_limit_info.reset_per_minute)
-        headers["X-RateLimit-Limit-Day"] = str(rate_limit_info.limit_per_day)
-        headers["X-RateLimit-Remaining-Day"] = str(rate_limit_info.remaining_per_day)
-        headers["X-RateLimit-Reset-Day"] = str(rate_limit_info.reset_per_day)
+        if rate_limit_info.limit_per_minute is not None:
+            headers["X-RateLimit-Limit-Minute"] = str(rate_limit_info.limit_per_minute)
+            headers["X-RateLimit-Remaining-Minute"] = str(
+                rate_limit_info.remaining_per_minute
+            )
+            headers["X-RateLimit-Reset-Minute"] = str(rate_limit_info.reset_per_minute)
+        if rate_limit_info.limit_per_day is not None:
+            headers["X-RateLimit-Limit-Day"] = str(rate_limit_info.limit_per_day)
+            headers["X-RateLimit-Remaining-Day"] = str(
+                rate_limit_info.remaining_per_day
+            )
+            headers["X-RateLimit-Reset-Day"] = str(rate_limit_info.reset_per_day)
 
         # Add Retry-After header for rate limit exceeded responses
         if rate_limit_info.is_exceeded:
             if rate_limit_info.exceeded_window == "minute":
                 retry_after = max(
-                    0, rate_limit_info.reset_per_minute - int(time.time())
+                    0, (rate_limit_info.reset_per_minute or 0) - int(time.time())
                 )
             else:
-                retry_after = max(0, rate_limit_info.reset_per_day - int(time.time()))
+                retry_after = max(
+                    0, (rate_limit_info.reset_per_day or 0) - int(time.time())
+                )
             headers["Retry-After"] = str(retry_after)
 
     return JSONResponse(

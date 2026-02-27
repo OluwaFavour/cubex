@@ -15,6 +15,7 @@ Run with coverage:
 
 import time
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -22,6 +23,7 @@ import pytest
 
 from app.apps.cubex_api.services.quota import RateLimitInfo, quota_service
 from app.core.enums import FeatureKey
+from app.core.services.quota_cache import FeatureConfig, PlanConfig
 
 
 class TestRateLimitInfoDataclass:
@@ -36,55 +38,72 @@ class TestRateLimitInfoDataclass:
 
         assert RateLimitInfo is not None
 
-    def test_rate_limit_info_creation_with_all_fields(self):
+    def test_rate_limit_info_creation_with_minute_fields(self):
         info = RateLimitInfo(
-            limit=20,
-            remaining=15,
-            reset_timestamp=1739352000,
+            limit_per_minute=20,
+            remaining_per_minute=15,
+            reset_per_minute=1739352000,
             is_exceeded=False,
         )
-        assert info.limit == 20
-        assert info.remaining == 15
-        assert info.reset_timestamp == 1739352000
+        assert info.limit_per_minute == 20
+        assert info.remaining_per_minute == 15
+        assert info.reset_per_minute == 1739352000
         assert info.is_exceeded is False
 
-    def test_rate_limit_info_default_is_exceeded(self):
-        info = RateLimitInfo(
-            limit=20,
-            remaining=15,
-            reset_timestamp=1739352000,
-        )
+    def test_rate_limit_info_defaults_are_none(self):
+        info = RateLimitInfo()
+        assert info.limit_per_minute is None
+        assert info.remaining_per_minute is None
+        assert info.reset_per_minute is None
+        assert info.limit_per_day is None
+        assert info.remaining_per_day is None
+        assert info.reset_per_day is None
         assert info.is_exceeded is False
+        assert info.exceeded_window is None
 
     def test_rate_limit_info_exceeded_state(self):
         info = RateLimitInfo(
-            limit=20,
-            remaining=0,
-            reset_timestamp=1739352000,
+            limit_per_minute=20,
+            remaining_per_minute=0,
+            reset_per_minute=1739352000,
             is_exceeded=True,
+            exceeded_window="minute",
         )
         assert info.is_exceeded is True
-        assert info.remaining == 0
+        assert info.remaining_per_minute == 0
+        assert info.exceeded_window == "minute"
 
     def test_rate_limit_info_zero_remaining(self):
         info = RateLimitInfo(
-            limit=50,
-            remaining=0,
-            reset_timestamp=int(time.time()) + 45,
+            limit_per_minute=50,
+            remaining_per_minute=0,
+            reset_per_minute=int(time.time()) + 45,
         )
-        assert info.remaining == 0
-        assert info.limit == 50
+        assert info.remaining_per_minute == 0
+        assert info.limit_per_minute == 50
 
-    def test_rate_limit_info_fields_are_integers(self):
+    def test_rate_limit_info_fields_types(self):
         info = RateLimitInfo(
-            limit=20,
-            remaining=15,
-            reset_timestamp=1739352000,
+            limit_per_minute=20,
+            remaining_per_minute=15,
+            reset_per_minute=1739352000,
         )
-        assert isinstance(info.limit, int)
-        assert isinstance(info.remaining, int)
-        assert isinstance(info.reset_timestamp, int)
+        assert isinstance(info.limit_per_minute, int)
+        assert isinstance(info.remaining_per_minute, int)
+        assert isinstance(info.reset_per_minute, int)
         assert isinstance(info.is_exceeded, bool)
+
+    def test_rate_limit_info_with_both_windows(self):
+        info = RateLimitInfo(
+            limit_per_minute=20,
+            remaining_per_minute=15,
+            reset_per_minute=1739352000,
+            limit_per_day=1000,
+            remaining_per_day=950,
+            reset_per_day=1739395200,
+        )
+        assert info.limit_per_minute == 20
+        assert info.limit_per_day == 1000
 
 
 class TestCheckRateLimitMethod:
@@ -100,216 +119,180 @@ class TestCheckRateLimitMethod:
         params = list(sig.parameters.keys())
 
         assert "workspace_id" in params
-        assert "plan_id" in params
+        assert "rate_limit_per_minute" in params
+        assert "rate_limit_per_day" in params
 
     @pytest.mark.asyncio
     async def test_check_rate_limit_returns_rate_limit_info(self):
         workspace_id = uuid4()
-        plan_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                return_value=(1, 60),  # (current_count, ttl)
-            ),
+        with patch(
+            "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=(1, 60),
         ):
-            result = await quota_service._check_rate_limit(workspace_id, plan_id)
+            result = await quota_service._check_rate_limit(workspace_id, 20, None)
 
         assert isinstance(result, RateLimitInfo)
-        assert result.limit == 20
+        assert result.limit_per_minute == 20
 
     @pytest.mark.asyncio
     async def test_check_rate_limit_first_request_in_window(self):
         workspace_id = uuid4()
-        plan_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                return_value=(1, 60),  # (current_count, ttl) - first request
-            ) as mock_rate_limit_incr,
-        ):
-            result = await quota_service._check_rate_limit(workspace_id, plan_id)
+        with patch(
+            "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=(1, 60),
+        ) as mock_rate_limit_incr:
+            result = await quota_service._check_rate_limit(workspace_id, 20, None)
 
-        # Atomic rate_limit_incr should be called
         mock_rate_limit_incr.assert_called_once()
-        assert result.remaining == 19
+        assert result.remaining_per_minute == 19
         assert result.is_exceeded is False
 
     @pytest.mark.asyncio
     async def test_check_rate_limit_subsequent_request(self):
         workspace_id = uuid4()
-        plan_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                return_value=(5, 45),  # (current_count, ttl) - 5th request
-            ),
+        with patch(
+            "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=(5, 45),
         ):
-            result = await quota_service._check_rate_limit(workspace_id, plan_id)
+            result = await quota_service._check_rate_limit(workspace_id, 20, None)
 
-        # 20 - 5 = 15 remaining
-        assert result.remaining == 15
+        assert result.remaining_per_minute == 15
         assert result.is_exceeded is False
 
     @pytest.mark.asyncio
     async def test_check_rate_limit_exceeded(self):
         workspace_id = uuid4()
-        plan_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                return_value=(21, 30),  # (current_count, ttl) - over limit
-            ),
+        with patch(
+            "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=(21, 30),
         ):
-            result = await quota_service._check_rate_limit(workspace_id, plan_id)
+            result = await quota_service._check_rate_limit(workspace_id, 20, None)
 
         assert result.is_exceeded is True
-        assert result.remaining == 0
+        assert result.remaining_per_minute == 0
+        assert result.exceeded_window == "minute"
 
     @pytest.mark.asyncio
     async def test_check_rate_limit_redis_unavailable(self):
         workspace_id = uuid4()
-        plan_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                return_value=None,  # Redis unavailable
-            ),
+        with patch(
+            "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=None,
         ):
-            result = await quota_service._check_rate_limit(workspace_id, plan_id)
+            result = await quota_service._check_rate_limit(workspace_id, 20, None)
 
-        # Should allow request when Redis is unavailable
         assert result.is_exceeded is False
-        assert result.limit == 20
-        assert result.remaining == 19
+        assert result.limit_per_minute == 20
+        assert result.remaining_per_minute == 19
 
     @pytest.mark.asyncio
     async def test_check_rate_limit_uses_correct_redis_key(self):
         workspace_id = uuid4()
-        plan_id = uuid4()
-        expected_key = f"rate_limit:{workspace_id}"
+        expected_key = f"rate_limit:{workspace_id}:min"
 
-        with (
-            patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                return_value=(1, 60),  # (current_count, ttl)
-            ) as mock_rate_limit_incr,
-        ):
-            await quota_service._check_rate_limit(workspace_id, plan_id)
+        with patch(
+            "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=(1, 60),
+        ) as mock_rate_limit_incr:
+            await quota_service._check_rate_limit(workspace_id, 20, None)
 
         mock_rate_limit_incr.assert_called_once_with(expected_key, 60)
 
     @pytest.mark.asyncio
-    async def test_check_rate_limit_uses_plan_rate_limit(self):
+    async def test_check_rate_limit_with_custom_limit(self):
         workspace_id = uuid4()
-        plan_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=50,  # Custom rate limit
-            ) as mock_get_rate_limit,
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                return_value=(1, 60),  # (current_count, ttl)
-            ),
+        with patch(
+            "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=(1, 60),
         ):
-            result = await quota_service._check_rate_limit(workspace_id, plan_id)
+            result = await quota_service._check_rate_limit(workspace_id, 50, None)
 
-        mock_get_rate_limit.assert_called_once_with(plan_id)
-        assert result.limit == 50
-        assert result.remaining == 49
+        assert result.limit_per_minute == 50
+        assert result.remaining_per_minute == 49
 
     @pytest.mark.asyncio
     async def test_check_rate_limit_ttl_fallback(self):
         workspace_id = uuid4()
-        plan_id = uuid4()
         current_time = int(time.time())
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
                 "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=(5, -1),  # (current_count, ttl) - TTL lookup failed
+                return_value=(5, -1),
             ),
             patch(
                 "app.apps.cubex_api.services.quota.time.time", return_value=current_time
             ),
         ):
-            result = await quota_service._check_rate_limit(workspace_id, plan_id)
+            result = await quota_service._check_rate_limit(workspace_id, 20, None)
 
-        # Should default to 60 seconds
-        assert result.reset_timestamp == current_time + 60
+        assert result.reset_per_minute == current_time + 60
 
     @pytest.mark.asyncio
     async def test_check_rate_limit_at_exact_limit(self):
         workspace_id = uuid4()
-        plan_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                return_value=(20, 30),  # (current_count, ttl) - exactly at limit
-            ),
+        with patch(
+            "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=(20, 30),
         ):
-            result = await quota_service._check_rate_limit(workspace_id, plan_id)
+            result = await quota_service._check_rate_limit(workspace_id, 20, None)
 
-        # At exactly limit, should not be exceeded
         assert result.is_exceeded is False
-        assert result.remaining == 0
+        assert result.remaining_per_minute == 0
+
+    @pytest.mark.asyncio
+    async def test_check_rate_limit_returns_none_when_both_unlimited(self):
+        workspace_id = uuid4()
+        result = await quota_service._check_rate_limit(workspace_id, None, None)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_check_rate_limit_day_window_only(self):
+        workspace_id = uuid4()
+
+        with patch(
+            "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=(10, 80000),
+        ):
+            result = await quota_service._check_rate_limit(workspace_id, None, 1000)
+
+        assert result.limit_per_minute is None
+        assert result.remaining_per_minute is None
+        assert result.limit_per_day == 1000
+        assert result.remaining_per_day == 990
+        assert result.is_exceeded is False
+
+    @pytest.mark.asyncio
+    async def test_check_rate_limit_day_exceeded(self):
+        workspace_id = uuid4()
+
+        with patch(
+            "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=(1001, 40000),
+        ):
+            result = await quota_service._check_rate_limit(workspace_id, None, 1000)
+
+        assert result.is_exceeded is True
+        assert result.exceeded_window == "day"
+        assert result.remaining_per_day == 0
 
 
 class TestValidateAndLogUsageRateLimiting:
@@ -334,32 +317,42 @@ class TestValidateAndLogUsageRateLimiting:
 class TestRateLimitHeadersConstruction:
 
     def test_x_ratelimit_limit_header_format(self):
-        info = RateLimitInfo(limit=20, remaining=15, reset_timestamp=1739352000)
-        header_value = str(info.limit)
+        info = RateLimitInfo(
+            limit_per_minute=20, remaining_per_minute=15, reset_per_minute=1739352000
+        )
+        header_value = str(info.limit_per_minute)
         assert header_value == "20"
         assert header_value.isdigit()
 
     def test_x_ratelimit_remaining_header_format(self):
-        info = RateLimitInfo(limit=20, remaining=15, reset_timestamp=1739352000)
-        header_value = str(info.remaining)
+        info = RateLimitInfo(
+            limit_per_minute=20, remaining_per_minute=15, reset_per_minute=1739352000
+        )
+        header_value = str(info.remaining_per_minute)
         assert header_value == "15"
         assert header_value.isdigit()
 
     def test_x_ratelimit_reset_header_format(self):
         reset_time = int(time.time()) + 60
-        info = RateLimitInfo(limit=20, remaining=15, reset_timestamp=reset_time)
-        header_value = str(info.reset_timestamp)
+        info = RateLimitInfo(
+            limit_per_minute=20, remaining_per_minute=15, reset_per_minute=reset_time
+        )
+        header_value = str(info.reset_per_minute)
         assert header_value.isdigit()
-        assert int(header_value) > int(time.time())  # Should be in the future
+        assert int(header_value) > int(time.time())
 
     def test_retry_after_calculation(self):
         current_time = int(time.time())
         reset_time = current_time + 45
         info = RateLimitInfo(
-            limit=20, remaining=0, reset_timestamp=reset_time, is_exceeded=True
+            limit_per_minute=20,
+            remaining_per_minute=0,
+            reset_per_minute=reset_time,
+            is_exceeded=True,
+            exceeded_window="minute",
         )
 
-        retry_after = max(0, info.reset_timestamp - current_time)
+        retry_after = max(0, info.reset_per_minute - current_time)
         assert retry_after == 45
 
 
@@ -387,10 +380,10 @@ class TestRateLimitHeadersInResponse:
         )
 
         # Headers may or may not be present depending on how far validation got
-        # Use .get() to safely access
-        rate_limit = response.headers.get("X-RateLimit-Limit")
-        remaining = response.headers.get("X-RateLimit-Remaining")
-        reset_at = response.headers.get("X-RateLimit-Reset")
+        # Use .get() to safely access — new header names include window suffix
+        rate_limit = response.headers.get("X-RateLimit-Limit-Minute")
+        remaining = response.headers.get("X-RateLimit-Remaining-Minute")
+        reset_at = response.headers.get("X-RateLimit-Reset-Minute")
 
         # If headers are present, they should be valid integers
         if rate_limit is not None:
@@ -419,9 +412,9 @@ class TestRateLimitHeadersInResponse:
         )
 
         # This is the documented pattern - should not raise KeyError
-        rate_limit = response.headers.get("X-RateLimit-Limit")
-        remaining = response.headers.get("X-RateLimit-Remaining")
-        reset_at = response.headers.get("X-RateLimit-Reset")
+        rate_limit = response.headers.get("X-RateLimit-Limit-Minute")
+        remaining = response.headers.get("X-RateLimit-Remaining-Minute")
+        reset_at = response.headers.get("X-RateLimit-Reset-Minute")
         retry_after = response.headers.get("Retry-After")
 
         # All should be None or valid values, never raise an error
@@ -435,12 +428,12 @@ class TestRateLimitEdgeCases:
 
     def test_rate_limit_info_with_zero_limit(self):
         info = RateLimitInfo(
-            limit=0,
-            remaining=0,
-            reset_timestamp=int(time.time()) + 60,
+            limit_per_minute=0,
+            remaining_per_minute=0,
+            reset_per_minute=int(time.time()) + 60,
         )
-        assert info.limit == 0
-        assert info.remaining == 0
+        assert info.limit_per_minute == 0
+        assert info.remaining_per_minute == 0
 
     def test_rate_limit_info_with_negative_remaining_handled(self):
         # The _check_rate_limit method uses max(0, ...) to ensure this
@@ -449,43 +442,18 @@ class TestRateLimitEdgeCases:
 
     def test_rate_limit_info_with_large_limit(self):
         info = RateLimitInfo(
-            limit=10000,
-            remaining=9999,
-            reset_timestamp=int(time.time()) + 60,
+            limit_per_minute=10000,
+            remaining_per_minute=9999,
+            reset_per_minute=int(time.time()) + 60,
         )
-        assert info.limit == 10000
-        assert info.remaining == 9999
+        assert info.limit_per_minute == 10000
+        assert info.remaining_per_minute == 9999
 
     @pytest.mark.asyncio
-    async def test_check_rate_limit_with_none_plan_id(self):
+    async def test_check_rate_limit_with_none_limits_returns_none(self):
         workspace_id = uuid4()
-
-        with (
-            patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,  # Default rate limit
-            ) as mock_get_rate_limit,
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
-            patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
-                new_callable=AsyncMock,
-                return_value=60,
-            ),
-        ):
-            result = await quota_service._check_rate_limit(workspace_id, None)
-
-        mock_get_rate_limit.assert_called_once_with(None)
-        assert result.limit == 20
+        result = await quota_service._check_rate_limit(workspace_id, None, None)
+        assert result is None
 
 
 @pytest.fixture
@@ -609,6 +577,20 @@ async def test_api_key(db_session, workspace_with_subscription):
 
 
 class TestRateLimitingEndToEnd:
+    """E2E tests going through the actual router.
+
+    All tests mock ``get_plan_config`` and ``get_feature_config`` because
+    the test DB has no ``PlanPricingRule`` / ``FeatureCostConfig`` rows,
+    and the new code intentionally has **no** silent defaults.
+    """
+
+    _PLAN_CONFIG = PlanConfig(
+        multiplier=Decimal("1.0"),
+        credits_allocation=Decimal("5000.0"),
+        rate_limit_per_minute=20,
+        rate_limit_per_day=None,
+    )
+    _FEATURE_CONFIG = FeatureConfig(internal_cost_credits=Decimal("1.0"))
 
     @pytest.mark.asyncio
     async def test_validate_request_includes_rate_limit_headers(
@@ -621,19 +603,19 @@ class TestRateLimitingEndToEnd:
 
         with (
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
                 new_callable=AsyncMock,
-                return_value=1,
+                return_value=self._PLAN_CONFIG,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_feature_config",
                 new_callable=AsyncMock,
-                return_value=True,
+                return_value=self._FEATURE_CONFIG,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=60,
+                return_value=(1, 60),
             ),
         ):
             response = await client.post(
@@ -654,13 +636,13 @@ class TestRateLimitingEndToEnd:
         data = response.json()
         assert data["access"] == "granted"
 
-        assert "X-RateLimit-Limit" in response.headers
-        assert "X-RateLimit-Remaining" in response.headers
-        assert "X-RateLimit-Reset" in response.headers
+        assert "X-RateLimit-Limit-Minute" in response.headers
+        assert "X-RateLimit-Remaining-Minute" in response.headers
+        assert "X-RateLimit-Reset-Minute" in response.headers
 
-        assert response.headers["X-RateLimit-Limit"].isdigit()
-        assert response.headers["X-RateLimit-Remaining"].isdigit()
-        assert response.headers["X-RateLimit-Reset"].isdigit()
+        assert response.headers["X-RateLimit-Limit-Minute"].isdigit()
+        assert response.headers["X-RateLimit-Remaining-Minute"].isdigit()
+        assert response.headers["X-RateLimit-Reset-Minute"].isdigit()
 
     @pytest.mark.asyncio
     async def test_rate_limit_remaining_decrements(
@@ -674,19 +656,19 @@ class TestRateLimitingEndToEnd:
         # Simulate first request (count = 1)
         with (
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
                 new_callable=AsyncMock,
-                return_value=1,
+                return_value=self._PLAN_CONFIG,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_feature_config",
                 new_callable=AsyncMock,
-                return_value=True,
+                return_value=self._FEATURE_CONFIG,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=60,
+                return_value=(1, 60),
             ),
         ):
             response1 = await client.post(
@@ -706,19 +688,19 @@ class TestRateLimitingEndToEnd:
         # Simulate second request (count = 2)
         with (
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.incr",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
                 new_callable=AsyncMock,
-                return_value=2,
+                return_value=self._PLAN_CONFIG,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.expire",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_feature_config",
                 new_callable=AsyncMock,
-                return_value=True,
+                return_value=self._FEATURE_CONFIG,
             ),
             patch(
-                "app.apps.cubex_api.services.quota.RedisService.ttl",
+                "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=55,
+                return_value=(2, 55),
             ),
         ):
             response2 = await client.post(
@@ -739,8 +721,8 @@ class TestRateLimitingEndToEnd:
         assert response1.status_code == 200
         assert response2.status_code == 200
 
-        remaining1 = int(response1.headers.get("X-RateLimit-Remaining", "-1"))
-        remaining2 = int(response2.headers.get("X-RateLimit-Remaining", "-1"))
+        remaining1 = int(response1.headers.get("X-RateLimit-Remaining-Minute", "-1"))
+        remaining2 = int(response2.headers.get("X-RateLimit-Remaining-Minute", "-1"))
 
         # Second request should have lower remaining
         assert remaining2 < remaining1
@@ -754,15 +736,17 @@ class TestRateLimitingEndToEnd:
     ):
         raw_key, api_key_record, workspace, subscription, plan = live_api_key
 
-        # Simulate rate limit exceeded (count > limit)
+        # Simulate rate limit exceeded (count > limit of 20)
         with (
+            patch(
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
+                new_callable=AsyncMock,
+                return_value=self._PLAN_CONFIG,
+            ),
             patch(
                 "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=(
-                    21,
-                    45,
-                ),  # (current_count, ttl) - over the default limit of 20
+                return_value=(21, 45),
             ),
         ):
             response = await client.post(
@@ -781,12 +765,12 @@ class TestRateLimitingEndToEnd:
 
         assert response.status_code == 429
         data = response.json()
-        assert data["access"] == "denied"  # Rate limited uses DENIED access status
+        assert data["access"] == "denied"
 
         assert "Retry-After" in response.headers
         retry_after = int(response.headers["Retry-After"])
         assert retry_after > 0
-        assert retry_after <= 60  # Within the rate limit window
+        assert retry_after <= 60
 
     @pytest.mark.asyncio
     async def test_test_api_key_has_rate_limit_headers(
@@ -799,9 +783,14 @@ class TestRateLimitingEndToEnd:
 
         with (
             patch(
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
+                new_callable=AsyncMock,
+                return_value=self._PLAN_CONFIG,
+            ),
+            patch(
                 "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=(1, 60),  # (current_count, ttl)
+                return_value=(1, 60),
             ),
         ):
             response = await client.post(
@@ -820,8 +809,8 @@ class TestRateLimitingEndToEnd:
 
         # Test keys should still be rate limited
         assert response.status_code == 200
-        assert "X-RateLimit-Limit" in response.headers
-        assert "X-RateLimit-Remaining" in response.headers
+        assert "X-RateLimit-Limit-Minute" in response.headers
+        assert "X-RateLimit-Remaining-Minute" in response.headers
 
     @pytest.mark.asyncio
     async def test_rate_limit_workspace_isolation(
@@ -867,7 +856,6 @@ class TestRateLimitingEndToEnd:
         db_session.add(workspace2)
         await db_session.flush()
 
-        # Add members
         for ws in [workspace1, workspace2]:
             member = WorkspaceMember(
                 id=uuid4(),
@@ -928,9 +916,19 @@ class TestRateLimitingEndToEnd:
         # Simulate workspace1 at high count, workspace2 at low count
         with (
             patch(
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
+                new_callable=AsyncMock,
+                return_value=self._PLAN_CONFIG,
+            ),
+            patch(
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_feature_config",
+                new_callable=AsyncMock,
+                return_value=self._FEATURE_CONFIG,
+            ),
+            patch(
                 "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=(15, 30),  # (current_count, ttl) - high usage
+                return_value=(15, 30),
             ),
         ):
             response1 = await client.post(
@@ -949,9 +947,19 @@ class TestRateLimitingEndToEnd:
 
         with (
             patch(
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
+                new_callable=AsyncMock,
+                return_value=self._PLAN_CONFIG,
+            ),
+            patch(
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_feature_config",
+                new_callable=AsyncMock,
+                return_value=self._FEATURE_CONFIG,
+            ),
+            patch(
                 "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=(2, 55),  # (current_count, ttl) - low usage
+                return_value=(2, 55),
             ),
         ):
             response2 = await client.post(
@@ -973,8 +981,8 @@ class TestRateLimitingEndToEnd:
         assert response2.status_code == 200
 
         # But they should have different remaining counts
-        remaining1 = int(response1.headers.get("X-RateLimit-Remaining", "-1"))
-        remaining2 = int(response2.headers.get("X-RateLimit-Remaining", "-1"))
+        remaining1 = int(response1.headers.get("X-RateLimit-Remaining-Minute", "-1"))
+        remaining2 = int(response2.headers.get("X-RateLimit-Remaining-Minute", "-1"))
 
         # Workspace2 should have more remaining (lower count)
         assert remaining2 > remaining1
@@ -988,17 +996,28 @@ class TestRateLimitingEndToEnd:
     ):
         raw_key, api_key_record, workspace, subscription, plan = live_api_key
 
-        # Mock a specific rate limit for the plan
+        custom_config = PlanConfig(
+            multiplier=Decimal("1.0"),
+            credits_allocation=Decimal("5000.0"),
+            rate_limit_per_minute=50,
+            rate_limit_per_day=None,
+        )
+
         with (
             patch(
-                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
                 new_callable=AsyncMock,
-                return_value=50,  # Custom rate limit
+                return_value=custom_config,
+            ),
+            patch(
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_feature_config",
+                new_callable=AsyncMock,
+                return_value=self._FEATURE_CONFIG,
             ),
             patch(
                 "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=(10, 45),  # (current_count, ttl)
+                return_value=(10, 45),
             ),
         ):
             response = await client.post(
@@ -1017,11 +1036,11 @@ class TestRateLimitingEndToEnd:
 
         assert response.status_code == 200
 
-        # Limit should be 50 (from mocked plan rate limit)
-        assert response.headers["X-RateLimit-Limit"] == "50"
+        # Limit should be 50 (from mocked plan config)
+        assert response.headers["X-RateLimit-Limit-Minute"] == "50"
 
         # Remaining should be limit - count = 50 - 10 = 40
-        assert response.headers["X-RateLimit-Remaining"] == "40"
+        assert response.headers["X-RateLimit-Remaining-Minute"] == "40"
 
     @pytest.mark.asyncio
     async def test_rate_limited_response_includes_denial_reason(
@@ -1034,12 +1053,14 @@ class TestRateLimitingEndToEnd:
 
         with (
             patch(
+                "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
+                new_callable=AsyncMock,
+                return_value=self._PLAN_CONFIG,
+            ),
+            patch(
                 "app.apps.cubex_api.services.quota.RedisService.rate_limit_incr",
                 new_callable=AsyncMock,
-                return_value=(
-                    25,
-                    30,
-                ),  # (current_count, ttl) - over default limit of 20
+                return_value=(25, 30),
             ),
         ):
             response = await client.post(
@@ -1059,7 +1080,6 @@ class TestRateLimitingEndToEnd:
         assert response.status_code == 429
         data = response.json()
 
-        assert data["access"] == "denied"  # Rate limited uses DENIED access status
+        assert data["access"] == "denied"
         assert "message" in data
         assert "rate limit" in data["message"].lower()
-

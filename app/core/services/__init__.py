@@ -3,6 +3,8 @@ from app.core.services.brevo import BrevoService
 from app.core.services.cloudinary import CloudinaryService
 from app.core.services.email_manager import EmailManagerService
 from app.core.services.quota_cache import (
+    FeatureConfig,
+    PlanConfig,
     QuotaCacheService,
     QuotaCacheBackend,
     MemoryBackend as QuotaMemoryBackend,
@@ -62,5 +64,6 @@ __all__ = [
     "QuotaCacheBackend",
     "QuotaMemoryBackend",
     "QuotaRedisBackend",
+    "PlanConfig",
+    "FeatureConfig",
 ]
-

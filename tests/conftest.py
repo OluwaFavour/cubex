@@ -468,6 +468,70 @@ async def basic_api_plan_pricing_rule(db_session: AsyncSession, basic_api_plan):
 
 
 @pytest.fixture
+async def basic_feature_cost_config(db_session: AsyncSession, basic_api_plan):
+    """Get or create a FeatureCostConfig for API_EXTRACT_CUES_RESUME.
+
+    This ensures quota validation tests have a feature cost row.
+    """
+    from decimal import Decimal
+
+    from app.core.db.models import FeatureCostConfig
+    from app.core.enums import FeatureKey, ProductType
+
+    result = await db_session.execute(
+        select(FeatureCostConfig).where(
+            FeatureCostConfig.feature_key == FeatureKey.API_EXTRACT_CUES_RESUME,
+            FeatureCostConfig.product_type == ProductType.API,
+        )
+    )
+    config = result.scalar_one_or_none()
+
+    if config is None:
+        config = FeatureCostConfig(
+            id=uuid4(),
+            feature_key=FeatureKey.API_EXTRACT_CUES_RESUME,
+            product_type=ProductType.API,
+            internal_cost_credits=Decimal("1.0"),
+        )
+        db_session.add(config)
+        await db_session.flush()
+
+    return config
+
+
+@pytest.fixture
+async def career_feature_cost_config(db_session: AsyncSession):
+    """Get or create a FeatureCostConfig for CAREER_CAREER_PATH.
+
+    This ensures Career quota validation tests have a feature cost row.
+    """
+    from decimal import Decimal
+
+    from app.core.db.models import FeatureCostConfig
+    from app.core.enums import FeatureKey, ProductType
+
+    result = await db_session.execute(
+        select(FeatureCostConfig).where(
+            FeatureCostConfig.feature_key == FeatureKey.CAREER_CAREER_PATH,
+            FeatureCostConfig.product_type == ProductType.CAREER,
+        )
+    )
+    config = result.scalar_one_or_none()
+
+    if config is None:
+        config = FeatureCostConfig(
+            id=uuid4(),
+            feature_key=FeatureKey.CAREER_CAREER_PATH,
+            product_type=ProductType.CAREER,
+            internal_cost_credits=Decimal("1.0"),
+        )
+        db_session.add(config)
+        await db_session.flush()
+
+    return config
+
+
+@pytest.fixture
 async def benchmark_plan_pricing_rule(
     db_session: AsyncSession, basic_api_plan, client: AsyncClient
 ):
@@ -736,7 +800,13 @@ async def test_workspace_admin(db_session: AsyncSession, test_workspace):
 
 
 @pytest.fixture
-async def test_subscription(db_session: AsyncSession, test_workspace, basic_api_plan):
+async def test_subscription(
+    db_session: AsyncSession,
+    test_workspace,
+    basic_api_plan,
+    basic_api_plan_pricing_rule,
+    basic_feature_cost_config,
+):
     from app.core.db.models import APISubscriptionContext, Subscription
     from app.core.enums import SubscriptionStatus
 
@@ -1144,7 +1214,11 @@ async def other_workspace(db_session: AsyncSession, test_user, basic_api_plan):
 
 @pytest.fixture
 async def workspace_quota_exhausted(
-    db_session: AsyncSession, test_user, basic_api_plan, basic_api_plan_pricing_rule
+    db_session: AsyncSession,
+    test_user,
+    basic_api_plan,
+    basic_api_plan_pricing_rule,
+    basic_feature_cost_config,
 ):
     """Create a workspace with exhausted quota.
 
@@ -1272,4 +1346,3 @@ async def test_api_key_for_exhausted_workspace(
     await db_session.flush()
 
     return raw_key, api_key, workspace, subscription, credits_allocation
-

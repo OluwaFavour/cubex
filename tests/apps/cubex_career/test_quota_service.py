@@ -75,6 +75,19 @@ class TestRateLimitInfoDataclass:
         assert info.is_exceeded is False
         assert info.exceeded_window is None
 
+    def test_rate_limit_info_all_fields_optional(self):
+        from app.apps.cubex_career.services.quota import RateLimitInfo
+
+        info = RateLimitInfo()
+        assert info.limit_per_minute is None
+        assert info.remaining_per_minute is None
+        assert info.reset_per_minute is None
+        assert info.limit_per_day is None
+        assert info.remaining_per_day is None
+        assert info.reset_per_day is None
+        assert info.is_exceeded is False
+        assert info.exceeded_window is None
+
     def test_rate_limit_info_exceeded_minute(self):
         from app.apps.cubex_career.services.quota import RateLimitInfo
 
@@ -313,26 +326,13 @@ class TestCheckRateLimit:
         from app.apps.cubex_career.services.quota import RateLimitInfo
 
         user_id = uuid4()
-        plan_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_day_limit",
-                new_callable=AsyncMock,
-                return_value=500,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                side_effect=[(1, 60), (1, 86400)],
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            side_effect=[(1, 60), (1, 86400)],
         ):
-            result = await service._check_rate_limit(user_id, plan_id)
+            result = await service._check_rate_limit(user_id, 20, 500)
 
         assert isinstance(result, RateLimitInfo)
         assert result.limit_per_minute == 20
@@ -343,24 +343,12 @@ class TestCheckRateLimit:
     async def test_remaining_decrements_correctly(self, service):
         user_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_day_limit",
-                new_callable=AsyncMock,
-                return_value=500,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                side_effect=[(5, 45), (100, 50000)],
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            side_effect=[(5, 45), (100, 50000)],
         ):
-            result = await service._check_rate_limit(user_id, None)
+            result = await service._check_rate_limit(user_id, 20, 500)
 
         assert result.remaining_per_minute == 15  # 20 - 5
         assert result.remaining_per_day == 400  # 500 - 100
@@ -369,24 +357,12 @@ class TestCheckRateLimit:
     async def test_minute_limit_exceeded(self, service):
         user_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_day_limit",
-                new_callable=AsyncMock,
-                return_value=500,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                side_effect=[(21, 45), (100, 50000)],  # 21 > 20, minute exceeded
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            side_effect=[(21, 45), (100, 50000)],  # 21 > 20, minute exceeded
         ):
-            result = await service._check_rate_limit(user_id, None)
+            result = await service._check_rate_limit(user_id, 20, 500)
 
         assert result.is_exceeded is True
         assert result.exceeded_window == "minute"
@@ -396,24 +372,12 @@ class TestCheckRateLimit:
     async def test_day_limit_exceeded(self, service):
         user_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_day_limit",
-                new_callable=AsyncMock,
-                return_value=500,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                side_effect=[(5, 45), (501, 50000)],  # 501 > 500, day exceeded
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            side_effect=[(5, 45), (501, 50000)],  # 501 > 500, day exceeded
         ):
-            result = await service._check_rate_limit(user_id, None)
+            result = await service._check_rate_limit(user_id, 20, 500)
 
         assert result.is_exceeded is True
         assert result.exceeded_window == "day"
@@ -422,24 +386,12 @@ class TestCheckRateLimit:
     async def test_redis_unavailable_allows_request(self, service):
         user_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_day_limit",
-                new_callable=AsyncMock,
-                return_value=500,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                return_value=None,  # Redis unavailable
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            return_value=None,  # Redis unavailable
         ):
-            result = await service._check_rate_limit(user_id, None)
+            result = await service._check_rate_limit(user_id, 20, 500)
 
         assert result.is_exceeded is False
         assert result.limit_per_minute == 20
@@ -449,24 +401,12 @@ class TestCheckRateLimit:
     async def test_minute_exceeded_takes_priority_over_day(self, service):
         user_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_day_limit",
-                new_callable=AsyncMock,
-                return_value=500,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                side_effect=[(21, 45), (501, 50000)],  # both exceeded
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            side_effect=[(21, 45), (501, 50000)],  # both exceeded
         ):
-            result = await service._check_rate_limit(user_id, None)
+            result = await service._check_rate_limit(user_id, 20, 500)
 
         assert result.is_exceeded is True
         assert result.exceeded_window == "minute"
@@ -475,28 +415,22 @@ class TestCheckRateLimit:
     async def test_negative_ttl_defaults_to_window_size(self, service):
         user_id = uuid4()
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_limit",
-                new_callable=AsyncMock,
-                return_value=20,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_day_limit",
-                new_callable=AsyncMock,
-                return_value=500,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
-                new_callable=AsyncMock,
-                side_effect=[(1, -1), (1, -1)],  # negative TTLs
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.RedisService.rate_limit_incr",
+            new_callable=AsyncMock,
+            side_effect=[(1, -1), (1, -1)],  # negative TTLs
         ):
-            result = await service._check_rate_limit(user_id, None)
+            result = await service._check_rate_limit(user_id, 20, 500)
 
         # Should not crash, values should use default window sizes
         assert result.is_exceeded is False
         assert result.limit_per_minute == 20
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_both_limits_none(self, service):
+        user_id = uuid4()
+        result = await service._check_rate_limit(user_id, None, None)
+        assert result is None
 
 
 class TestUsageEstimateValidation:
@@ -951,20 +885,13 @@ class TestCheckQuota:
         mock_context = AsyncMock()
         mock_context.credits_used = Decimal("50.00")
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_credits_allocation_with_fallback",
-                new_callable=AsyncMock,
-                return_value=Decimal("100.00"),
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.career_subscription_context_db.get_by_user",
-                new_callable=AsyncMock,
-                return_value=mock_context,
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.career_subscription_context_db.get_by_user",
+            new_callable=AsyncMock,
+            return_value=mock_context,
         ):
             access, message, status_code = await service._check_quota(
-                mock_session, uuid4(), uuid4(), Decimal("1.50")
+                mock_session, uuid4(), Decimal("100.00"), Decimal("1.50")
             )
 
         assert access == AccessStatus.GRANTED
@@ -976,20 +903,13 @@ class TestCheckQuota:
         mock_context = AsyncMock()
         mock_context.credits_used = Decimal("99.00")
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_credits_allocation_with_fallback",
-                new_callable=AsyncMock,
-                return_value=Decimal("100.00"),
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.career_subscription_context_db.get_by_user",
-                new_callable=AsyncMock,
-                return_value=mock_context,
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.career_subscription_context_db.get_by_user",
+            new_callable=AsyncMock,
+            return_value=mock_context,
         ):
             access, message, status_code = await service._check_quota(
-                mock_session, uuid4(), uuid4(), Decimal("2.00")
+                mock_session, uuid4(), Decimal("100.00"), Decimal("2.00")
             )
 
         assert access == AccessStatus.DENIED
@@ -1002,20 +922,13 @@ class TestCheckQuota:
         mock_context = AsyncMock()
         mock_context.credits_used = Decimal("98.50")
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_credits_allocation_with_fallback",
-                new_callable=AsyncMock,
-                return_value=Decimal("100.00"),
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.career_subscription_context_db.get_by_user",
-                new_callable=AsyncMock,
-                return_value=mock_context,
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.career_subscription_context_db.get_by_user",
+            new_callable=AsyncMock,
+            return_value=mock_context,
         ):
             access, _, status_code = await service._check_quota(
-                mock_session, uuid4(), uuid4(), Decimal("1.50")
+                mock_session, uuid4(), Decimal("100.00"), Decimal("1.50")
             )
 
         assert access == AccessStatus.GRANTED
@@ -1025,20 +938,13 @@ class TestCheckQuota:
     async def test_quota_check_no_context_defaults_to_zero(self, service):
         mock_session = AsyncMock()
 
-        with (
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_credits_allocation_with_fallback",
-                new_callable=AsyncMock,
-                return_value=Decimal("100.00"),
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.career_subscription_context_db.get_by_user",
-                new_callable=AsyncMock,
-                return_value=None,  # No context
-            ),
+        with patch(
+            "app.apps.cubex_career.services.quota.career_subscription_context_db.get_by_user",
+            new_callable=AsyncMock,
+            return_value=None,  # No context
         ):
             access, _, status_code = await service._check_quota(
-                mock_session, uuid4(), uuid4(), Decimal("1.50")
+                mock_session, uuid4(), Decimal("100.00"), Decimal("1.50")
             )
 
         assert access == AccessStatus.GRANTED
@@ -1056,11 +962,19 @@ class TestValidateAndLogUsage:
     @pytest.mark.asyncio
     async def test_returns_six_tuple(self, service):
         from app.apps.cubex_career.services.quota import RateLimitInfo
+        from app.core.services.quota_cache import PlanConfig
 
         mock_session = AsyncMock()
         mock_session.flush = AsyncMock()
         mock_log = AsyncMock()
         mock_log.id = uuid4()
+
+        mock_plan_config = PlanConfig(
+            multiplier=Decimal("1.0"),
+            credits_allocation=Decimal("100.00"),
+            rate_limit_per_minute=20,
+            rate_limit_per_day=500,
+        )
 
         rate_info = RateLimitInfo(
             limit_per_minute=20,
@@ -1073,6 +987,11 @@ class TestValidateAndLogUsage:
 
         with (
             patch.object(service, "_check_idempotency", return_value=None),
+            patch(
+                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_config",
+                new_callable=AsyncMock,
+                return_value=mock_plan_config,
+            ),
             patch.object(service, "_check_rate_limit", return_value=rate_info),
             patch(
                 "app.apps.cubex_career.services.quota.QuotaCacheService.calculate_billable_cost",
@@ -1113,8 +1032,16 @@ class TestValidateAndLogUsage:
     @pytest.mark.asyncio
     async def test_rate_limit_exceeded_returns_denied(self, service):
         from app.apps.cubex_career.services.quota import RateLimitInfo
+        from app.core.services.quota_cache import PlanConfig
 
         mock_session = AsyncMock()
+
+        mock_plan_config = PlanConfig(
+            multiplier=Decimal("1.0"),
+            credits_allocation=Decimal("100.00"),
+            rate_limit_per_minute=20,
+            rate_limit_per_day=500,
+        )
 
         rate_info = RateLimitInfo(
             limit_per_minute=20,
@@ -1129,6 +1056,11 @@ class TestValidateAndLogUsage:
 
         with (
             patch.object(service, "_check_idempotency", return_value=None),
+            patch(
+                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_config",
+                new_callable=AsyncMock,
+                return_value=mock_plan_config,
+            ),
             patch.object(service, "_check_rate_limit", return_value=rate_info),
         ):
             result = await service.validate_and_log_usage(
@@ -1439,4 +1371,3 @@ class TestCareerFeatureKeys:
         assert len(career_keys) > 0
         assert len(api_keys) > 0
         assert set(career_keys).isdisjoint(set(api_keys))
-

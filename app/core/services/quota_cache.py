@@ -4,6 +4,7 @@ Quota Cache Service for O(1) cost lookups.
 """
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Literal
 from uuid import UUID
@@ -17,6 +18,52 @@ from app.core.services.redis_service import RedisService
 
 if TYPE_CHECKING:
     from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule
+
+
+# ---------------------------------------------------------------------------
+# Public dataclasses returned by cache getters
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PlanConfig:
+    """Cached plan pricing configuration.
+
+    Represents one PlanPricingRule row.  A ``None`` return from
+    ``get_plan_config`` means no row exists — the caller should deny
+    the request (HTTP 500).
+
+    Attributes:
+        multiplier: Pricing multiplier for billable cost calculation.
+        credits_allocation: Total credits per billing period.
+        rate_limit_per_minute: Max requests/minute, or ``None`` if unlimited.
+        rate_limit_per_day: Max requests/day, or ``None`` if unlimited.
+    """
+
+    multiplier: Decimal
+    credits_allocation: Decimal
+    rate_limit_per_minute: int | None
+    rate_limit_per_day: int | None
+
+
+@dataclass(frozen=True)
+class FeatureConfig:
+    """Cached feature cost configuration.
+
+    Represents one FeatureCostConfig row.  A ``None`` return from
+    ``get_feature_config`` means no row exists — the caller should deny
+    the request (HTTP 500).
+
+    Attributes:
+        internal_cost_credits: Base credit cost for one call to this feature.
+    """
+
+    internal_cost_credits: Decimal
+
+
+# Sentinel stored in cache backends for "rate limit is intentionally unlimited".
+# The backends only store ``int``; ``None`` means "not cached".
+_UNLIMITED: int = -1
 
 
 class QuotaCacheBackend(ABC):
@@ -96,12 +143,12 @@ class QuotaCacheBackend(ABC):
 
     @abstractmethod
     async def set_plan_rate_day_limit(self, plan_id: UUID, rate_limit: int) -> None:
-        """Set plan rate limit in cache."""
+        """Set plan rate limit per day in cache."""
         pass
 
     @abstractmethod
     async def delete_plan_rate_day_limit(self, plan_id: UUID) -> None:
-        """Remove plan rate limit from cache."""
+        """Remove plan rate limit per day from cache."""
         pass
 
     @abstractmethod
@@ -180,15 +227,15 @@ class MemoryBackend(QuotaCacheBackend):
         self._plan_rate_limits.pop(plan_id, None)
 
     async def get_plan_rate_day_limit(self, plan_id: UUID) -> int | None:
-        """Get cached plan rate limit per minute."""
+        """Get cached plan rate limit per day."""
         return self._plan_rate_day_limit.get(plan_id)
 
     async def set_plan_rate_day_limit(self, plan_id: UUID, rate_limit: int) -> None:
-        """Set plan rate limit in cache."""
+        """Set plan rate limit per day in cache."""
         self._plan_rate_day_limit[plan_id] = rate_limit
 
     async def delete_plan_rate_day_limit(self, plan_id: UUID) -> None:
-        """Remove plan rate limit from cache."""
+        """Remove plan rate limit per day from cache."""
         self._plan_rate_day_limit.pop(plan_id, None)
 
     async def clear(self) -> None:
@@ -290,7 +337,7 @@ class RedisBackend(QuotaCacheBackend):
         await RedisService.delete(key)
 
     async def get_plan_rate_day_limit(self, plan_id: UUID) -> int | None:
-        """Get cached plan rate limit from Redis."""
+        """Get cached plan rate limit per day from Redis."""
         key = f"{self.PLAN_RATE_DAY_LIMIT_PREFIX}{plan_id}"
         value = await RedisService.get(key)
         if value is not None:
@@ -298,12 +345,12 @@ class RedisBackend(QuotaCacheBackend):
         return None
 
     async def set_plan_rate_day_limit(self, plan_id: UUID, rate_limit: int) -> None:
-        """Set plan rate limit in Redis (no TTL - permanent until updated)."""
+        """Set plan rate limit per day in Redis (no TTL - permanent until updated)."""
         key = f"{self.PLAN_RATE_DAY_LIMIT_PREFIX}{plan_id}"
         await RedisService.set(key, str(rate_limit))
 
     async def delete_plan_rate_day_limit(self, plan_id: UUID) -> None:
-        """Remove plan rate limit from Redis."""
+        """Remove plan rate limit per day from Redis."""
         key = f"{self.PLAN_RATE_DAY_LIMIT_PREFIX}{plan_id}"
         await RedisService.delete(key)
 
@@ -341,13 +388,6 @@ class QuotaCacheService:
     _initialized: bool = False
     _backend: QuotaCacheBackend | None = None
     _events_registered: bool = False
-
-    # Default values when no config exists
-    DEFAULT_FEATURE_COST: Decimal = Decimal("6.0")
-    DEFAULT_PLAN_MULTIPLIER: Decimal = Decimal("3.0")
-    DEFAULT_PLAN_CREDITS: Decimal = Decimal("5000.0")
-    DEFAULT_RATE_LIMIT_PER_MINUTE: int = 20
-    DEFAULT_RATE_LIMIT_PER_DAY: int = 20
 
     @classmethod
     async def init(
@@ -407,10 +447,19 @@ class QuotaCacheService:
             )
             await cls._backend.set_plan_rate_limit(
                 rule.plan_id,
-                rule.rate_limit_per_minute or cls.DEFAULT_RATE_LIMIT_PER_MINUTE,
+                (
+                    rule.rate_limit_per_minute
+                    if rule.rate_limit_per_minute is not None
+                    else _UNLIMITED
+                ),
             )
             await cls._backend.set_plan_rate_day_limit(
-                rule.plan_id, rule.rate_limit_per_day or cls.DEFAULT_RATE_LIMIT_PER_DAY
+                rule.plan_id,
+                (
+                    rule.rate_limit_per_day
+                    if rule.rate_limit_per_day is not None
+                    else _UNLIMITED
+                ),
             )
         app_logger.info(f"Loaded {len(pricing_rules)} plan pricing rules.")
 
@@ -441,7 +490,6 @@ class QuotaCacheService:
         event.listen(PlanPricingRule, "after_delete", cls._on_pricing_delete)
 
         app_logger.debug("SQLAlchemy event listeners registered for quota cache.")
-
 
     @classmethod
     def _on_feature_change(
@@ -497,7 +545,6 @@ class QuotaCacheService:
         except RuntimeError:
             asyncio.run(_delete())
 
-
     @classmethod
     def _on_pricing_change(cls, mapper, connection, target: "PlanPricingRule") -> None:
         """Handle pricing rule insert/update."""
@@ -523,11 +570,19 @@ class QuotaCacheService:
                 )
                 await backend.set_plan_rate_limit(
                     target.plan_id,
-                    target.rate_limit_per_minute or cls.DEFAULT_RATE_LIMIT_PER_MINUTE,
+                    (
+                        target.rate_limit_per_minute
+                        if target.rate_limit_per_minute is not None
+                        else _UNLIMITED
+                    ),
                 )
                 await backend.set_plan_rate_day_limit(
                     target.plan_id,
-                    target.rate_limit_per_day or cls.DEFAULT_RATE_LIMIT_PER_DAY,
+                    (
+                        target.rate_limit_per_day
+                        if target.rate_limit_per_day is not None
+                        else _UNLIMITED
+                    ),
                 )
                 app_logger.debug(
                     f"Cache: Updated pricing rule for plan '{target.plan_id}'"
@@ -561,164 +616,191 @@ class QuotaCacheService:
         except RuntimeError:
             asyncio.run(_delete())
 
+    # ------------------------------------------------------------------
+    # Public getters  (cache → DB → None)
+    # ------------------------------------------------------------------
 
     @classmethod
-    async def get_feature_cost(cls, feature_key: FeatureKey) -> Decimal:
-        """
-        Get the internal credit cost for an feature.
-
-        Args:
-            feature: The API feature path (will be normalized to lowercase).
-
-        Returns:
-            The internal credit cost, or DEFAULT_FEATURE_COST if not configured.
-        """
-        if cls._backend is None:
-            return cls.DEFAULT_FEATURE_COST
-        cost = await cls._backend.get_feature_cost(feature_key)
-        return cost if cost is not None else cls.DEFAULT_FEATURE_COST
-
-    @classmethod
-    async def get_plan_multiplier(cls, plan_id: UUID | None) -> Decimal:
-        """
-        Get the pricing multiplier for a plan.
-
-        Args:
-            plan_id: The plan UUID or None.
-
-        Returns:
-            The pricing multiplier, or DEFAULT_PLAN_MULTIPLIER if not configured.
-        """
-        if cls._backend is None or plan_id is None:
-            return cls.DEFAULT_PLAN_MULTIPLIER
-        multiplier = await cls._backend.get_plan_multiplier(plan_id)
-        return multiplier if multiplier is not None else cls.DEFAULT_PLAN_MULTIPLIER
-
-    @classmethod
-    async def get_plan_credits_allocation(cls, plan_id: UUID | None) -> Decimal:
-        """
-        Get the credits allocation for a plan.
-
-        Args:
-            plan_id: The plan UUID or None.
-
-        Returns:
-            The credits allocation, or DEFAULT_PLAN_CREDITS if not configured.
-        """
-        if cls._backend is None or plan_id is None:
-            return cls.DEFAULT_PLAN_CREDITS
-        credits = await cls._backend.get_plan_credits_allocation(plan_id)
-        return credits if credits is not None else cls.DEFAULT_PLAN_CREDITS
-
-    @classmethod
-    async def get_plan_credits_allocation_with_fallback(
+    async def get_plan_config(
         cls,
         session: AsyncSession,
         plan_id: UUID | None,
-    ) -> Decimal:
+    ) -> PlanConfig | None:
         """
-        Get the credits allocation for a plan, with DB fallback if cache unavailable.
+        Get the full pricing configuration for a plan.
 
-        Tries cache first. If cache miss or cache unavailable, falls back to
-        querying the database directly via PlanPricingRuleDB.
+        Lookup order: cache → database → ``None``.
 
         Args:
-            session: Database session for fallback query.
-            plan_id: The plan UUID or None.
+            session: Database session (used on cache miss).
+            plan_id: The plan UUID, or ``None``.
 
         Returns:
-            The credits allocation, or DEFAULT_PLAN_CREDITS if not configured.
+            A :class:`PlanConfig` if a row exists, otherwise ``None``
+            (meaning the caller should deny the request).
         """
         if plan_id is None:
-            return cls.DEFAULT_PLAN_CREDITS
+            return None
 
-        # Try cache first
-        try:
-            if cls._backend is not None:
+        # --- 1. Try cache ---------------------------------------------------
+        if cls._backend is not None:
+            try:
+                multiplier = await cls._backend.get_plan_multiplier(plan_id)
                 credits = await cls._backend.get_plan_credits_allocation(plan_id)
-                if credits is not None:
-                    return credits
-        except Exception as e:
-            app_logger.warning(
-                f"Cache lookup failed for plan credits allocation {plan_id}, "
-                f"falling back to DB: {e}"
-            )
+                rate_min = await cls._backend.get_plan_rate_limit(plan_id)
+                rate_day = await cls._backend.get_plan_rate_day_limit(plan_id)
 
-        # Fallback to database query
+                if (
+                    multiplier is not None
+                    and credits is not None
+                    and rate_min is not None
+                    and rate_day is not None
+                ):
+                    return PlanConfig(
+                        multiplier=multiplier,
+                        credits_allocation=credits,
+                        rate_limit_per_minute=(
+                            rate_min if rate_min != _UNLIMITED else None
+                        ),
+                        rate_limit_per_day=(
+                            rate_day if rate_day != _UNLIMITED else None
+                        ),
+                    )
+            except Exception as e:
+                app_logger.warning(
+                    f"Cache lookup failed for plan config {plan_id}, "
+                    f"falling back to DB: {e}"
+                )
+
+        # --- 2. Fallback to DB ----------------------------------------------
         try:
             from app.core.db.crud.quota import plan_pricing_rule_db
 
             rule = await plan_pricing_rule_db.get_by_plan_id(session, plan_id)
-            if rule is not None:
-                # Update cache for next time (best effort)
-                if cls._backend is not None:
-                    try:
-                        await cls._backend.set_plan_credits_allocation(
-                            plan_id, rule.credits_allocation
-                        )
-                    except Exception:
-                        pass  # Cache update is best-effort
-                return rule.credits_allocation
+            if rule is None:
+                return None
+
+            # Populate cache for next time (best effort)
+            if cls._backend is not None:
+                try:
+                    await cls._backend.set_plan_multiplier(plan_id, rule.multiplier)
+                    await cls._backend.set_plan_credits_allocation(
+                        plan_id, rule.credits_allocation
+                    )
+                    await cls._backend.set_plan_rate_limit(
+                        plan_id,
+                        (
+                            rule.rate_limit_per_minute
+                            if rule.rate_limit_per_minute is not None
+                            else _UNLIMITED
+                        ),
+                    )
+                    await cls._backend.set_plan_rate_day_limit(
+                        plan_id,
+                        (
+                            rule.rate_limit_per_day
+                            if rule.rate_limit_per_day is not None
+                            else _UNLIMITED
+                        ),
+                    )
+                except Exception:
+                    pass  # Cache update is best-effort
+
+            return PlanConfig(
+                multiplier=rule.multiplier,
+                credits_allocation=rule.credits_allocation,
+                rate_limit_per_minute=rule.rate_limit_per_minute,
+                rate_limit_per_day=rule.rate_limit_per_day,
+            )
+        except Exception as e:
+            app_logger.warning(f"DB fallback failed for plan config {plan_id}: {e}")
+            return None
+
+    @classmethod
+    async def get_feature_config(
+        cls,
+        session: AsyncSession,
+        feature_key: FeatureKey,
+    ) -> FeatureConfig | None:
+        """
+        Get the cost configuration for a feature.
+
+        Lookup order: cache → database → ``None``.
+
+        Args:
+            session: Database session (used on cache miss).
+            feature_key: The feature key to look up.
+
+        Returns:
+            A :class:`FeatureConfig` if a row exists, otherwise ``None``
+            (meaning the caller should deny the request).
+        """
+        # --- 1. Try cache ---------------------------------------------------
+        if cls._backend is not None:
+            try:
+                cost = await cls._backend.get_feature_cost(feature_key)
+                if cost is not None:
+                    return FeatureConfig(internal_cost_credits=cost)
+            except Exception as e:
+                app_logger.warning(
+                    f"Cache lookup failed for feature config '{feature_key}', "
+                    f"falling back to DB: {e}"
+                )
+
+        # --- 2. Fallback to DB ----------------------------------------------
+        try:
+            from app.core.db.crud.quota import feature_cost_config_db
+
+            config = await feature_cost_config_db.get_by_feature_key(
+                session, feature_key
+            )
+            if config is None:
+                return None
+
+            # Populate cache for next time (best effort)
+            if cls._backend is not None:
+                try:
+                    await cls._backend.set_feature_cost(
+                        feature_key, config.internal_cost_credits
+                    )
+                except Exception:
+                    pass
+
+            return FeatureConfig(internal_cost_credits=config.internal_cost_credits)
         except Exception as e:
             app_logger.warning(
-                f"DB fallback failed for plan credits allocation {plan_id}: {e}"
+                f"DB fallback failed for feature config '{feature_key}': {e}"
             )
-
-        return cls.DEFAULT_PLAN_CREDITS
-
-    @classmethod
-    async def get_plan_rate_limit(cls, plan_id: UUID | None) -> int:
-        """
-        Get the rate limit per minute for a plan.
-
-        Args:
-            plan_id: The plan UUID or None.
-
-        Returns:
-            The rate limit per minute, or DEFAULT_RATE_LIMIT_PER_MINUTE if not configured.
-        """
-        if cls._backend is None or plan_id is None:
-            return cls.DEFAULT_RATE_LIMIT_PER_MINUTE
-        rate_limit = await cls._backend.get_plan_rate_limit(plan_id)
-        return (
-            rate_limit if rate_limit is not None else cls.DEFAULT_RATE_LIMIT_PER_MINUTE
-        )
-
-    @classmethod
-    async def get_plan_rate_day_limit(cls, plan_id: UUID | None) -> int:
-        """
-        Get the rate limit per day for a plan.
-
-        Args:
-            plan_id: The plan UUID or None.
-
-        Returns:
-            The rate limit per day, or DEFAULT_RATE_LIMIT_PER_DAY if not configured.
-        """
-        if cls._backend is None or plan_id is None:
-            return cls.DEFAULT_RATE_LIMIT_PER_DAY
-        rate_limit = await cls._backend.get_plan_rate_day_limit(plan_id)
-        return rate_limit if rate_limit is not None else cls.DEFAULT_RATE_LIMIT_PER_DAY
+            return None
 
     @classmethod
     async def calculate_billable_cost(
-        cls, feature_key: FeatureKey, plan_id: UUID | None
-    ) -> Decimal:
+        cls,
+        session: AsyncSession,
+        feature_key: FeatureKey,
+        plan_id: UUID | None,
+    ) -> Decimal | None:
         """
-        Calculate the billable cost for an feature call.
+        Calculate the billable cost for a feature call.
 
-        Formula: internal_cost_credits * multiplier
+        Formula: ``internal_cost_credits * multiplier``
+
+        Returns ``None`` if either the feature or plan configuration is
+        missing — the caller should deny the request.
 
         Args:
-            feature: The API feature path.
-            plan_id: The plan UUID or None.
+            session: Database session (used on cache miss).
+            feature_key: The feature key.
+            plan_id: The plan UUID, or ``None``.
 
         Returns:
-            The billable cost in credits.
+            The billable cost in credits, or ``None``.
         """
-        base_cost = await cls.get_feature_cost(feature_key)
-        multiplier = await cls.get_plan_multiplier(plan_id)
-        return base_cost * multiplier
+        feature_cfg = await cls.get_feature_config(session, feature_key)
+        plan_cfg = await cls.get_plan_config(session, plan_id)
+        if feature_cfg is None or plan_cfg is None:
+            return None
+        return feature_cfg.internal_cost_credits * plan_cfg.multiplier
 
     @classmethod
     def is_initialized(cls) -> bool:
@@ -754,5 +836,11 @@ class QuotaCacheService:
         await cls.init(session, backend=backend_type)
 
 
-__all__ = ["QuotaCacheService", "QuotaCacheBackend", "MemoryBackend", "RedisBackend"]
-
+__all__ = [
+    "QuotaCacheService",
+    "QuotaCacheBackend",
+    "MemoryBackend",
+    "RedisBackend",
+    "PlanConfig",
+    "FeatureConfig",
+]

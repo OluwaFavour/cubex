@@ -14,6 +14,8 @@ Run with coverage:
 """
 
 import hashlib
+from decimal import Decimal
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -22,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.enums import AccessStatus, FeatureKey
+from app.core.services.quota_cache import PlanConfig
 
 
 def _generate_payload_hash(data: str = "") -> str:
@@ -886,9 +889,9 @@ class TestValidateUsageE2E:
         # Should be 422 (validation error) not 400
         assert response.status_code == 422
         # Rate limit headers should NOT be present on validation errors
-        assert "X-RateLimit-Limit" not in response.headers
-        assert "X-RateLimit-Remaining" not in response.headers
-        assert "X-RateLimit-Reset" not in response.headers
+        assert "X-RateLimit-Limit-Minute" not in response.headers
+        assert "X-RateLimit-Remaining-Minute" not in response.headers
+        assert "X-RateLimit-Reset-Minute" not in response.headers
 
     @pytest.mark.asyncio
     async def test_validate_usage_rate_limit_headers_present(
@@ -915,12 +918,12 @@ class TestValidateUsageE2E:
 
         assert response.status_code == 200
         # Rate limit headers should be present
-        assert "X-RateLimit-Limit" in response.headers
-        assert "X-RateLimit-Remaining" in response.headers
-        assert "X-RateLimit-Reset" in response.headers
+        assert "X-RateLimit-Limit-Minute" in response.headers
+        assert "X-RateLimit-Remaining-Minute" in response.headers
+        assert "X-RateLimit-Reset-Minute" in response.headers
         # Remaining should be less than limit (we just used one)
-        limit = int(response.headers["X-RateLimit-Limit"])
-        remaining = int(response.headers["X-RateLimit-Remaining"])
+        limit = int(response.headers["X-RateLimit-Limit-Minute"])
+        remaining = int(response.headers["X-RateLimit-Remaining-Minute"])
         assert remaining < limit
 
     @pytest.mark.asyncio
@@ -938,7 +941,6 @@ class TestValidateUsageE2E:
         """
         import time
         from statistics import mean, stdev
-        from unittest.mock import AsyncMock, patch
 
         from tests.conftest import make_client_id
 
@@ -950,9 +952,14 @@ class TestValidateUsageE2E:
 
         # Mock rate limit to 1000 to avoid hitting limits during benchmark
         with patch(
-            "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_rate_limit",
+            "app.apps.cubex_api.services.quota.APIQuotaCacheService.get_plan_config",
             new_callable=AsyncMock,
-            return_value=1000,
+            return_value=PlanConfig(
+                multiplier=Decimal("1.0"),
+                credits_allocation=Decimal("5000.0"),
+                rate_limit_per_minute=1000,
+                rate_limit_per_day=None,
+            ),
         ):
             # Warm-up request (not counted in stats)
             await client.post(
@@ -1006,4 +1013,3 @@ class TestValidateUsageE2E:
         print("=" * 60)
 
         assert avg_latency > 0
-

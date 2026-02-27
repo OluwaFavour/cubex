@@ -94,14 +94,15 @@ async def _build_workspace_response(
         if workspace.api_subscription_context
         else Decimal("0.00")
     )
-    credits_limit = await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-        session,
-        (
-            workspace.api_subscription_context.subscription.plan_id
-            if workspace.api_subscription_context
-            else None
-        ),
+    plan_id = (
+        workspace.api_subscription_context.subscription.plan_id
+        if workspace.api_subscription_context
+        else None
     )
+    plan_config = (
+        await QuotaCacheService.get_plan_config(session, plan_id) if plan_id else None
+    )
+    credits_limit = plan_config.credits_allocation if plan_config else Decimal("0.00")
     return WorkspaceResponse(
         id=workspace.id,
         display_name=workspace.display_name,
@@ -390,10 +391,13 @@ async def get_workspace(
             if subscription and subscription.api_context
             else Decimal("0.00")
         )
+        plan_config = (
+            await QuotaCacheService.get_plan_config(session, subscription.plan_id)
+            if subscription
+            else None
+        )
         credits_limit = (
-            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-                session, subscription.plan_id if subscription else None
-            )
+            plan_config.credits_allocation if plan_config else Decimal("0.00")
         )
 
         return WorkspaceDetailResponse(
@@ -1825,4 +1829,3 @@ async def revoke_api_key(
 
 
 __all__ = ["router"]
-

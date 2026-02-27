@@ -61,15 +61,19 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     that the caller should return mocked/sample responses instead of real data.
     Note: Rate limits still apply to test keys.
     
-    **Rate Limiting**: Workspace-level rate limiting is enforced using a sliding
-    window of 60 seconds. The rate limit is configurable per plan (default: 20 req/min).
+    **Rate Limiting**: Workspace-level rate limiting is enforced using sliding
+    windows for both per-minute and per-day limits. Limits are configurable
+    per plan via PlanPricingRule.
     
     **Rate Limit Response Headers** (Server B should forward these to developers):
     | Header | Type | Description |
     |--------|------|-------------|
-    | `X-RateLimit-Limit` | int | Maximum requests allowed per minute for this workspace |
-    | `X-RateLimit-Remaining` | int | Number of requests remaining in the current window |
-    | `X-RateLimit-Reset` | int | Unix timestamp (seconds) when the rate limit window resets |
+    | `X-RateLimit-Limit-Minute` | int | Max requests per minute for this workspace |
+    | `X-RateLimit-Remaining-Minute` | int | Remaining in current minute window |
+    | `X-RateLimit-Reset-Minute` | int | Unix timestamp when minute window resets |
+    | `X-RateLimit-Limit-Day` | int | Max requests per day for this workspace |
+    | `X-RateLimit-Remaining-Day` | int | Remaining in current day window |
+    | `X-RateLimit-Reset-Day` | int | Unix timestamp when day window resets |
     | `Retry-After` | int | Seconds until rate limit resets (only included on 429 responses) |
     
     **Important**: Server B should copy these headers from this response to the response
@@ -79,9 +83,12 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     **Note**: These headers are **not always present** (e.g., for idempotent requests or
     early validation failures). Use `.get()` to safely access them and avoid KeyError:
     ```python
-    rate_limit = response.headers.get("X-RateLimit-Limit")
-    remaining = response.headers.get("X-RateLimit-Remaining")
-    reset_at = response.headers.get("X-RateLimit-Reset")
+    limit_min = response.headers.get("X-RateLimit-Limit-Minute")
+    remaining_min = response.headers.get("X-RateLimit-Remaining-Minute")
+    reset_min = response.headers.get("X-RateLimit-Reset-Minute")
+    limit_day = response.headers.get("X-RateLimit-Limit-Day")
+    remaining_day = response.headers.get("X-RateLimit-Remaining-Day")
+    reset_day = response.headers.get("X-RateLimit-Reset-Day")
     retry_after = response.headers.get("Retry-After")  # Only on 429
     ```
     
@@ -110,7 +117,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     - 400: Invalid request format (bad client_id or API key format)
     - 401: API key not found, expired, or revoked
     - 403: API key does not belong to the specified workspace
-    - 429: Rate limit exceeded OR quota exceeded
+    - 429: Rate limit exceeded (per-minute or per-day) OR quota exceeded
     """,
     responses={
         200: {
@@ -224,13 +231,24 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
             "content": {
                 "application/json": {
                     "examples": {
-                        "rate_limit_exceeded": {
-                            "summary": "Rate Limit Exceeded",
-                            "description": "Response includes X-RateLimit-* and Retry-After headers",
+                        "rate_limit_exceeded_minute": {
+                            "summary": "Rate Limit Exceeded (Per-Minute)",
+                            "description": "Response includes X-RateLimit-*-Minute, X-RateLimit-*-Day, and Retry-After headers",
                             "value": {
                                 "access": "denied",
                                 "usage_id": None,
                                 "message": "Rate limit exceeded. Limit: 20 requests/minute. Try again in 45 seconds.",
+                                "credits_reserved": None,
+                                "is_test_key": False,
+                            },
+                        },
+                        "rate_limit_exceeded_day": {
+                            "summary": "Rate Limit Exceeded (Per-Day)",
+                            "description": "Response includes X-RateLimit-*-Minute, X-RateLimit-*-Day, and Retry-After headers",
+                            "value": {
+                                "access": "denied",
+                                "usage_id": None,
+                                "message": "Rate limit exceeded. Limit: 500 requests/day. Try again in 3600 seconds.",
                                 "credits_reserved": None,
                                 "is_test_key": False,
                             },
@@ -313,13 +331,29 @@ async def validate_usage(
 
     headers: dict[str, str] = {}
     if rate_limit_info is not None:
-        headers["X-RateLimit-Limit"] = str(rate_limit_info.limit)
-        headers["X-RateLimit-Remaining"] = str(rate_limit_info.remaining)
-        headers["X-RateLimit-Reset"] = str(rate_limit_info.reset_timestamp)
+        if rate_limit_info.limit_per_minute is not None:
+            headers["X-RateLimit-Limit-Minute"] = str(rate_limit_info.limit_per_minute)
+            headers["X-RateLimit-Remaining-Minute"] = str(
+                rate_limit_info.remaining_per_minute
+            )
+            headers["X-RateLimit-Reset-Minute"] = str(rate_limit_info.reset_per_minute)
+        if rate_limit_info.limit_per_day is not None:
+            headers["X-RateLimit-Limit-Day"] = str(rate_limit_info.limit_per_day)
+            headers["X-RateLimit-Remaining-Day"] = str(
+                rate_limit_info.remaining_per_day
+            )
+            headers["X-RateLimit-Reset-Day"] = str(rate_limit_info.reset_per_day)
 
         # Add Retry-After header for rate limit exceeded responses
         if rate_limit_info.is_exceeded:
-            retry_after = max(0, rate_limit_info.reset_timestamp - int(time.time()))
+            if rate_limit_info.exceeded_window == "minute":
+                retry_after = max(
+                    0, (rate_limit_info.reset_per_minute or 0) - int(time.time())
+                )
+            else:
+                retry_after = max(
+                    0, (rate_limit_info.reset_per_day or 0) - int(time.time())
+                )
             headers["Retry-After"] = str(retry_after)
 
     return JSONResponse(

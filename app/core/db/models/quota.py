@@ -51,13 +51,11 @@ class FeatureCostConfig(BaseModel):
         Enum(ProductType, native_enum=False, name="product_type"),
         nullable=False,
         index=True,
-        default=ProductType.API,
         comment="Product this plan belongs to (API or CAREER)",
     )
     internal_cost_credits: Mapped[Decimal] = mapped_column(
         Numeric(precision=12, scale=2),
         nullable=False,
-        default=Decimal("1.0"),
         comment="Internal credit cost for this feature",
     )
 
@@ -96,26 +94,24 @@ class PlanPricingRule(BaseModel):
     multiplier: Mapped[Decimal] = mapped_column(
         Numeric(precision=8, scale=2),
         nullable=False,
-        default=Decimal("1.0"),
         comment="Pricing multiplier (1.0 = standard rate)",
     )
 
     credits_allocation: Mapped[Decimal] = mapped_column(
         Numeric(precision=12, scale=2),
         nullable=False,
-        default=Decimal("5000.0"),
         comment="Credits allocated to users on this plan",
     )
 
     rate_limit_per_minute: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
-        comment="Maximum API requests allowed per minute",
+        comment="Maximum API requests allowed per minute (None = unlimited)",
     )
     rate_limit_per_day: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
-        comment="Maximum API requests allowed per day",
+        comment="Maximum API requests allowed per day (None = unlimited)",
     )
 
     # Relationship
@@ -124,4 +120,3 @@ class PlanPricingRule(BaseModel):
     __table_args__ = (
         UniqueConstraint("plan_id", name="uq_plan_pricing_rules_plan_id"),
     )
-

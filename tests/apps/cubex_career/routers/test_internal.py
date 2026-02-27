@@ -537,7 +537,9 @@ class TestCareerInternalCommitEndpoint:
 class TestCareerValidateUsageE2E:
 
     @pytest.fixture
-    async def career_pricing_rule(self, db_session: AsyncSession, free_career_plan):
+    async def career_pricing_rule(
+        self, db_session: AsyncSession, free_career_plan, career_feature_cost_config
+    ):
         """Create a PlanPricingRule for the free career plan."""
         from sqlalchemy import select
 
@@ -721,7 +723,9 @@ class TestCareerValidateUsageE2E:
 class TestCareerCommitUsageE2E:
 
     @pytest.fixture
-    async def career_pricing_rule(self, db_session: AsyncSession, free_career_plan):
+    async def career_pricing_rule(
+        self, db_session: AsyncSession, free_career_plan, career_feature_cost_config
+    ):
         """Create a PlanPricingRule for the free career plan."""
         from sqlalchemy import select
 
@@ -914,7 +918,7 @@ class TestCareerRateLimitE2E:
 
     @pytest.fixture
     async def career_pricing_rule_low_limit(
-        self, db_session: AsyncSession, free_career_plan
+        self, db_session: AsyncSession, free_career_plan, career_feature_cost_config
     ):
         """Create a PlanPricingRule with a very low rate limit for testing."""
         from sqlalchemy import select
@@ -957,6 +961,8 @@ class TestCareerRateLimitE2E:
 
         from freezegun import freeze_time
 
+        from app.core.services.quota_cache import PlanConfig
+
         rate_limit = career_pricing_rule_low_limit.rate_limit_per_minute
         rate_limit_day = career_pricing_rule_low_limit.rate_limit_per_day
 
@@ -965,14 +971,14 @@ class TestCareerRateLimitE2E:
         with (
             freeze_time("2026-02-26 12:00:00"),
             patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_limit",
+                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_config",
                 new_callable=AsyncMock,
-                return_value=rate_limit,
-            ),
-            patch(
-                "app.apps.cubex_career.services.quota.QuotaCacheService.get_plan_rate_day_limit",
-                new_callable=AsyncMock,
-                return_value=rate_limit_day,
+                return_value=PlanConfig(
+                    multiplier=career_pricing_rule_low_limit.multiplier,
+                    credits_allocation=career_pricing_rule_low_limit.credits_allocation,
+                    rate_limit_per_minute=rate_limit,
+                    rate_limit_per_day=rate_limit_day,
+                ),
             ),
         ):
             headers = _make_auth_headers(test_user)
@@ -999,4 +1005,3 @@ class TestCareerRateLimitE2E:
             assert data["access"] == AccessStatus.DENIED.value
             assert "rate limit" in data["message"].lower()
             assert "Retry-After" in response.headers
-

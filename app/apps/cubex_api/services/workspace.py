@@ -127,7 +127,6 @@ class WorkspaceService:
     # Default invitation expiry (7 days)
     INVITATION_EXPIRY_DAYS = 7
 
-
     async def _generate_workspace_identity(
         self,
         session: AsyncSession,
@@ -336,7 +335,6 @@ class WorkspaceService:
             Expiration datetime.
         """
         return datetime.now(timezone.utc) + timedelta(days=self.INVITATION_EXPIRY_DAYS)
-
 
     async def create_personal_workspace(
         self,
@@ -691,12 +689,10 @@ class WorkspaceService:
         subscription = await subscription_db.get_by_workspace(session, workspace_id)
         if not subscription:
             return Decimal("0.00")
-        credits_limit = (
-            await QuotaCacheService.get_plan_credits_allocation_with_fallback(
-                session, subscription.plan_id
-            )
+        plan_config = await QuotaCacheService.get_plan_config(
+            session, subscription.plan_id
         )
-        return credits_limit
+        return plan_config.credits_allocation if plan_config else Decimal("0.00")
 
     async def _check_can_add_member(
         self,
@@ -1327,4 +1323,3 @@ __all__ = [
     "PermissionDeniedException",
     "FreeWorkspaceNoInvitesException",
 ]
-
