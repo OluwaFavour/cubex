@@ -326,7 +326,7 @@ class TestStripeWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_webhook_invoice_payment_failed(self, client: AsyncClient):
-        """Should publish invoice.payment_failed to queue."""
+        """Should publish invoice.payment_failed to queue with amount_due."""
         event_data = {
             "id": "evt_payment_failed_123",
             "type": "invoice.payment_failed",
@@ -334,6 +334,7 @@ class TestStripeWebhookEndpoint:
                 "object": {
                     "subscription": "sub_failed_123",
                     "customer_email": "customer@example.com",
+                    "amount_due": 4999,
                 }
             },
         }
@@ -364,6 +365,7 @@ class TestStripeWebhookEndpoint:
         assert message["event_id"] == "evt_payment_failed_123"
         assert message["stripe_subscription_id"] == "sub_failed_123"
         assert message["customer_email"] == "customer@example.com"
+        assert message["amount_due"] == 4999
 
     @pytest.mark.asyncio
     async def test_webhook_publish_failure(self, client: AsyncClient):
@@ -456,6 +458,33 @@ class TestEventQueueMapping:
         from app.core.routers.webhook import EVENT_QUEUE_MAPPING
 
         assert EVENT_QUEUE_MAPPING["invoice.payment_failed"] == "stripe_payment_failed"
+
+    def test_subscription_paused_mapping(self):
+        """Test customer.subscription.paused maps to correct queue."""
+        from app.core.routers.webhook import EVENT_QUEUE_MAPPING
+
+        assert (
+            EVENT_QUEUE_MAPPING["customer.subscription.paused"]
+            == "stripe_subscription_updated"
+        )
+
+    def test_subscription_resumed_mapping(self):
+        """Test customer.subscription.resumed maps to correct queue."""
+        from app.core.routers.webhook import EVENT_QUEUE_MAPPING
+
+        assert (
+            EVENT_QUEUE_MAPPING["customer.subscription.resumed"]
+            == "stripe_subscription_updated"
+        )
+
+    def test_invoice_payment_action_required_mapping(self):
+        """Test invoice.payment_action_required maps to correct queue."""
+        from app.core.routers.webhook import EVENT_QUEUE_MAPPING
+
+        assert (
+            EVENT_QUEUE_MAPPING["invoice.payment_action_required"]
+            == "stripe_payment_failed"
+        )
 
 
 # ============================================================================
@@ -556,6 +585,7 @@ class TestBuildQueueMessage:
         obj = {
             "subscription": "sub_failed_123",
             "customer_email": "failed@example.com",
+            "amount_due": 2999,
         }
 
         message = _build_queue_message("evt_fail_123", "invoice.payment_failed", obj)
@@ -563,6 +593,65 @@ class TestBuildQueueMessage:
         assert message["event_id"] == "evt_fail_123"
         assert message["stripe_subscription_id"] == "sub_failed_123"
         assert message["customer_email"] == "failed@example.com"
+        assert message["amount_due"] == 2999
+
+    def test_build_invoice_payment_failed_message_no_amount(self):
+        """Test building message for invoice.payment_failed without amount_due."""
+        from app.core.routers.webhook import _build_queue_message
+
+        obj = {
+            "subscription": "sub_failed_123",
+            "customer_email": "failed@example.com",
+        }
+
+        message = _build_queue_message("evt_fail_123", "invoice.payment_failed", obj)
+
+        assert message["amount_due"] is None
+
+    def test_build_invoice_payment_action_required_message(self):
+        """Test building message for invoice.payment_action_required."""
+        from app.core.routers.webhook import _build_queue_message
+
+        obj = {
+            "subscription": "sub_action_123",
+            "customer_email": "action@example.com",
+            "amount_due": 4999,
+        }
+
+        message = _build_queue_message(
+            "evt_action_123", "invoice.payment_action_required", obj
+        )
+
+        assert message["event_id"] == "evt_action_123"
+        assert message["stripe_subscription_id"] == "sub_action_123"
+        assert message["customer_email"] == "action@example.com"
+        assert message["amount_due"] == 4999
+
+    def test_build_subscription_paused_message(self):
+        """Test building message for customer.subscription.paused."""
+        from app.core.routers.webhook import _build_queue_message
+
+        obj = {"id": "sub_paused_123"}
+
+        message = _build_queue_message(
+            "evt_pause_123", "customer.subscription.paused", obj
+        )
+
+        assert message["event_id"] == "evt_pause_123"
+        assert message["stripe_subscription_id"] == "sub_paused_123"
+
+    def test_build_subscription_resumed_message(self):
+        """Test building message for customer.subscription.resumed."""
+        from app.core.routers.webhook import _build_queue_message
+
+        obj = {"id": "sub_resumed_123"}
+
+        message = _build_queue_message(
+            "evt_resume_123", "customer.subscription.resumed", obj
+        )
+
+        assert message["event_id"] == "evt_resume_123"
+        assert message["stripe_subscription_id"] == "sub_resumed_123"
 
 
 # ============================================================================

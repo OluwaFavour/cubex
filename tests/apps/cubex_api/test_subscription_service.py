@@ -1009,3 +1009,1528 @@ class TestHandleCheckoutCompletedAmount:
 
             expected_amount = Decimal("145.00")
             assert create_data.get("amount") == expected_amount
+
+
+# ============================================================================
+# Phase 3: handle_checkout_completed Business Logic Tests
+# ============================================================================
+
+
+class TestHandleCheckoutCompletedLogic:
+    """Test suite for handle_checkout_completed business logic paths."""
+
+    @pytest.fixture
+    def service(self):
+        from app.apps.cubex_api.services.subscription import SubscriptionService
+
+        return SubscriptionService()
+
+    @pytest.fixture
+    def mock_stripe_sub(self):
+        """Create a basic mock Stripe subscription with single item."""
+        price = MagicMock()
+        price.id = "price_base_123"
+        price.unit_amount = 2900
+
+        item = MagicMock()
+        item.price = price
+        item.quantity = 1
+        item.current_period_start = 1700000000
+        item.current_period_end = 1702678400
+
+        items = MagicMock()
+        items.data = [item]
+
+        stripe_sub = MagicMock()
+        stripe_sub.id = "sub_123"
+        stripe_sub.status = "active"
+        stripe_sub.items = items
+        return stripe_sub
+
+    @pytest.mark.asyncio
+    async def test_idempotency_returns_existing(self, service, mock_stripe_sub):
+        """If subscription already exists, return it without creating new."""
+        existing = MagicMock(id=uuid4())
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe:
+            mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=existing)
+            mock_sub_db.create = AsyncMock()
+
+            result = await service.handle_checkout_completed(
+                session=AsyncMock(),
+                stripe_subscription_id="sub_123",
+                stripe_customer_id="cus_123",
+                workspace_id=uuid4(),
+                plan_id=uuid4(),
+                seat_count=1,
+            )
+
+            assert result == existing
+            mock_sub_db.create.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_deactivates_existing_free_subscription(
+        self, service, mock_stripe_sub
+    ):
+        """Existing free subscription is marked CANCELED before creating new."""
+        current_sub = MagicMock(id=uuid4())
+        plan = MagicMock(id=uuid4(), stripe_price_id="price_base_123")
+        new_sub = MagicMock(id=uuid4())
+        workspace_id = uuid4()
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.plan_db"
+        ) as mock_plan_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db, patch(
+            "app.apps.cubex_api.services.subscription.user_db"
+        ) as mock_user_db, patch(
+            "app.apps.cubex_api.services.subscription.publish_event"
+        ):
+            mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=current_sub)
+            mock_sub_db.update = AsyncMock(return_value=current_sub)
+            mock_sub_db.create = AsyncMock(return_value=new_sub)
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
+            mock_ws_db.update_status = AsyncMock()
+            mock_ws_db.get_by_id = AsyncMock(return_value=None)
+            mock_ctx_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_ctx_db.create = AsyncMock()
+            mock_user_db.get_by_id = AsyncMock(return_value=None)
+
+            mock_session = AsyncMock()
+            await service.handle_checkout_completed(
+                session=mock_session,
+                stripe_subscription_id="sub_123",
+                stripe_customer_id="cus_123",
+                workspace_id=workspace_id,
+                plan_id=plan.id,
+                seat_count=1,
+            )
+
+            # Verify old sub was canceled
+            cancel_call = mock_sub_db.update.call_args_list[0]
+            cancel_data = (
+                cancel_call.args[2]
+                if len(cancel_call.args) > 2
+                else cancel_call.kwargs.get("data", {})
+            )
+            assert cancel_data["status"] == SubscriptionStatus.CANCELED
+
+    @pytest.mark.asyncio
+    async def test_creates_new_context_when_none_exists(self, service, mock_stripe_sub):
+        """New context is created when workspace has no previous context."""
+        plan = MagicMock(id=uuid4(), stripe_price_id="price_base_123")
+        new_sub = MagicMock(id=uuid4())
+        workspace_id = uuid4()
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.plan_db"
+        ) as mock_plan_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db, patch(
+            "app.apps.cubex_api.services.subscription.user_db"
+        ) as mock_user_db, patch(
+            "app.apps.cubex_api.services.subscription.publish_event"
+        ):
+            mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_sub_db.create = AsyncMock(return_value=new_sub)
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
+            mock_ws_db.update_status = AsyncMock()
+            mock_ws_db.get_by_id = AsyncMock(return_value=None)
+            mock_ctx_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_ctx_db.create = AsyncMock()
+            mock_user_db.get_by_id = AsyncMock(return_value=None)
+
+            mock_session = AsyncMock()
+            await service.handle_checkout_completed(
+                session=mock_session,
+                stripe_subscription_id="sub_123",
+                stripe_customer_id="cus_123",
+                workspace_id=workspace_id,
+                plan_id=plan.id,
+                seat_count=1,
+            )
+
+            mock_ctx_db.create.assert_called_once()
+            create_data = mock_ctx_db.create.call_args
+            data = (
+                create_data.args[1]
+                if len(create_data.args) > 1
+                else create_data.kwargs.get("data", {})
+            )
+            assert data["workspace_id"] == workspace_id
+            assert data["subscription_id"] == new_sub.id
+
+    @pytest.mark.asyncio
+    async def test_updates_existing_context(self, service, mock_stripe_sub):
+        """Existing context is updated to point to the new subscription."""
+        plan = MagicMock(id=uuid4(), stripe_price_id="price_base_123")
+        new_sub = MagicMock(id=uuid4())
+        workspace_id = uuid4()
+        existing_ctx = MagicMock(id=uuid4())
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.plan_db"
+        ) as mock_plan_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db, patch(
+            "app.apps.cubex_api.services.subscription.user_db"
+        ) as mock_user_db, patch(
+            "app.apps.cubex_api.services.subscription.publish_event"
+        ):
+            mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_sub_db.create = AsyncMock(return_value=new_sub)
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
+            mock_ws_db.update_status = AsyncMock()
+            mock_ws_db.get_by_id = AsyncMock(return_value=None)
+            mock_ctx_db.get_by_workspace = AsyncMock(return_value=existing_ctx)
+            mock_ctx_db.update = AsyncMock()
+            mock_user_db.get_by_id = AsyncMock(return_value=None)
+
+            mock_session = AsyncMock()
+            await service.handle_checkout_completed(
+                session=mock_session,
+                stripe_subscription_id="sub_123",
+                stripe_customer_id="cus_123",
+                workspace_id=workspace_id,
+                plan_id=plan.id,
+                seat_count=1,
+            )
+
+            mock_ctx_db.update.assert_called_once()
+            update_data = mock_ctx_db.update.call_args
+            data = (
+                update_data.args[2]
+                if len(update_data.args) > 2
+                else update_data.kwargs.get("data", {})
+            )
+            assert data["subscription_id"] == new_sub.id
+
+    @pytest.mark.asyncio
+    async def test_activates_workspace(self, service, mock_stripe_sub):
+        """Workspace is set to ACTIVE after checkout."""
+        from app.core.enums import WorkspaceStatus
+
+        plan = MagicMock(id=uuid4(), stripe_price_id="price_base_123")
+        new_sub = MagicMock(id=uuid4())
+        workspace_id = uuid4()
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.plan_db"
+        ) as mock_plan_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db, patch(
+            "app.apps.cubex_api.services.subscription.user_db"
+        ) as mock_user_db, patch(
+            "app.apps.cubex_api.services.subscription.publish_event"
+        ):
+            mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_sub_db.create = AsyncMock(return_value=new_sub)
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
+            mock_ws_db.update_status = AsyncMock()
+            mock_ws_db.get_by_id = AsyncMock(return_value=None)
+            mock_ctx_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_ctx_db.create = AsyncMock()
+            mock_user_db.get_by_id = AsyncMock(return_value=None)
+
+            mock_session = AsyncMock()
+            await service.handle_checkout_completed(
+                session=mock_session,
+                stripe_subscription_id="sub_123",
+                stripe_customer_id="cus_123",
+                workspace_id=workspace_id,
+                plan_id=plan.id,
+                seat_count=1,
+            )
+
+            mock_ws_db.update_status.assert_called_once_with(
+                mock_session, workspace_id, WorkspaceStatus.ACTIVE, commit_self=False
+            )
+
+    @pytest.mark.asyncio
+    async def test_sends_activation_email(self, service, mock_stripe_sub):
+        """Activation email is published after successful checkout."""
+        plan_id = uuid4()
+        plan = MagicMock(id=plan_id, stripe_price_id="price_base_123")
+        plan.name = "Professional"
+        new_sub = MagicMock(id=uuid4())
+        workspace_id = uuid4()
+        owner = MagicMock(email="owner@test.com", full_name="Test Owner")
+        workspace = MagicMock(owner_id=uuid4())
+        workspace.display_name = "Test WS"
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.plan_db"
+        ) as mock_plan_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db, patch(
+            "app.apps.cubex_api.services.subscription.user_db"
+        ) as mock_user_db, patch(
+            "app.apps.cubex_api.services.subscription.publish_event",
+            new_callable=AsyncMock,
+        ) as mock_publish:
+            mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_sub_db.create = AsyncMock(return_value=new_sub)
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
+            mock_ws_db.update_status = AsyncMock()
+            mock_ws_db.get_by_id = AsyncMock(return_value=workspace)
+            mock_ctx_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_ctx_db.create = AsyncMock()
+            mock_user_db.get_by_id = AsyncMock(return_value=owner)
+
+            mock_session = AsyncMock()
+            await service.handle_checkout_completed(
+                session=mock_session,
+                stripe_subscription_id="sub_123",
+                stripe_customer_id="cus_123",
+                workspace_id=workspace_id,
+                plan_id=plan.id,
+                seat_count=5,
+            )
+
+            mock_publish.assert_called_once()
+            payload = mock_publish.call_args[0][1]
+            assert payload["email"] == "owner@test.com"
+            assert payload["plan_name"] == "Professional"
+            assert payload["workspace_name"] == "Test WS"
+            assert payload["seat_count"] == 5
+            assert payload["product_name"] == "CueBX API"
+
+    @pytest.mark.asyncio
+    async def test_plan_not_found_raises(self, service, mock_stripe_sub):
+        """Missing plan raises PlanNotFoundException."""
+        from app.apps.cubex_api.services.subscription import PlanNotFoundException
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.plan_db"
+        ) as mock_plan_db:
+            mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_plan_db.get_by_id = AsyncMock(return_value=None)
+
+            with pytest.raises(PlanNotFoundException):
+                await service.handle_checkout_completed(
+                    session=AsyncMock(),
+                    stripe_subscription_id="sub_123",
+                    stripe_customer_id="cus_123",
+                    workspace_id=uuid4(),
+                    plan_id=uuid4(),
+                    seat_count=1,
+                )
+
+
+# ============================================================================
+# Phase 4: handle_subscription_deleted Tests
+# ============================================================================
+
+
+class TestHandleSubscriptionDeleted:
+    """Test suite for handle_subscription_deleted business logic."""
+
+    @pytest.fixture
+    def service(self):
+        from app.apps.cubex_api.services.subscription import SubscriptionService
+
+        return SubscriptionService()
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_not_found(self, service):
+        """Returns None when subscription not found in DB."""
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
+
+            result = await service.handle_subscription_deleted(
+                session=AsyncMock(),
+                stripe_subscription_id="sub_not_found",
+            )
+
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_marks_subscription_canceled(self, service):
+        """Subscription is marked CANCELED with canceled_at timestamp."""
+        api_context = MagicMock(workspace_id=uuid4())
+        subscription = MagicMock(
+            id=uuid4(),
+            product_type=ProductType.API,
+            api_context=api_context,
+        )
+        updated_sub = MagicMock(
+            id=subscription.id,
+            product_type=ProductType.API,
+            api_context=api_context,
+        )
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_member_db"
+        ) as mock_member_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
+                return_value=subscription
+            )
+            mock_sub_db.update = AsyncMock(return_value=updated_sub)
+            mock_ws_db.update_status = AsyncMock()
+            mock_member_db.disable_all_members = AsyncMock()
+
+            mock_session = AsyncMock()
+            result = await service.handle_subscription_deleted(
+                session=mock_session,
+                stripe_subscription_id="sub_del_123",
+            )
+
+            assert result == updated_sub
+            update_call = mock_sub_db.update.call_args
+            data = (
+                update_call.args[2]
+                if len(update_call.args) > 2
+                else update_call.kwargs.get("data", {})
+            )
+            assert data["status"] == SubscriptionStatus.CANCELED
+            assert "canceled_at" in data
+
+    @pytest.mark.asyncio
+    async def test_freezes_workspace_for_api_subscription(self, service):
+        """Workspace is frozen when API subscription is deleted."""
+        from app.core.enums import WorkspaceStatus
+
+        workspace_id = uuid4()
+        api_context = MagicMock(workspace_id=workspace_id)
+        subscription = MagicMock(
+            id=uuid4(),
+            product_type=ProductType.API,
+            api_context=api_context,
+        )
+        updated_sub = MagicMock(id=subscription.id)
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_member_db"
+        ) as mock_member_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
+                return_value=subscription
+            )
+            mock_sub_db.update = AsyncMock(return_value=updated_sub)
+            mock_ws_db.update_status = AsyncMock()
+            mock_member_db.disable_all_members = AsyncMock()
+
+            mock_session = AsyncMock()
+            await service.handle_subscription_deleted(
+                session=mock_session,
+                stripe_subscription_id="sub_del_123",
+            )
+
+            mock_ws_db.update_status.assert_called_once_with(
+                mock_session, workspace_id, WorkspaceStatus.FROZEN, commit_self=False
+            )
+            mock_member_db.disable_all_members.assert_called_once_with(
+                mock_session, workspace_id, except_owner=True, commit_self=False
+            )
+
+    @pytest.mark.asyncio
+    async def test_no_freeze_when_no_api_context(self, service):
+        """No workspace freeze when subscription has no API context."""
+        subscription = MagicMock(
+            id=uuid4(),
+            product_type=ProductType.API,
+            api_context=None,
+        )
+        updated_sub = MagicMock(id=subscription.id)
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
+                return_value=subscription
+            )
+            mock_sub_db.update = AsyncMock(return_value=updated_sub)
+            mock_ws_db.update_status = AsyncMock()
+
+            mock_session = AsyncMock()
+            await service.handle_subscription_deleted(
+                session=mock_session,
+                stripe_subscription_id="sub_del_123",
+            )
+
+            mock_ws_db.update_status.assert_not_called()
+
+
+# ============================================================================
+# Phase 5: handle_subscription_updated Extended Tests
+# ============================================================================
+
+
+class TestHandleSubscriptionUpdatedLogic:
+    """Test suite for handle_subscription_updated business logic paths."""
+
+    @pytest.fixture
+    def service(self):
+        from app.apps.cubex_api.services.subscription import SubscriptionService
+
+        return SubscriptionService()
+
+    @pytest.fixture
+    def mock_db_sub(self):
+        """Create a mock DB subscription for update tests."""
+        plan = MagicMock()
+        plan.stripe_price_id = "price_base_123"
+        plan.seat_stripe_price_id = "price_seat_456"
+        plan.name = "Professional"
+        plan.product_type = ProductType.API
+
+        api_context = MagicMock(workspace_id=uuid4())
+
+        sub = MagicMock()
+        sub.id = uuid4()
+        sub.plan = plan
+        sub.plan_id = plan.id if hasattr(plan, "id") else uuid4()
+        sub.product_type = ProductType.API
+        sub.seat_count = 5
+        sub.amount = None
+        sub.current_period_start = 1700000000
+        sub.current_period_end = 1702678400
+        sub.api_context = api_context
+        return sub
+
+    def _make_stripe_sub(self, status="active", cancel_at_period_end=False):
+        """Helper to create a mock stripe subscription."""
+        price = MagicMock()
+        price.id = "price_base_123"
+        price.unit_amount = 2900
+
+        item = MagicMock()
+        item.price = price
+        item.quantity = 1
+        item.current_period_start = 1700000000
+        item.current_period_end = 1702678400
+
+        items = MagicMock()
+        items.data = [item]
+
+        stripe_sub = MagicMock()
+        stripe_sub.status = status
+        stripe_sub.cancel_at_period_end = cancel_at_period_end
+        stripe_sub.canceled_at = None
+        stripe_sub.items = items
+        return stripe_sub
+
+    @pytest.mark.asyncio
+    async def test_invalid_subscription_id_raises_value_error(self, service):
+        """Empty or non-string subscription ID raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid Stripe subscription ID"):
+            await service.handle_subscription_updated(
+                session=AsyncMock(),
+                stripe_subscription_id="",
+            )
+
+    @pytest.mark.asyncio
+    async def test_not_found_returns_none(self, service):
+        """Returns None when subscription not in DB."""
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
+
+            result = await service.handle_subscription_updated(
+                session=AsyncMock(),
+                stripe_subscription_id="sub_not_found",
+            )
+
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_status_mapping_active(self, service, mock_db_sub):
+        """Stripe 'active' status maps to ACTIVE."""
+        stripe_sub = self._make_stripe_sub(status="active")
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
+                return_value=mock_db_sub
+            )
+            mock_sub_db.update = AsyncMock(return_value=mock_db_sub)
+            mock_stripe.get_subscription = AsyncMock(return_value=stripe_sub)
+            mock_ctx_db.get_by_subscription = AsyncMock(return_value=None)
+            mock_ws_db.get_by_id = AsyncMock(return_value=MagicMock())
+
+            await service.handle_subscription_updated(
+                session=AsyncMock(),
+                stripe_subscription_id="sub_123",
+            )
+
+            update_data = mock_sub_db.update.call_args
+            data = (
+                update_data.args[2]
+                if len(update_data.args) > 2
+                else update_data.kwargs.get("data", {})
+            )
+            assert data["status"] == SubscriptionStatus.ACTIVE
+
+    @pytest.mark.asyncio
+    async def test_status_mapping_past_due(self, service, mock_db_sub):
+        """Stripe 'past_due' status maps to PAST_DUE."""
+        stripe_sub = self._make_stripe_sub(status="past_due")
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
+                return_value=mock_db_sub
+            )
+            mock_sub_db.update = AsyncMock(return_value=mock_db_sub)
+            mock_stripe.get_subscription = AsyncMock(return_value=stripe_sub)
+            mock_ctx_db.get_by_subscription = AsyncMock(return_value=None)
+            mock_ws_db.get_by_id = AsyncMock(return_value=MagicMock())
+
+            await service.handle_subscription_updated(
+                session=AsyncMock(),
+                stripe_subscription_id="sub_123",
+            )
+
+            update_data = mock_sub_db.update.call_args
+            data = (
+                update_data.args[2]
+                if len(update_data.args) > 2
+                else update_data.kwargs.get("data", {})
+            )
+            assert data["status"] == SubscriptionStatus.PAST_DUE
+
+    @pytest.mark.asyncio
+    async def test_status_canceled_freezes_workspace(self, service, mock_db_sub):
+        """CANCELED status triggers workspace freeze."""
+        from app.core.enums import WorkspaceStatus
+
+        stripe_sub = self._make_stripe_sub(status="canceled")
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_member_db"
+        ) as mock_member_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
+                return_value=mock_db_sub
+            )
+            mock_sub_db.update = AsyncMock(return_value=mock_db_sub)
+            mock_stripe.get_subscription = AsyncMock(return_value=stripe_sub)
+            mock_ctx_db.get_by_subscription = AsyncMock(return_value=None)
+            mock_ws_db.update_status = AsyncMock()
+            mock_member_db.disable_all_members = AsyncMock()
+
+            await service.handle_subscription_updated(
+                session=AsyncMock(),
+                stripe_subscription_id="sub_123",
+            )
+
+            mock_ws_db.update_status.assert_called_once()
+            ws_args = mock_ws_db.update_status.call_args
+            assert ws_args.args[1] == mock_db_sub.api_context.workspace_id
+            assert ws_args.args[2] == WorkspaceStatus.FROZEN
+
+    @pytest.mark.asyncio
+    async def test_active_status_reactivates_frozen_workspace(
+        self, service, mock_db_sub
+    ):
+        """ACTIVE status reactivates a FROZEN workspace."""
+        from app.core.enums import WorkspaceStatus
+
+        stripe_sub = self._make_stripe_sub(status="active")
+        frozen_ws = MagicMock(status=WorkspaceStatus.FROZEN)
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
+                return_value=mock_db_sub
+            )
+            mock_sub_db.update = AsyncMock(return_value=mock_db_sub)
+            mock_stripe.get_subscription = AsyncMock(return_value=stripe_sub)
+            mock_ctx_db.get_by_subscription = AsyncMock(return_value=None)
+            mock_ws_db.get_by_id = AsyncMock(return_value=frozen_ws)
+            mock_ws_db.update_status = AsyncMock()
+
+            await service.handle_subscription_updated(
+                session=AsyncMock(),
+                stripe_subscription_id="sub_123",
+            )
+
+            mock_ws_db.update_status.assert_called_once()
+            ws_args = mock_ws_db.update_status.call_args
+            assert ws_args.args[2] == WorkspaceStatus.ACTIVE
+
+    @pytest.mark.asyncio
+    async def test_canceled_at_propagated(self, service, mock_db_sub):
+        """canceled_at from Stripe is propagated to DB update."""
+        stripe_sub = self._make_stripe_sub(status="canceled")
+        stripe_sub.canceled_at = 1702000000
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.workspace_member_db"
+        ) as mock_member_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
+                return_value=mock_db_sub
+            )
+            mock_sub_db.update = AsyncMock(return_value=mock_db_sub)
+            mock_stripe.get_subscription = AsyncMock(return_value=stripe_sub)
+            mock_ctx_db.get_by_subscription = AsyncMock(return_value=None)
+            mock_ws_db.update_status = AsyncMock()
+            mock_member_db.disable_all_members = AsyncMock()
+
+            await service.handle_subscription_updated(
+                session=AsyncMock(),
+                stripe_subscription_id="sub_123",
+            )
+
+            update_data = mock_sub_db.update.call_args
+            data = (
+                update_data.args[2]
+                if len(update_data.args) > 2
+                else update_data.kwargs.get("data", {})
+            )
+            assert data["canceled_at"] == 1702000000
+
+    @pytest.mark.asyncio
+    async def test_billing_period_change_resets_credits(self, service, mock_db_sub):
+        """Credits are reset when billing period changes."""
+        stripe_sub = self._make_stripe_sub(status="active")
+        # Change period to trigger reset
+        stripe_sub.items.data[0].current_period_start = 1702678400  # New period
+        stripe_sub.items.data[0].current_period_end = 1705356800
+
+        context = MagicMock(id=uuid4())
+
+        with patch(
+            "app.apps.cubex_api.services.subscription.subscription_db"
+        ) as mock_sub_db, patch(
+            "app.apps.cubex_api.services.subscription.Stripe"
+        ) as mock_stripe, patch(
+            "app.apps.cubex_api.services.subscription.workspace_db"
+        ) as mock_ws_db, patch(
+            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+        ) as mock_ctx_db:
+            mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
+                return_value=mock_db_sub
+            )
+            mock_sub_db.update = AsyncMock(return_value=mock_db_sub)
+            mock_stripe.get_subscription = AsyncMock(return_value=stripe_sub)
+            mock_ctx_db.get_by_subscription = AsyncMock(return_value=context)
+            mock_ctx_db.reset_credits_used = AsyncMock()
+            mock_ws_db.get_by_id = AsyncMock(return_value=MagicMock())
+
+            await service.handle_subscription_updated(
+                session=AsyncMock(),
+                stripe_subscription_id="sub_123",
+            )
+
+
+# ============================================================================
+# Phase 6: API create_checkout_session tests
+# ============================================================================
+
+
+class TestCreateCheckoutSessionLogic:
+    """Tests for SubscriptionService.create_checkout_session."""
+
+    SVC = "app.apps.cubex_api.services.subscription"
+
+    @pytest.fixture
+    def service(self):
+        from app.apps.cubex_api.services.subscription import SubscriptionService
+
+        return SubscriptionService()
+
+    def _make_plan(self, *, has_seats=True, can_purchase=True):
+        plan = MagicMock(
+            id=uuid4(),
+            stripe_price_id="price_base_123",
+            seat_stripe_price_id="price_seat_123" if has_seats else None,
+            has_seat_pricing=has_seats,
+            can_be_purchased=can_purchase,
+            product_type=ProductType.API,
+            min_seats=1,
+            max_seats=50,
+            is_active=True,
+            is_deleted=False,
+        )
+        plan.name = "Professional"
+        return plan
+
+    @pytest.mark.asyncio
+    async def test_happy_path_with_seat_pricing(self, service):
+        """Creates checkout with dual line items for seat plan."""
+        plan = self._make_plan(has_seats=True)
+        user = MagicMock(id=uuid4(), email="u@test.com", full_name="Test")
+        user.stripe_customer_id = "cus_123"
+        stripe_session = MagicMock(id="cs_abc", url="https://checkout.stripe.com")
+
+        with patch(f"{self.SVC}.plan_db") as mock_plan_db, patch(
+            f"{self.SVC}.subscription_db"
+        ) as mock_sub_db, patch(f"{self.SVC}.Stripe") as mock_stripe:
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_stripe.create_checkout_session = AsyncMock(return_value=stripe_session)
+
+            result = await service.create_checkout_session(
+                session=AsyncMock(),
+                workspace_id=uuid4(),
+                plan_id=plan.id,
+                seat_count=5,
+                success_url="https://app/success",
+                cancel_url="https://app/cancel",
+                user=user,
+            )
+
+            assert result is stripe_session
+            mock_stripe.create_checkout_session.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_plan_not_purchasable_raises(self, service):
+        """Raises when plan cannot be purchased."""
+        from app.apps.cubex_api.services.subscription import PlanNotFoundException
+
+        plan = self._make_plan(can_purchase=False)
+
+        with patch(f"{self.SVC}.plan_db") as mock_plan_db:
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
+
+            with pytest.raises(PlanNotFoundException):
+                await service.create_checkout_session(
+                    session=AsyncMock(),
+                    workspace_id=uuid4(),
+                    plan_id=plan.id,
+                    seat_count=1,
+                    success_url="https://app/success",
+                    cancel_url="https://app/cancel",
+                    user=MagicMock(id=uuid4()),
+                )
+
+    @pytest.mark.asyncio
+    async def test_invalid_seat_count_raises(self, service):
+        """Raises when seat count exceeds plan limits."""
+        from app.apps.cubex_api.services.subscription import (
+            InvalidSeatCountException,
+        )
+
+        plan = self._make_plan()
+
+        with patch(f"{self.SVC}.plan_db") as mock_plan_db:
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
+
+            with pytest.raises(InvalidSeatCountException):
+                await service.create_checkout_session(
+                    session=AsyncMock(),
+                    workspace_id=uuid4(),
+                    plan_id=plan.id,
+                    seat_count=100,  # Exceeds max_seats=50
+                    success_url="https://app/success",
+                    cancel_url="https://app/cancel",
+                    user=MagicMock(id=uuid4()),
+                )
+
+    @pytest.mark.asyncio
+    async def test_existing_paid_subscription_raises(self, service):
+        """Raises when workspace already has a paid subscription."""
+        from app.apps.cubex_api.services.subscription import (
+            CannotUpgradeFreeWorkspace,
+        )
+
+        plan = self._make_plan()
+        existing_sub = MagicMock(stripe_subscription_id="sub_existing")
+
+        with patch(f"{self.SVC}.plan_db") as mock_plan_db, patch(
+            f"{self.SVC}.subscription_db"
+        ) as mock_sub_db:
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=existing_sub)
+
+            with pytest.raises(CannotUpgradeFreeWorkspace):
+                await service.create_checkout_session(
+                    session=AsyncMock(),
+                    workspace_id=uuid4(),
+                    plan_id=plan.id,
+                    seat_count=3,
+                    success_url="https://app/success",
+                    cancel_url="https://app/cancel",
+                    user=MagicMock(id=uuid4()),
+                )
+
+    @pytest.mark.asyncio
+    async def test_ensure_stripe_customer_creates_new(self, service):
+        """Creates Stripe customer when user has none."""
+        plan = self._make_plan()
+        user = MagicMock(id=uuid4(), email="new@test.com", full_name="New")
+        user.stripe_customer_id = None
+        stripe_customer = MagicMock(id="cus_new")
+
+        with patch(f"{self.SVC}.plan_db") as mock_plan_db, patch(
+            f"{self.SVC}.subscription_db"
+        ) as mock_sub_db, patch(f"{self.SVC}.Stripe") as mock_stripe, patch(
+            f"{self.SVC}.user_db"
+        ) as mock_user_db:
+            mock_plan_db.get_by_id = AsyncMock(return_value=plan)
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+            mock_stripe.create_customer = AsyncMock(return_value=stripe_customer)
+            mock_stripe.create_checkout_session = AsyncMock(
+                return_value=MagicMock(id="cs_x")
+            )
+            mock_user_db.update = AsyncMock()
+
+            await service.create_checkout_session(
+                session=AsyncMock(),
+                workspace_id=uuid4(),
+                plan_id=plan.id,
+                seat_count=1,
+                success_url="https://app/success",
+                cancel_url="https://app/cancel",
+                user=user,
+            )
+
+            mock_stripe.create_customer.assert_called_once()
+
+
+# ============================================================================
+# Phase 6: API cancel_subscription tests
+# ============================================================================
+
+
+class TestCancelSubscriptionLogic:
+    """Tests for SubscriptionService.cancel_subscription."""
+
+    SVC = "app.apps.cubex_api.services.subscription"
+
+    @pytest.fixture
+    def service(self):
+        from app.apps.cubex_api.services.subscription import SubscriptionService
+
+        return SubscriptionService()
+
+    @pytest.mark.asyncio
+    async def test_cancel_at_period_end(self, service):
+        """Period-end cancel sets flag, does NOT freeze workspace."""
+        sub = MagicMock(
+            id=uuid4(),
+            stripe_subscription_id="sub_cancel_period",
+        )
+        updated_sub = MagicMock(id=sub.id)
+        mock_session = AsyncMock()
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.Stripe"
+        ) as mock_stripe, patch(f"{self.SVC}.workspace_db") as mock_ws_db, patch(
+            f"{self.SVC}.workspace_member_db"
+        ) as mock_member_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            mock_sub_db.update = AsyncMock(return_value=updated_sub)
+            mock_stripe.cancel_subscription = AsyncMock()
+
+            result = await service.cancel_subscription(
+                session=mock_session,
+                workspace_id=uuid4(),
+                cancel_at_period_end=True,
+            )
+
+            assert result is updated_sub
+            mock_stripe.cancel_subscription.assert_called_once_with(
+                "sub_cancel_period", cancel_at_period_end=True
+            )
+            # Should NOT freeze workspace
+            mock_ws_db.update_status.assert_not_called()
+            mock_member_db.disable_all_members.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cancel_immediately_freezes_workspace(self, service):
+        """Immediate cancel sets CANCELED, freezes workspace."""
+        workspace_id = uuid4()
+        sub = MagicMock(
+            id=uuid4(),
+            stripe_subscription_id="sub_cancel_now",
+        )
+        updated_sub = MagicMock(id=sub.id)
+        mock_session = AsyncMock()
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.Stripe"
+        ) as mock_stripe, patch(f"{self.SVC}.workspace_db") as mock_ws_db, patch(
+            f"{self.SVC}.workspace_member_db"
+        ) as mock_member_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            mock_sub_db.update = AsyncMock(return_value=updated_sub)
+            mock_stripe.cancel_subscription = AsyncMock()
+            mock_ws_db.update_status = AsyncMock()
+            mock_member_db.disable_all_members = AsyncMock()
+
+            result = await service.cancel_subscription(
+                session=mock_session,
+                workspace_id=workspace_id,
+                cancel_at_period_end=False,
+            )
+
+            assert result is updated_sub
+            update_data = mock_sub_db.update.call_args
+            data = (
+                update_data.args[2]
+                if len(update_data.args) > 2
+                else update_data.kwargs.get("data", {})
+            )
+            assert data["status"] == SubscriptionStatus.CANCELED
+            assert data["canceled_at"] is not None
+            # Workspace should be frozen
+            mock_ws_db.update_status.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_not_found_raises(self, service):
+        """Raises when no subscription found for workspace."""
+        from app.apps.cubex_api.services.subscription import (
+            SubscriptionNotFoundException,
+        )
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+
+            with pytest.raises(SubscriptionNotFoundException):
+                await service.cancel_subscription(
+                    session=AsyncMock(), workspace_id=uuid4()
+                )
+
+
+# ============================================================================
+# Phase 6: API reactivate_workspace tests
+# ============================================================================
+
+
+class TestReactivateWorkspaceLogic:
+    """Tests for SubscriptionService.reactivate_workspace."""
+
+    SVC = "app.apps.cubex_api.services.subscription"
+
+    @pytest.fixture
+    def service(self):
+        from app.apps.cubex_api.services.subscription import SubscriptionService
+
+        return SubscriptionService()
+
+    @pytest.mark.asyncio
+    async def test_happy_path_reactivates(self, service):
+        """Reactivates workspace and re-enables owner."""
+        from app.core.enums import WorkspaceStatus
+
+        workspace_id = uuid4()
+        owner_id = uuid4()
+        sub = MagicMock(
+            id=uuid4(),
+            seat_count=5,
+            stripe_subscription_id="sub_react",
+            status=SubscriptionStatus.ACTIVE,
+        )
+        owner_member = MagicMock(user_id=owner_id, is_owner=True, is_active=False)
+        workspace = MagicMock(id=workspace_id, owner_id=owner_id)
+        mock_session = AsyncMock()
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.workspace_member_db"
+        ) as mock_member_db, patch(f"{self.SVC}.workspace_db") as mock_ws_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            mock_member_db.get_workspace_members = AsyncMock(
+                return_value=[owner_member]
+            )
+            mock_ws_db.update_status = AsyncMock(return_value=workspace)
+
+            result = await service.reactivate_workspace(
+                session=mock_session,
+                workspace_id=workspace_id,
+            )
+
+            assert result is workspace
+            mock_ws_db.update_status.assert_called_once()
+            ws_args = mock_ws_db.update_status.call_args
+            assert ws_args.args[2] == WorkspaceStatus.ACTIVE
+
+    @pytest.mark.asyncio
+    async def test_too_many_members_raises(self, service):
+        """Raises when selected members exceed seat count."""
+        from app.apps.cubex_api.services.subscription import (
+            InvalidSeatCountException,
+        )
+
+        workspace_id = uuid4()
+        owner_id = uuid4()
+        sub = MagicMock(
+            id=uuid4(),
+            seat_count=2,  # Only 2 seats
+            stripe_subscription_id="sub_react",
+            status=SubscriptionStatus.ACTIVE,
+        )
+        owner_member = MagicMock(user_id=owner_id, is_owner=True)
+        member2 = MagicMock(user_id=uuid4(), is_owner=False)
+        member3 = MagicMock(user_id=uuid4(), is_owner=False)
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.workspace_member_db"
+        ) as mock_member_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            mock_member_db.get_workspace_members = AsyncMock(
+                return_value=[owner_member, member2, member3]
+            )
+
+            with pytest.raises(InvalidSeatCountException):
+                await service.reactivate_workspace(
+                    session=AsyncMock(),
+                    workspace_id=workspace_id,
+                    member_ids_to_enable=[member2.user_id, member3.user_id],
+                )
+
+    @pytest.mark.asyncio
+    async def test_not_found_raises(self, service):
+        """Raises when no active subscription found."""
+        from app.apps.cubex_api.services.subscription import (
+            SubscriptionNotFoundException,
+        )
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+
+            with pytest.raises(SubscriptionNotFoundException):
+                await service.reactivate_workspace(
+                    session=AsyncMock(), workspace_id=uuid4()
+                )
+
+
+# ============================================================================
+# Phase 6: API preview_subscription_change tests
+# ============================================================================
+
+
+class TestPreviewSubscriptionChangeLogic:
+    """Tests for SubscriptionService.preview_subscription_change."""
+
+    SVC = "app.apps.cubex_api.services.subscription"
+
+    @pytest.fixture
+    def service(self):
+        from app.apps.cubex_api.services.subscription import SubscriptionService
+
+        return SubscriptionService()
+
+    def _make_sub(self, plan_rank=1, seat_count=5):
+        plan = MagicMock(
+            id=uuid4(),
+            rank=plan_rank,
+            stripe_price_id="price_current",
+            seat_stripe_price_id="price_seat_current",
+            min_seats=1,
+            max_seats=50,
+        )
+        plan.name = "Current"
+        sub = MagicMock(
+            id=uuid4(),
+            stripe_subscription_id="sub_preview",
+            plan=plan,
+            plan_id=plan.id,
+            seat_count=seat_count,
+            status=SubscriptionStatus.ACTIVE,
+        )
+        sub.api_context = MagicMock(workspace_id=uuid4())
+        return sub
+
+    @pytest.mark.asyncio
+    async def test_plan_upgrade_preview(self, service):
+        """Previews a plan upgrade returning invoice."""
+        sub = self._make_sub(plan_rank=1)
+        new_plan = MagicMock(
+            id=uuid4(),
+            rank=2,
+            stripe_price_id="price_new",
+            seat_stripe_price_id="price_seat_new",
+            min_seats=1,
+            max_seats=50,
+            is_active=True,
+            is_deleted=False,
+            product_type=ProductType.API,
+        )
+        new_plan.name = "Enterprise"
+        invoice = MagicMock(amount_due=5000)
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.plan_db"
+        ) as mock_plan_db, patch(f"{self.SVC}.Stripe") as mock_stripe, patch(
+            f"{self.SVC}.workspace_member_db"
+        ):
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            mock_plan_db.get_by_id = AsyncMock(return_value=new_plan)
+            mock_stripe.preview_invoice = AsyncMock(return_value=invoice)
+
+            result = await service.preview_subscription_change(
+                session=AsyncMock(),
+                workspace_id=sub.api_context.workspace_id,
+                new_plan_id=new_plan.id,
+            )
+
+            assert result is invoice
+            mock_stripe.preview_invoice.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_same_plan_raises(self, service):
+        """Raises when target plan is the same."""
+        from app.apps.cubex_api.services.subscription import SamePlanException
+
+        sub = self._make_sub()
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.plan_db"
+        ) as mock_plan_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            same_plan = MagicMock(
+                id=sub.plan_id,
+                rank=1,
+                is_active=True,
+                is_deleted=False,
+                product_type=ProductType.API,
+            )
+            mock_plan_db.get_by_id = AsyncMock(return_value=same_plan)
+
+            with pytest.raises(SamePlanException):
+                await service.preview_subscription_change(
+                    session=AsyncMock(),
+                    workspace_id=uuid4(),
+                    new_plan_id=sub.plan_id,
+                )
+
+    @pytest.mark.asyncio
+    async def test_downgrade_raises(self, service):
+        """Raises when target plan has lower rank."""
+        from app.apps.cubex_api.services.subscription import (
+            PlanDowngradeNotAllowedException,
+        )
+
+        sub = self._make_sub(plan_rank=3)
+        lower_plan = MagicMock(
+            id=uuid4(),
+            rank=2,
+            stripe_price_id="price_lower",
+            min_seats=1,
+            max_seats=10,
+            is_active=True,
+            is_deleted=False,
+            product_type=ProductType.API,
+        )
+        lower_plan.name = "Lower"
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.plan_db"
+        ) as mock_plan_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            mock_plan_db.get_by_id = AsyncMock(return_value=lower_plan)
+
+            with pytest.raises(PlanDowngradeNotAllowedException):
+                await service.preview_subscription_change(
+                    session=AsyncMock(),
+                    workspace_id=uuid4(),
+                    new_plan_id=lower_plan.id,
+                )
+
+    @pytest.mark.asyncio
+    async def test_not_found_raises(self, service):
+        """Raises when subscription not found."""
+        from app.apps.cubex_api.services.subscription import (
+            SubscriptionNotFoundException,
+        )
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+
+            with pytest.raises(SubscriptionNotFoundException):
+                await service.preview_subscription_change(
+                    session=AsyncMock(),
+                    workspace_id=uuid4(),
+                    new_plan_id=uuid4(),
+                )
+
+
+# ============================================================================
+# Phase 6: API upgrade_plan tests
+# ============================================================================
+
+
+class TestUpgradePlanLogic:
+    """Tests for SubscriptionService.upgrade_plan."""
+
+    SVC = "app.apps.cubex_api.services.subscription"
+
+    @pytest.fixture
+    def service(self):
+        from app.apps.cubex_api.services.subscription import SubscriptionService
+
+        return SubscriptionService()
+
+    def _make_sub(self, plan_rank=1, seat_count=3):
+        plan = MagicMock(
+            id=uuid4(),
+            rank=plan_rank,
+            stripe_price_id="price_current",
+            seat_stripe_price_id="price_seat_current",
+        )
+        plan.name = "Current Plan"
+        ctx = MagicMock(workspace_id=uuid4())
+        sub = MagicMock(
+            id=uuid4(),
+            stripe_subscription_id="sub_upgrade",
+            plan=plan,
+            plan_id=plan.id,
+            seat_count=seat_count,
+            api_context=ctx,
+            current_period_start=datetime(2024, 1, 1, tzinfo=UTC),
+        )
+        return sub
+
+    @pytest.mark.asyncio
+    async def test_happy_path_upgrades(self, service):
+        """Successful upgrade updates Stripe and DB."""
+        sub = self._make_sub(plan_rank=1)
+        new_plan = MagicMock(
+            id=uuid4(),
+            rank=2,
+            stripe_price_id="price_enterprise",
+            seat_stripe_price_id="price_seat_enterprise",
+            max_seats=100,
+            is_active=True,
+            is_deleted=False,
+            product_type=ProductType.API,
+        )
+        new_plan.name = "Enterprise"
+        updated_sub = MagicMock(id=sub.id)
+        workspace = MagicMock()
+        workspace.display_name = "Test WS"
+        owner = MagicMock(email="owner@test.com", full_name="Owner")
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.plan_db"
+        ) as mock_plan_db, patch(f"{self.SVC}.Stripe") as mock_stripe, patch(
+            f"{self.SVC}.workspace_db"
+        ) as mock_ws_db, patch(
+            f"{self.SVC}.user_db"
+        ) as mock_user_db, patch(
+            f"{self.SVC}.publish_event"
+        ) as mock_publish:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            mock_plan_db.get_by_id = AsyncMock(return_value=new_plan)
+            mock_stripe.update_subscription = AsyncMock()
+            mock_sub_db.update = AsyncMock(return_value=updated_sub)
+            mock_ws_db.get_by_id = AsyncMock(return_value=workspace)
+            mock_user_db.get_by_id = AsyncMock(return_value=owner)
+            mock_publish.return_value = None
+
+            result = await service.upgrade_plan(
+                session=AsyncMock(),
+                workspace_id=sub.api_context.workspace_id,
+                new_plan_id=new_plan.id,
+            )
+
+            assert result is updated_sub
+            mock_stripe.update_subscription.assert_called_once()
+            # Verify DB updated with new plan_id
+            update_data = mock_sub_db.update.call_args
+            data = (
+                update_data.args[2]
+                if len(update_data.args) > 2
+                else update_data.kwargs.get("data", {})
+            )
+            assert data["plan_id"] == new_plan.id
+
+    @pytest.mark.asyncio
+    async def test_same_plan_raises(self, service):
+        """Raises when upgrading to same plan."""
+        from app.apps.cubex_api.services.subscription import SamePlanException
+
+        sub = self._make_sub()
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.plan_db"
+        ) as mock_plan_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            same_plan = MagicMock(
+                id=sub.plan_id,
+                rank=1,
+                is_active=True,
+                is_deleted=False,
+                product_type=ProductType.API,
+            )
+            mock_plan_db.get_by_id = AsyncMock(return_value=same_plan)
+
+            with pytest.raises(SamePlanException):
+                await service.upgrade_plan(
+                    session=AsyncMock(),
+                    workspace_id=uuid4(),
+                    new_plan_id=sub.plan_id,
+                )
+
+    @pytest.mark.asyncio
+    async def test_downgrade_raises(self, service):
+        """Raises when target plan rank is lower."""
+        from app.apps.cubex_api.services.subscription import (
+            PlanDowngradeNotAllowedException,
+        )
+
+        sub = self._make_sub(plan_rank=3)
+        lower_plan = MagicMock(
+            id=uuid4(),
+            rank=1,
+            stripe_price_id="price_low",
+            is_active=True,
+            is_deleted=False,
+            product_type=ProductType.API,
+        )
+        lower_plan.name = "Lower"
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.plan_db"
+        ) as mock_plan_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            mock_plan_db.get_by_id = AsyncMock(return_value=lower_plan)
+
+            with pytest.raises(PlanDowngradeNotAllowedException):
+                await service.upgrade_plan(
+                    session=AsyncMock(),
+                    workspace_id=uuid4(),
+                    new_plan_id=lower_plan.id,
+                )
+
+    @pytest.mark.asyncio
+    async def test_seats_exceed_new_plan_max_raises(self, service):
+        """Raises when current seat count exceeds new plan max."""
+        from app.apps.cubex_api.services.subscription import (
+            InvalidSeatCountException,
+        )
+
+        sub = self._make_sub(plan_rank=1, seat_count=20)
+        new_plan = MagicMock(
+            id=uuid4(),
+            rank=2,
+            stripe_price_id="price_new",
+            seat_stripe_price_id="price_seat_new",
+            max_seats=10,  # Less than current 20
+            is_active=True,
+            is_deleted=False,
+            product_type=ProductType.API,
+        )
+        new_plan.name = "New Plan"
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
+            f"{self.SVC}.plan_db"
+        ) as mock_plan_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
+            mock_plan_db.get_by_id = AsyncMock(return_value=new_plan)
+
+            with pytest.raises(InvalidSeatCountException):
+                await service.upgrade_plan(
+                    session=AsyncMock(),
+                    workspace_id=uuid4(),
+                    new_plan_id=new_plan.id,
+                )
+
+    @pytest.mark.asyncio
+    async def test_not_found_raises(self, service):
+        """Raises when subscription not found."""
+        from app.apps.cubex_api.services.subscription import (
+            SubscriptionNotFoundException,
+        )
+
+        with patch(f"{self.SVC}.subscription_db") as mock_sub_db:
+            mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
+
+            with pytest.raises(SubscriptionNotFoundException):
+                await service.upgrade_plan(
+                    session=AsyncMock(),
+                    workspace_id=uuid4(),
+                    new_plan_id=uuid4(),
+                )

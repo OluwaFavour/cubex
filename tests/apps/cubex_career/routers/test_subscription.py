@@ -7,6 +7,7 @@ Tests all Career subscription endpoints with real database and per-test rollback
 import pytest
 from httpx import AsyncClient
 from uuid import uuid4
+from unittest.mock import patch, AsyncMock
 
 from app.core.enums import SubscriptionStatus
 
@@ -338,32 +339,49 @@ class TestCancelCareerSubscription:
     async def test_cancel_career_subscription_at_period_end(
         self, authenticated_client: AsyncClient, paid_career_subscription
     ):
-        """Should handle cancel at period end request."""
+        """Should cancel subscription at period end when requested."""
         payload = {"cancel_at_period_end": True}
-        response = await authenticated_client.post(
-            "/career/subscriptions/cancel", json=payload
-        )
 
-        # May succeed or fail based on Stripe mock, check format
-        if response.status_code == 200:
-            data = response.json()
-            assert "message" in data
-            assert "success" in data
+        with patch(
+            "app.apps.cubex_career.services.subscription.Stripe.cancel_subscription",
+            new_callable=AsyncMock,
+        ) as mock_cancel:
+            response = await authenticated_client.post(
+                "/career/subscriptions/cancel", json=payload
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "period" in data["message"].lower()
+        mock_cancel.assert_called_once_with(
+            paid_career_subscription.stripe_subscription_id,
+            cancel_at_period_end=True,
+        )
 
     @pytest.mark.asyncio
     async def test_cancel_career_subscription_immediately(
         self, authenticated_client: AsyncClient, paid_career_subscription
     ):
-        """Should handle immediate cancel request."""
+        """Should cancel subscription immediately when requested."""
         payload = {"cancel_at_period_end": False}
-        response = await authenticated_client.post(
-            "/career/subscriptions/cancel", json=payload
-        )
 
-        # May succeed or fail based on Stripe mock, check format
-        if response.status_code == 200:
-            data = response.json()
-            assert "message" in data
+        with patch(
+            "app.apps.cubex_career.services.subscription.Stripe.cancel_subscription",
+            new_callable=AsyncMock,
+        ) as mock_cancel:
+            response = await authenticated_client.post(
+                "/career/subscriptions/cancel", json=payload
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "immediately" in data["message"].lower()
+        mock_cancel.assert_called_once_with(
+            paid_career_subscription.stripe_subscription_id,
+            cancel_at_period_end=False,
+        )
 
 
 # ============================================================================
