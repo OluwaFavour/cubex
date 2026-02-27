@@ -1018,6 +1018,41 @@ class TestCreateRequestFingerprint:
         # Both should produce the same hash since method is normalized to uppercase
         assert result_upper == result_lower
 
+    def test_different_feature_keys_different_hashes(self):
+        from app.core.utils import create_request_fingerprint
+
+        endpoint = "/v1/validate-usage"
+        method = "POST"
+        payload_hash = "a" * 64
+        usage_estimate = {"input_chars": 100, "max_output_tokens": 50, "model": "gpt-4"}
+
+        result1 = create_request_fingerprint(
+            endpoint,
+            method,
+            payload_hash,
+            usage_estimate,
+            feature_key="api.career_path",
+        )
+        result2 = create_request_fingerprint(
+            endpoint, method, payload_hash, usage_estimate, feature_key="api.job_match"
+        )
+
+        assert result1 != result2
+
+    def test_feature_key_none_vs_provided_different_hashes(self):
+        from app.core.utils import create_request_fingerprint
+
+        endpoint = "/v1/validate-usage"
+        method = "POST"
+        payload_hash = "a" * 64
+
+        result_none = create_request_fingerprint(endpoint, method, payload_hash)
+        result_with = create_request_fingerprint(
+            endpoint, method, payload_hash, feature_key="api.career_path"
+        )
+
+        assert result_none != result_with
+
     def test_endpoint_normalization_to_lowercase(self):
         from app.core.utils import create_request_fingerprint
 
@@ -1170,4 +1205,3 @@ class TestCreateRequestFingerprint:
 
         assert len(result) == 64
         assert all(c in "0123456789abcdef" for c in result)
-

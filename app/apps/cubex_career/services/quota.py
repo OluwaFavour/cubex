@@ -73,7 +73,6 @@ class CareerQuotaService:
     and the calling server is authenticated via X-Internal-API-Key.
     """
 
-
     def _calculate_billing_period(
         self,
         subscription_period_start: datetime | None,
@@ -315,7 +314,6 @@ class CareerQuotaService:
                 status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-
     async def validate_and_log_usage(
         self,
         session: AsyncSession,
@@ -367,6 +365,7 @@ class CareerQuotaService:
             method=method,
             payload_hash=payload_hash,
             usage_estimate=usage_estimate,
+            feature_key=feature_key.value if feature_key else None,
         )
         idempotent_result = await self._check_idempotency(
             session, user_id, request_id, fingerprint_hash
@@ -537,4 +536,3 @@ __all__ = [
     "career_quota_service",
     "RateLimitInfo",
 ]
-

@@ -97,7 +97,6 @@ class ResolvedAPIKey:
 class QuotaService:
     """Service for API usage validation and quota management."""
 
-
     def _generate_api_key(self, is_test_key: bool = False) -> tuple[str, str, str]:
         """
         Generate a new API key with its hash and prefix.
@@ -531,7 +530,6 @@ class QuotaService:
                 status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-
     async def create_api_key(
         self,
         session: AsyncSession,
@@ -659,7 +657,6 @@ class QuotaService:
 
         return revoked_key
 
-
     async def validate_and_log_usage(
         self,
         session: AsyncSession,
@@ -733,6 +730,7 @@ class QuotaService:
             method=method,
             payload_hash=payload_hash,
             usage_estimate=usage_estimate,
+            feature_key=feature_key.value if feature_key else None,
         )
         idempotent_result = await self._check_idempotency(
             session, workspace_id, request_id, fingerprint_hash
@@ -954,4 +952,3 @@ __all__ = [
     "TEST_API_KEY_PREFIX",
     "CLIENT_ID_PREFIX",
 ]
-

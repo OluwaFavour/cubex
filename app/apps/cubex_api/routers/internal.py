@@ -86,7 +86,7 @@ router = APIRouter(prefix="/internal", tags=["Internal API"])
     ```
     
     **Idempotency**: Uses request_id + fingerprint (computed from endpoint,
-    method, payload_hash, usage_estimate) for true idempotency.
+    method, payload_hash, usage_estimate, and feature_key) for true idempotency.
     - Same request_id + same fingerprint = return existing access_status
     - Same request_id + different fingerprint = create new record (different payload)
     
@@ -341,6 +341,13 @@ async def validate_usage(
     completes to mark the usage as SUCCESS (counts toward quota) or FAILED
     (does not count toward quota).
     
+    **Async Alternative (RabbitMQ)**: Instead of calling this endpoint
+    synchronously, the caller can publish the same `UsageCommitRequest`
+    payload as a JSON message to the **`usage_commits`** RabbitMQ queue.
+    The message will be processed asynchronously by the usage commit handler.
+    - Retry queue: `usage_commits_retry` (30 s TTL, max 3 retries)
+    - Dead-letter queue: `usage_commits_dead`
+    
     **Metrics (optional)**: When `success=True`, you can optionally provide
     metrics about the request:
     - `model_used`: Model identifier (e.g., "gpt-4o")
@@ -448,4 +455,3 @@ async def commit_usage(
 
 
 __all__ = ["router"]
-

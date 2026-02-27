@@ -486,6 +486,7 @@ def create_request_fingerprint(
     method: str,
     payload_hash: str,
     usage_estimate: dict | None = None,
+    feature_key: str | None = None,
 ) -> str:
     """
     Create a deterministic fingerprint hash for request idempotency.
@@ -503,6 +504,7 @@ def create_request_fingerprint(
         payload_hash: Hash of the request payload (provided by client).
         usage_estimate: Optional usage estimation dict with keys:
                        input_chars, max_output_tokens, model.
+        feature_key: Optional feature key string (e.g. "api.career_path").
 
     Returns:
         str: 64-character hexadecimal fingerprint hash.
@@ -526,6 +528,7 @@ def create_request_fingerprint(
         "method": method.upper().strip(),
         "payload_hash": payload_hash,
         "usage_estimate": None,
+        "feature_key": feature_key.lower().strip() if feature_key else None,
     }
 
     # Normalize usage_estimate if provided
@@ -648,4 +651,3 @@ async def write_to_file_async(file_path: str, data: str) -> None:
             f"Failed to write data to file {file_path}: {type(e).__name__} - {str(e)}"
         )
         raise
-

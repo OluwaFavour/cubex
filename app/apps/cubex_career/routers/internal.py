@@ -53,11 +53,12 @@ router = APIRouter(prefix="/internal", tags=["Career - Internal API"])
 
     This endpoint is called by the AI tool server to:
     1. Authenticate the user via JWT (Bearer token)
-    2. Check user-level rate limits (per-minute and per-day)
-    3. Check user quota (credits used vs credits_allocation)
-    4. Create a PENDING usage log for quota tracking
-    5. Calculate and reserve credits for billing
-    6. Return access granted/denied with a usage_id and credits_reserved
+    2. Verify the user has an active career subscription
+    3. Check user-level rate limits (per-minute and per-day)
+    4. Check user quota (credits used vs credits_allocation)
+    5. Create a PENDING usage log for quota tracking
+    6. Calculate and reserve credits for billing
+    7. Return access granted/denied with a usage_id and credits_reserved
 
     **Rate Limiting**: User-level rate limiting is enforced using sliding
     windows for both per-minute and per-day limits. Limits are configurable
@@ -74,14 +75,35 @@ router = APIRouter(prefix="/internal", tags=["Career - Internal API"])
     | `X-RateLimit-Reset-Day` | int | Unix timestamp when day window resets |
     | `Retry-After` | int | Seconds until rate limit resets (only on 429) |
 
+    **Note**: These headers are **not always present** (e.g., for idempotent
+    requests or early validation failures like 402). Use `.get()` to safely
+    access them.
+
     **Idempotency**: Uses request_id + fingerprint (computed from endpoint,
-    method, payload_hash, usage_estimate) for true idempotency.
+    method, payload_hash, usage_estimate, and feature_key) for true
+    idempotency.
+    - Same request_id + same fingerprint = return existing access_status
+    - Same request_id + different fingerprint = create new record
 
     The caller must then call /usage/commit to mark the usage as SUCCESS
     or FAILED after the request completes. PENDING logs that are not
     committed will be expired by a scheduled job.
 
+    **Quota Enforcement**: The system checks if the user has sufficient
+    credits remaining in the current billing period. If quota is exceeded,
+    access is denied with HTTP 429.
+
+    **Usage Estimate Validation**: If `usage_estimate` is provided, at least
+    one field must be set (input_chars, max_output_tokens, or model). Fields
+    are validated with bounds: input_chars (0-10M), max_output_tokens (0-2M),
+    model (max 100 chars).
+
     **Security**: Requires Bearer JWT token AND X-Internal-API-Key header.
+
+    **Status Codes**:
+    - 200: Access granted (quota available or idempotent request)
+    - 402: No active career subscription found
+    - 429: Rate limit exceeded (per-minute or per-day) OR quota exceeded
     """,
     responses={
         200: {
@@ -107,6 +129,25 @@ router = APIRouter(prefix="/internal", tags=["Career - Internal API"])
                                 "usage_id": "550e8400-e29b-41d4-a716-446655440000",
                                 "message": "Request already processed (idempotent). Access: granted",
                                 "credits_reserved": "1.50",
+                            },
+                        },
+                    }
+                }
+            },
+        },
+        402: {
+            "description": "No active career subscription",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "no_subscription": {
+                            "summary": "No Active Subscription",
+                            "value": {
+                                "access": "denied",
+                                "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "usage_id": None,
+                                "message": "No active career subscription found.",
+                                "credits_reserved": None,
                             },
                         },
                     }
@@ -270,6 +311,14 @@ async def validate_usage(
     completes to mark the usage as SUCCESS (counts toward quota) or FAILED
     (does not count toward quota).
 
+    **Async Alternative (RabbitMQ)**: Instead of calling this endpoint
+    synchronously, the caller can publish the same `UsageCommitRequest`
+    payload as a JSON message to the **`career_usage_commits`** RabbitMQ
+    queue. The message will be processed asynchronously by the career
+    usage commit handler.
+    - Retry queue: `career_usage_commits_retry` (30 s TTL, max 3 retries)
+    - Dead-letter queue: `career_usage_commits_dead`
+
     **Metrics (optional)**: When `success=True`, you can optionally provide
     metrics about the request:
     - `model_used`: Model identifier (e.g., "gpt-4o")
@@ -279,13 +328,17 @@ async def validate_usage(
 
     **Failure Details (required when success=False)**: When `success=False`,
     you MUST provide failure details:
-    - `failure_type`: Category of failure
+    - `failure_type`: Category of failure (internal_error, timeout,
+      rate_limited, invalid_response, upstream_error, client_error,
+      validation_error)
     - `reason`: Human-readable description (max 1000 chars)
 
     **Idempotent**: Safe to retry. If the usage log is already committed
     or doesn't exist, success is still returned.
 
-    **Security**: Requires X-Internal-API-Key header.
+    **Security**: Requires X-Internal-API-Key header. No JWT needed —
+    the `user_id` is passed in the request body and ownership is verified
+    against the usage log record.
     """,
     responses={
         200: {
@@ -376,4 +429,3 @@ async def commit_usage(
 
 
 __all__ = ["router"]
-
