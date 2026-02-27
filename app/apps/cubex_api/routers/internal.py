@@ -30,7 +30,7 @@ from app.apps.cubex_api.services.quota import quota_service
 from app.core.dependencies import get_async_session, InternalAPIKeyDep
 
 
-router = APIRouter(prefix="/internal", tags=["Internal API"])
+router = APIRouter(prefix="/internal")
 
 
 @router.post(

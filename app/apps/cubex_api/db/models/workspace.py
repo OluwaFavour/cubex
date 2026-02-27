@@ -107,14 +107,14 @@ class Workspace(BaseModel):
     owner: Mapped["User"] = relationship(
         "User",
         foreign_keys=[owner_id],
-        lazy="selectin",
+        lazy="raise",
     )
 
     members: Mapped[list["WorkspaceMember"]] = relationship(
         "WorkspaceMember",
         back_populates="workspace",
         cascade="all, delete-orphan",
-        lazy="selectin",
+        lazy="raise",
     )
 
     invitations: Mapped[list["WorkspaceInvitation"]] = relationship(
@@ -241,7 +241,7 @@ class WorkspaceMember(BaseModel):
     user: Mapped["User"] = relationship(
         "User",
         foreign_keys=[user_id],
-        lazy="selectin",
+        lazy="raise",
     )
 
     __table_args__ = (
@@ -741,4 +741,3 @@ class UsageLog(BaseModel):
 
 
 __all__ = ["Workspace", "WorkspaceMember", "WorkspaceInvitation", "APIKey", "UsageLog"]
-

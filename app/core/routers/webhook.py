@@ -6,7 +6,8 @@ Business logic is NOT handled here - only signature verification and event routi
 
 from typing import Any
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Request, Response, status
+from fastapi.responses import JSONResponse
 
 from app.core.config import webhook_logger
 from app.core.exceptions.types import BadRequestException
@@ -75,10 +76,6 @@ Configure the webhook URL in your Stripe Dashboard.
                             "summary": "Unhandled event type",
                             "value": {"status": "ignored"},
                         },
-                        "publish_failed": {
-                            "summary": "Failed to publish to queue",
-                            "value": {"status": "publish_failed"},
-                        },
                     }
                 }
             },
@@ -104,10 +101,19 @@ Configure the webhook URL in your Stripe Dashboard.
                 }
             },
         },
+        500: {
+            "description": "Internal error - event could not be queued; Stripe will retry",
+            "content": {
+                "application/json": {
+                    "example": {"status": "publish_failed"},
+                }
+            },
+        },
     },
     tags=["Webhooks"],
+    response_model=None,
 )
-async def handle_stripe_webhook(request: Request) -> dict[str, str]:
+async def handle_stripe_webhook(request: Request) -> dict[str, str] | Response:
     """
     Handle Stripe webhook events.
 
@@ -158,8 +164,12 @@ async def handle_stripe_webhook(request: Request) -> dict[str, str]:
         webhook_logger.info(f"Published {event_type} to queue {queue_name}")
     except Exception as e:
         webhook_logger.error(f"Failed to publish event {event_id} to queue: {e}")
-        # Still return 200 to prevent Stripe retries - we'll handle via dead letter
-        return {"status": "publish_failed"}
+        # Return 500 so Stripe retries the event (up to 72h with exponential backoff).
+        # This is safer than swallowing failures — Stripe has robust retry logic.
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"status": "publish_failed"},
+        )
 
     return {"status": "received"}
 
@@ -232,4 +242,3 @@ def _build_queue_message(
 
 
 __all__ = ["router"]
-

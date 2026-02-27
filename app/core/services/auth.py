@@ -125,7 +125,6 @@ class AuthService:
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     REFRESH_TOKEN_REMEMBER_DAYS: int = 30
 
-
     @classmethod
     def init(cls) -> None:
         """
@@ -150,7 +149,6 @@ class AuthService:
         """
         return cls._initialized
 
-
     @classmethod
     def hash_password(cls, password: str) -> str:
         """
@@ -162,13 +160,18 @@ class AuthService:
         Returns:
             str: The bcrypt hashed password.
 
+        Note:
+            bcrypt silently truncates at 72 bytes. We truncate explicitly
+            so hashing and verification are consistent.
+
         Example:
             >>> hashed = AuthService.hash_password("mypassword")
             >>> hashed.startswith("$2b$")
             True
         """
+        password_bytes = password.encode("utf-8")[:72]  # bcrypt 72-byte limit
         salt = bcrypt.gensalt()
-        hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+        hashed = bcrypt.hashpw(password_bytes, salt)
         return hashed.decode("utf-8")
 
     @classmethod
@@ -191,10 +194,10 @@ class AuthService:
             False
         """
         try:
-            return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+            password_bytes = password.encode("utf-8")[:72]  # bcrypt 72-byte limit
+            return bcrypt.checkpw(password_bytes, hashed.encode("utf-8"))
         except Exception:
             return False
-
 
     @classmethod
     def generate_otp(cls, length: int | None = None) -> str:
@@ -361,7 +364,6 @@ class AuthService:
         auth_logger.info(f"OTP verified: email={email}, purpose={purpose.value}")
         return True
 
-
     @classmethod
     async def email_signup(
         cls,
@@ -500,7 +502,6 @@ class AuthService:
 
         auth_logger.info(f"User signin: email={email}")
         return user
-
 
     @classmethod
     def get_oauth_provider(cls, provider: OAuthProviders) -> Type[BaseOAuthProvider]:
@@ -689,7 +690,6 @@ class AuthService:
         )
         return new_user
 
-
     @classmethod
     async def reset_password(
         cls,
@@ -752,7 +752,6 @@ class AuthService:
 
         auth_logger.info(f"Password reset: email={email}")
         return True
-
 
     @classmethod
     def hash_token(cls, token: str) -> str:
@@ -1104,4 +1103,3 @@ class AuthService:
 
         auth_logger.info(f"Password changed: email={user.email}")
         return True
-

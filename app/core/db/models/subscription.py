@@ -165,7 +165,7 @@ class Subscription(BaseModel):
         "APISubscriptionContext",
         back_populates="subscription",
         uselist=False,
-        lazy="selectin",
+        lazy="raise",
         cascade="all, delete-orphan",
     )
 
@@ -173,7 +173,7 @@ class Subscription(BaseModel):
         "CareerSubscriptionContext",
         back_populates="subscription",
         uselist=False,
-        lazy="selectin",
+        lazy="raise",
         cascade="all, delete-orphan",
     )
 
@@ -248,4 +248,3 @@ class StripeEventLog(BaseModel):
 
 
 __all__ = ["Subscription", "StripeEventLog"]
-

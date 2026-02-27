@@ -12,10 +12,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.services.quota_cache import QuotaCacheService
 from app.core.dependencies import CurrentActiveUser, get_async_session
 from app.core.config import request_logger
+from app.core.services.rate_limit import rate_limit_by_ip
 from app.core.exceptions.types import (
     BadRequestException,
     ConflictException,
@@ -70,9 +72,40 @@ from app.apps.cubex_api.db.models import (
     WorkspaceMember,
     WorkspaceInvitation,
 )
+from app.core.db.models import Subscription
+from app.core.db.models.subscription_context import APISubscriptionContext
 
 
 router = APIRouter(prefix="/workspaces")
+
+# Standard loaders for building workspace responses (_build_workspace_response)
+_WORKSPACE_RESPONSE_LOADERS = [
+    selectinload(Workspace.members),
+    selectinload(Workspace.api_subscription_context).selectinload(
+        APISubscriptionContext.subscription
+    ),
+]
+
+# Extended loaders for the workspace detail view (also needs member.user + api_context)
+_WORKSPACE_DETAIL_LOADERS = [
+    selectinload(Workspace.members).selectinload(WorkspaceMember.user),
+    selectinload(Workspace.api_subscription_context)
+    .selectinload(APISubscriptionContext.subscription)
+    .selectinload(Subscription.api_context),
+]
+
+# Rate limiters for workspace write operations
+# Create workspace: 10 req/hour per IP (prevent mass creation)
+_create_workspace_rate_limit = rate_limit_by_ip(limit=10, window=3600)
+
+# Send invitation: 20 req/hour per IP (prevent invitation spam)
+_invite_rate_limit = rate_limit_by_ip(limit=20, window=3600)
+
+# Transfer ownership: 5 req/hour per IP (sensitive operation)
+_transfer_rate_limit = rate_limit_by_ip(limit=5, window=3600)
+
+# Create API key: 10 req/hour per IP (prevent key flooding)
+_create_api_key_rate_limit = rate_limit_by_ip(limit=10, window=3600)
 
 
 async def _build_workspace_response(
@@ -270,6 +303,7 @@ async def create_workspace(
     data: WorkspaceCreate,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_create_workspace_rate_limit)],
 ) -> WorkspaceDetailResponse:
     """Create a new workspace."""
     request_logger.info(f"POST /workspaces - user={current_user.id}")
@@ -375,7 +409,11 @@ async def get_workspace(
         if not member:
             raise NotFoundException("Workspace not found or access denied.")
 
-        workspace = await workspace_service.get_workspace(session, workspace_id)
+        workspace = await workspace_service.get_workspace(
+            session,
+            workspace_id,
+            options=_WORKSPACE_DETAIL_LOADERS,
+        )
         members = workspace.members if workspace.members else []
 
         subscription = (
@@ -495,6 +533,10 @@ async def update_workspace(
                 slug=data.slug,
                 description=data.description,
                 commit_self=False,
+            )
+            # Reload with relationships needed for response
+            workspace = await workspace_service.get_workspace(
+                session, workspace.id, options=_WORKSPACE_RESPONSE_LOADERS
             )
             workspace_response = await _build_workspace_response(session, workspace)
             return workspace_response
@@ -693,6 +735,10 @@ async def update_member_status(
                 status=data.status,
                 commit_self=False,
             )
+            # Reload with .user for response building
+            member = await workspace_member_db.get_member(
+                session, workspace_id, member_user_id
+            )
             return _build_member_response(member)
     except PermissionDeniedException as e:
         raise ForbiddenException(str(e.message)) from e
@@ -787,6 +833,10 @@ async def update_member_role(
                 admin_user_id=current_user.id,
                 role=data.role,
                 commit_self=False,
+            )
+            # Reload with .user for response building
+            member = await workspace_member_db.get_member(
+                session, workspace_id, member_user_id
             )
             return _build_member_response(member)
     except PermissionDeniedException as e:
@@ -1044,6 +1094,7 @@ async def transfer_ownership(
     new_owner_id: UUID,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_transfer_rate_limit)],
 ) -> WorkspaceResponse:
     """Transfer workspace ownership to another member."""
     request_logger.info(
@@ -1058,6 +1109,10 @@ async def transfer_ownership(
                 current_owner_id=current_user.id,
                 new_owner_id=new_owner_id,
                 commit_self=False,
+            )
+            # Reload with relationships needed for response
+            workspace = await workspace_service.get_workspace(
+                session, workspace.id, options=_WORKSPACE_RESPONSE_LOADERS
             )
             workspace_response = await _build_workspace_response(session, workspace)
             return workspace_response
@@ -1234,6 +1289,7 @@ async def create_invitation(
     data: InvitationCreate,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_invite_rate_limit)],
 ) -> InvitationCreatedResponse:
     """Invite a user to join the workspace."""
     request_logger.info(
@@ -1452,6 +1508,10 @@ async def accept_invitation(
                 user=current_user,
                 commit_self=False,
             )
+            # Reload with .user for response building
+            member = await workspace_member_db.get_member(
+                session, member.workspace_id, member.user_id
+            )
             return _build_member_response(member)
     except InvitationNotFoundException as e:
         raise NotFoundException(str(e.message)) from e
@@ -1516,6 +1576,10 @@ async def activate_personal_workspace(
                 user=current_user,
                 commit_self=False,
             )
+        )
+        # Reload with relationships needed for response
+        workspace = await workspace_service.get_workspace(
+            session, workspace.id, options=_WORKSPACE_RESPONSE_LOADERS
         )
         workspace_response = await _build_workspace_response(session, workspace)
 
@@ -1627,6 +1691,7 @@ async def create_api_key(
     data: APIKeyCreate,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_create_api_key_rate_limit)],
 ) -> APIKeyCreatedResponse:
     """Create a new API key for the workspace."""
     request_logger.info(

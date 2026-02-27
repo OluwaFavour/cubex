@@ -1,5 +1,4 @@
-
-
+import hmac
 from typing import Annotated
 
 from fastapi import Depends, Header
@@ -38,7 +37,7 @@ async def verify_internal_api_key(
         request_logger.warning("Internal API request missing X-Internal-API-Key header")
         raise InvalidInternalAPIKeyException("Missing X-Internal-API-Key header.")
 
-    if x_internal_api_key != settings.INTERNAL_API_SECRET:
+    if not hmac.compare_digest(x_internal_api_key, settings.INTERNAL_API_SECRET):
         request_logger.warning("Internal API request with invalid API key")
         raise InvalidInternalAPIKeyException("Invalid internal API key.")
 
@@ -56,4 +55,3 @@ __all__ = [
     # Exceptions
     "InvalidInternalAPIKeyException",
 ]
-

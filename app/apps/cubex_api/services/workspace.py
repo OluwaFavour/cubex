@@ -511,6 +511,7 @@ class WorkspaceService:
         self,
         session: AsyncSession,
         workspace_id: UUID,
+        options: list | None = None,
     ) -> Workspace:
         """
         Get workspace by ID.
@@ -518,6 +519,7 @@ class WorkspaceService:
         Args:
             session: Database session.
             workspace_id: Workspace ID.
+            options: Optional SQLAlchemy loader options (e.g. selectinload).
 
         Returns:
             Workspace.
@@ -525,7 +527,9 @@ class WorkspaceService:
         Raises:
             WorkspaceNotFoundException: If workspace not found.
         """
-        workspace = await workspace_db.get_by_id(session, workspace_id)
+        workspace = await workspace_db.get_by_id(
+            session, workspace_id, options=options or []
+        )
         if not workspace or workspace.is_deleted:
             raise WorkspaceNotFoundException()
         return workspace

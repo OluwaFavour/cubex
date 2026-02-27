@@ -77,7 +77,7 @@ class User(BaseModel):
             "CareerSubscriptionContext",
             back_populates="user",
             uselist=False,
-            lazy="selectin",
+            lazy="raise",
             cascade="all, delete-orphan",
         )
     )
@@ -115,4 +115,3 @@ class OAuthAccount(BaseModel):
         "User",
         back_populates="oauth_accounts",
     )
-

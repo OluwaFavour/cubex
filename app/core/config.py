@@ -2,6 +2,7 @@ from functools import lru_cache
 import logging
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.logger import setup_logger, init_sentry
@@ -16,7 +17,7 @@ class Settings(BaseSettings):
     APP_DESCRIPTION: str = """
     CueBX
     """
-    DEBUG: bool = True
+    DEBUG: bool = False
     ROOT_PATH: str = "/v1"
 
     USER_SOFT_DELETE_RETENTION_DAYS: int = 30
@@ -86,7 +87,7 @@ class Settings(BaseSettings):
     # Sentry settings
     SENTRY_DSN: str = ""
     SENTRY_ENVIRONMENT: str = "development"
-    SENTRY_TRACES_SAMPLE_RATE: float = 1.0
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
 
     # Stripe settings
     STRIPE_API_KEY: str = "your_stripe_api_key"
@@ -115,6 +116,37 @@ class Settings(BaseSettings):
         env_file=".env",
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        """Ensure insecure default secrets are overridden in production."""
+        if self.ENVIRONMENT != "production":
+            return self
+
+        insecure_defaults: dict[str, str] = {
+            "SESSION_SECRET_KEY": "supersecretkey",
+            "JWT_SECRET_KEY": "another_supersecret_key",
+            "OTP_HMAC_SECRET": "otp_hmac_secret_key_change_in_production",
+            "INTERNAL_API_SECRET": "internal_api_secret_change_in_production",
+            "ADMIN_PASSWORD": "admin_password_change_in_production",
+            "STRIPE_WEBHOOK_SECRET": "your_stripe_webhook_secret",
+            "STRIPE_API_KEY": "your_stripe_api_key",
+        }
+
+        still_default = [
+            name
+            for name, default_val in insecure_defaults.items()
+            if getattr(self, name) == default_val
+        ]
+
+        if still_default:
+            raise ValueError(
+                f"ENVIRONMENT is 'production' but the following secrets still "
+                f"have their insecure default values: {', '.join(still_default)}. "
+                f"Set them via environment variables or .env file."
+            )
+
+        return self
 
 
 @lru_cache()
@@ -263,4 +295,3 @@ __all__ = [
     "usage_logger",
     "career_logger",
 ]
-

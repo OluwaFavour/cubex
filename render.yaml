@@ -35,11 +35,19 @@ services:
         value: production
       - key: PORT
         value: "8000"
+      - key: DEBUG
+        value: "false"
       - key: DATABASE_URL
         sync: false  # Set manually in dashboard
       - key: SESSION_SECRET_KEY
         generateValue: true
-      - key: ACCESS_TOKEN_SECRET_KEY
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: OTP_HMAC_SECRET
+        generateValue: true
+      - key: INTERNAL_API_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD
         generateValue: true
       - key: REDIS_URL
         sync: false  # Set manually in dashboard
@@ -47,13 +55,99 @@ services:
         sync: false  # Set manually in dashboard
       - key: SENTRY_DSN
         sync: false  # Optional: Set in dashboard
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.1"
+      - key: STRIPE_API_KEY
+        sync: false  # Set manually in dashboard
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false  # Set manually in dashboard
       - key: BREVO_API_KEY
         sync: false  # Set manually in dashboard
-      - key: GOOGLE_OAUTH_CLIENT_ID
+      - key: GOOGLE_CLIENT_ID
         sync: false  # Set manually in dashboard
-      - key: GOOGLE_OAUTH_CLIENT_SECRET
+      - key: GOOGLE_CLIENT_SECRET
         sync: false  # Set manually in dashboard
-      - key: GITHUB_OAUTH_CLIENT_ID
+      - key: GITHUB_CLIENT_ID
         sync: false  # Set manually in dashboard
-      - key: GITHUB_OAUTH_CLIENT_SECRET
+      - key: GITHUB_CLIENT_SECRET
         sync: false  # Set manually in dashboard
+
+  # --------------------------------------------------------------------------
+  # Worker - RabbitMQ Message Consumer (processes Stripe webhooks, etc.)
+  # --------------------------------------------------------------------------
+  - type: worker
+    name: cubex-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    region: oregon
+    autoDeploy: true
+    dockerCommand: python -m app.infrastructure.messaging.main
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          name: cubex-api
+          type: web
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          name: cubex-api
+          type: web
+          envVarKey: REDIS_URL
+      - key: RABBITMQ_URL
+        fromService:
+          name: cubex-api
+          type: web
+          envVarKey: RABBITMQ_URL
+      - key: STRIPE_API_KEY
+        fromService:
+          name: cubex-api
+          type: web
+          envVarKey: STRIPE_API_KEY
+      - key: BREVO_API_KEY
+        fromService:
+          name: cubex-api
+          type: web
+          envVarKey: BREVO_API_KEY
+      - key: ENABLE_SCHEDULER
+        value: "false"
+      - key: ENABLE_MESSAGING
+        value: "true"
+
+  # --------------------------------------------------------------------------
+  # Scheduler - APScheduler Background Jobs (cleanup, usage log expiry)
+  # --------------------------------------------------------------------------
+  - type: worker
+    name: cubex-scheduler
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    region: oregon
+    autoDeploy: true
+    dockerCommand: python -m app.infrastructure.scheduler.main
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          name: cubex-api
+          type: web
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          name: cubex-api
+          type: web
+          envVarKey: REDIS_URL
+      - key: BREVO_API_KEY
+        fromService:
+          name: cubex-api
+          type: web
+          envVarKey: BREVO_API_KEY
+      - key: ENABLE_SCHEDULER
+        value: "true"
+      - key: ENABLE_MESSAGING
+        value: "false"

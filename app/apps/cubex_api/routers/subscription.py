@@ -11,11 +11,12 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentActiveUser, get_async_session
 from app.core.config import request_logger
+from app.core.services.rate_limit import rate_limit_by_ip
 from app.apps.cubex_api.db.crud import workspace_member_db
 from app.apps.cubex_api.schemas import (
     PlanResponse,
@@ -45,6 +46,19 @@ from app.core.db.crud import api_subscription_context_db
 
 
 router = APIRouter(prefix="/subscriptions")
+
+# Rate limiters for subscription endpoints
+# Public plan listing: 30 req/min per IP (prevent scraping)
+_list_plans_rate_limit = rate_limit_by_ip(limit=30, window=60)
+
+# Checkout: 10 req/hour per IP (prevent payment abuse)
+_checkout_rate_limit = rate_limit_by_ip(limit=10, window=3600)
+
+# Cancel: 5 req/hour per IP (prevent abuse)
+_cancel_rate_limit = rate_limit_by_ip(limit=5, window=3600)
+
+# Upgrade: 10 req/hour per IP (prevent abuse)
+_upgrade_rate_limit = rate_limit_by_ip(limit=10, window=3600)
 
 
 def _build_plan_response(plan: Plan) -> PlanResponse:
@@ -174,6 +188,7 @@ Returns a list of plans, each containing:
 )
 async def list_plans(
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_list_plans_rate_limit)],
 ) -> PlanListResponse:
     """List all active plans available for purchase."""
     request_logger.info("GET /subscriptions/plans")
@@ -394,6 +409,7 @@ async def create_checkout(
     data: CheckoutRequest,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_checkout_rate_limit)],
 ) -> CheckoutResponse:
     """Create a Stripe checkout session for subscription."""
     request_logger.info(
@@ -611,6 +627,7 @@ async def cancel_subscription(
     data: CancelSubscriptionRequest,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_cancel_rate_limit)],
 ) -> SubscriptionResponse:
     """Cancel workspace subscription."""
     request_logger.info(
@@ -994,6 +1011,7 @@ async def upgrade_plan(
     data: UpgradeRequest,
     current_user: CurrentActiveUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    _: Annotated[None, Depends(_upgrade_rate_limit)],
 ) -> SubscriptionResponse:
     """Upgrade subscription to a different plan."""
     request_logger.info(

@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.apps.cubex_api.db.crud import (
     workspace_db,
@@ -611,6 +612,11 @@ class SubscriptionService:
         if stripe_sub.canceled_at:
             updates["canceled_at"] = stripe_sub.canceled_at
 
+        # Capture workspace_id before update replaces object (lazy='raise')
+        workspace_id: UUID | None = None
+        if subscription.product_type == ProductType.API and subscription.api_context:
+            workspace_id = subscription.api_context.workspace_id
+
         subscription = await subscription_db.update(
             session, subscription.id, updates, commit_self=False
         )
@@ -620,10 +626,6 @@ class SubscriptionService:
                 f"Failed to update subscription for Stripe ID: {stripe_subscription_id}"
             )
             return None
-
-        workspace_id: UUID | None = None
-        if subscription.product_type == ProductType.API and subscription.api_context:
-            workspace_id = subscription.api_context.workspace_id
 
         # Handle workspace status based on subscription status
         if workspace_id:
@@ -1291,7 +1293,9 @@ class SubscriptionService:
             f"{current_plan.name} -> {new_plan.name}"
         )
 
-        workspace = await workspace_db.get_by_id(session, workspace_id)
+        workspace = await workspace_db.get_by_id(
+            session, workspace_id, options=[selectinload(Workspace.owner)]
+        )
         if workspace and workspace.owner:
             await publish_event(
                 "subscription_activated_emails",
@@ -1331,4 +1335,3 @@ __all__ = [
     "PlanDowngradeNotAllowedException",
     "SamePlanException",
 ]
-

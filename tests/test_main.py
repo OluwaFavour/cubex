@@ -54,7 +54,7 @@ class TestAppConfiguration:
         assert app.version == "1.0.0"
 
     def test_app_debug_mode(self):
-        assert app.debug is True
+        assert app.debug is False
 
     def test_app_openapi_url(self):
         assert app.openapi_url == "/openapi.json"
@@ -733,4 +733,3 @@ class TestMiddleware:
         # Check if session cookie exists (might not be set on simple GET)
         # This is more of a smoke test
         assert response.status_code == 200
-

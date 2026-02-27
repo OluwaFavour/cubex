@@ -117,6 +117,9 @@ class SubscriptionDB(BaseDB[Subscription]):
         """
         Get subscription by Stripe subscription ID.
 
+        Eagerly loads ``api_context`` and ``career_context`` so callers
+        can inspect the related workspace/user without extra queries.
+
         Args:
             session: Database session.
             stripe_subscription_id: Stripe Subscription ID.
@@ -130,6 +133,10 @@ class SubscriptionDB(BaseDB[Subscription]):
                 "stripe_subscription_id": stripe_subscription_id,
                 "is_deleted": False,
             },
+            options=[
+                joinedload(Subscription.api_context),
+                joinedload(Subscription.career_context),
+            ],
         )
 
     async def get_by_stripe_customer_id(
@@ -236,4 +243,3 @@ class StripeEventLogDB(BaseDB[StripeEventLog]):
 
 
 __all__ = ["SubscriptionDB", "StripeEventLogDB"]
-

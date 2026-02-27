@@ -77,14 +77,14 @@ class APISubscriptionContext(BaseModel):
         "Subscription",
         foreign_keys=[subscription_id],
         back_populates="api_context",
-        lazy="selectin",
+        lazy="raise",
     )
 
     workspace: Mapped["Workspace"] = relationship(
         "Workspace",
         foreign_keys=[workspace_id],
         back_populates="api_subscription_context",
-        lazy="selectin",
+        lazy="raise",
     )
 
     __table_args__ = (
@@ -155,14 +155,14 @@ class CareerSubscriptionContext(BaseModel):
         "Subscription",
         foreign_keys=[subscription_id],
         back_populates="career_context",
-        lazy="selectin",
+        lazy="raise",
     )
 
     user: Mapped["User"] = relationship(
         "User",
         foreign_keys=[user_id],
         back_populates="career_subscription_context",
-        lazy="selectin",
+        lazy="raise",
     )
 
     __table_args__ = (
@@ -178,4 +178,3 @@ class CareerSubscriptionContext(BaseModel):
 
 
 __all__ = ["APISubscriptionContext", "CareerSubscriptionContext"]
-

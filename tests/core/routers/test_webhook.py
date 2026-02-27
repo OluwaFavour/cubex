@@ -379,8 +379,8 @@ class TestStripeWebhookEndpoint:
                 },
             )
 
-        # Should still return 200 to prevent Stripe retries
-        assert response.status_code == 200
+        # Should return 500 so Stripe retries delivery
+        assert response.status_code == 500
         assert response.json()["status"] == "publish_failed"
 
 
@@ -636,4 +636,3 @@ class TestModuleExports:
 
         assert isinstance(EVENT_QUEUE_MAPPING, dict)
         assert len(EVENT_QUEUE_MAPPING) > 0
-

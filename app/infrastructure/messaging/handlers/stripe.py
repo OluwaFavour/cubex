@@ -8,6 +8,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.config import stripe_logger
 from app.core.db import AsyncSessionLocal
@@ -17,8 +18,10 @@ from app.core.db.crud import (
     user_db,
     api_subscription_context_db,
     career_subscription_context_db,
+    stripe_event_log_db,
 )
 from app.core.db.models import Subscription
+from app.apps.cubex_api.db.models import Workspace
 from app.core.enums import ProductType
 from app.core.services import RedisService
 from app.apps.cubex_api.services import subscription_service as api_subscription_service
@@ -47,6 +50,22 @@ async def _mark_event_as_processed(event_id: str) -> None:
     await RedisService.set_if_not_exists(key, "1", ttl=STRIPE_EVENT_TTL)
 
 
+async def _log_event_to_db(event_id: str, event_type: str) -> None:
+    """Persist a processed Stripe event to the DB for durable audit trail.
+
+    This complements the Redis-based deduplication with a permanent record.
+    Failures here are logged but never block the handler — Redis remains
+    the primary deduplication mechanism.
+    """
+    try:
+        async with AsyncSessionLocal.begin() as session:
+            await stripe_event_log_db.mark_event_processed(
+                session, event_id=event_id, event_type=event_type, commit_self=False
+            )
+    except Exception as e:
+        stripe_logger.warning(f"Failed to persist event log for {event_id}: {e}")
+
+
 async def _get_career_user_email_info(
     session: AsyncSession, subscription_id: UUID
 ) -> tuple[str, str] | None:
@@ -71,7 +90,9 @@ async def _get_api_workspace_owner_email_info(
     )
     if not context:
         return None
-    workspace = await workspace_db.get_by_id(session, context.workspace_id)
+    workspace = await workspace_db.get_by_id(
+        session, context.workspace_id, options=[selectinload(Workspace.owner)]
+    )
     if not workspace or not workspace.owner:
         return None
     return (
@@ -380,6 +401,7 @@ async def handle_stripe_checkout_completed(event: dict[str, Any]) -> None:
                 event["seat_count"],
             )
         await _mark_event_as_processed(event_id)
+        await _log_event_to_db(event_id, "checkout.session.completed")
     except Exception as e:
         entity_id = event.get("user_id") or event.get("workspace_id")
         stripe_logger.error(f"Failed to process checkout for {entity_id}: {e}")
@@ -405,6 +427,7 @@ async def handle_stripe_subscription_updated(event: dict[str, Any]) -> None:
     try:
         await _process_subscription_update(stripe_subscription_id)
         await _mark_event_as_processed(event_id)
+        await _log_event_to_db(event_id, "customer.subscription.updated")
     except Exception as e:
         stripe_logger.error(
             f"Failed to process subscription updated {stripe_subscription_id}: {e}"
@@ -432,6 +455,7 @@ async def handle_stripe_subscription_deleted(event: dict[str, Any]) -> None:
     try:
         await _process_subscription_deletion(stripe_subscription_id)
         await _mark_event_as_processed(event_id)
+        await _log_event_to_db(event_id, "customer.subscription.deleted")
     except Exception as e:
         stripe_logger.error(
             f"Failed to process subscription deleted {stripe_subscription_id}: {e}"
@@ -467,6 +491,7 @@ async def handle_stripe_payment_failed(event: dict[str, Any]) -> None:
         stripe_logger.error(f"Failed to queue payment failed email: {e}")
 
     await _mark_event_as_processed(event_id)
+    await _log_event_to_db(event_id, "invoice.payment_failed")
 
 
 __all__ = [
@@ -475,4 +500,3 @@ __all__ = [
     "handle_stripe_subscription_deleted",
     "handle_stripe_payment_failed",
 ]
-

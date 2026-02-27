@@ -296,9 +296,8 @@ class Plan(BaseModel):
         "PlanPricingRule",
         back_populates="plan",
         uselist=False,
-        lazy="selectin",
+        lazy="raise",
     )
 
 
 __all__ = ["Plan", "FeatureSchema"]
-
