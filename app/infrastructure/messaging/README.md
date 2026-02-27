@@ -1,4 +1,4 @@
-# CubeX Messaging Infrastructure
+# CueBX Messaging Infrastructure
 
 A robust, async RabbitMQ-based messaging system for background job processing with built-in retry logic and dead-letter queue support.
 

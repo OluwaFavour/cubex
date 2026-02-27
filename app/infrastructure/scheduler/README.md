@@ -1,4 +1,4 @@
-# CubeX Scheduler Infrastructure
+# CueBX Scheduler Infrastructure
 
 A robust, async APScheduler-based task scheduler for running background jobs with persistent storage, graceful shutdown, and flexible execution modes.
 
@@ -184,7 +184,7 @@ def schedule_pending_refunds_job(minutes: int):
 | `REDIS_URL` | Redis connection string | ✅ | `redis://redis:6379/0` |
 | `BREVO_API_KEY` | Brevo email service API key | ✅ | - |
 | `BREVO_SENDER_EMAIL` | Email sender address | ✅ | - |
-| `BREVO_SENDER_NAME` | Email sender display name | ❌ | `CubeX` |
+| `BREVO_SENDER_NAME` | Email sender display name | ❌ | `CueBX` |
 | `ENABLE_SCHEDULER` | Toggle scheduler on/off in FastAPI | ❌ | `True` |
 
 ### Dedicated Logger

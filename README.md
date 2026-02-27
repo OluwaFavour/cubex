@@ -11,6 +11,7 @@ A multi-product SaaS platform that provides AI-powered developer tools and caree
 
 - [Tech Stack](#tech-stack)
 - [Architecture Overview](#architecture-overview)
+- [Database Schema](#database-schema)
 - [Flow Diagrams](#flow-diagrams)
   - [Authentication](#authentication-flow)
   - [Workspace Lifecycle](#workspace-lifecycle)
@@ -23,10 +24,12 @@ A multi-product SaaS platform that provides AI-powered developer tools and caree
 - [Docker](#docker)
 - [CLI Reference](#cli-reference)
 - [API Endpoints](#api-endpoints)
+- [API Error Conventions](#api-error-conventions)
 - [Environment Variables](#environment-variables)
 - [Testing](#testing)
 - [Deployment](#deployment)
 - [Contributing](#contributing)
+- [Security](#security)
 - [License](#license)
 - [Submodule Docs](#submodule-docs)
 
@@ -96,6 +99,125 @@ A multi-product SaaS platform that provides AI-powered developer tools and caree
    └──────────────────────┘          │   • Usage handlers    │
                                       └──────────────────────┘
 ```
+
+---
+
+## Database Schema
+
+16 models across 18 tables. All models inherit from `BaseModel` which provides `id` (UUID PK), `created_at`, `updated_at`, `is_deleted`, `deleted_at`.
+
+```text
+┌──────────────────────┐
+│        User          │
+│ ──────────────────── │
+│ email (unique)       │
+│ email_verified       │
+│ full_name            │
+│ avatar_url           │
+│ password_hash        │
+│ is_active            │
+│ stripe_customer_id   │
+└──────────┬───────────┘
+           │
+     ┌─────┼──────────────────────────────────────────┐
+     │     │                                           │
+     ▼     ▼                                           ▼
+┌─────────────────┐ ┌──────────────────┐  ┌──────────────────────────┐
+│  OAuthAccount   │ │  RefreshToken    │  │  CareerSubscriptionCtx   │
+│ ─────────────── │ │ ──────────────── │  │ ────────────────────────  │
+│ provider        │ │ token_hash       │  │ subscription_id (FK)──┐  │
+│ provider_acct_id│ │ expires_at       │  │ user_id (FK)          │  │
+│ user_id (FK)    │ │ device_info      │  │ credits_used          │  │
+└─────────────────┘ │ revoked_at       │  └───────────────────────┼──┘
+                    │ user_id (FK)     │                          │
+                    └──────────────────┘                          │
+                                                                  ▼
+┌──────────────────────┐                           ┌──────────────────────┐
+│       OTPToken       │                           │     Subscription     │
+│ ──────────────────── │                           │ ──────────────────── │
+│ email                │                           │ plan_id (FK)─────┐   │
+│ code_hash            │                           │ product_type     │   │
+│ purpose              │                           │ stripe_sub_id    │   │
+│ expires_at           │                           │ status           │   │
+│ attempts             │                           │ seat_count       │   │
+│ user_id (FK)         │                           │ current_period_* │   │
+└──────────────────────┘                           │ cancel_at_end    │   │
+                                                   │ amount           │   │
+                              ┌─────────────────── └──────────────────┼───┘
+                              │                                       │
+                              ▼                                       ▼
+                ┌──────────────────────────┐            ┌──────────────────────┐
+                │  APISubscriptionContext   │            │        Plan          │
+                │ ──────────────────────── │            │ ──────────────────── │
+                │ subscription_id (FK)     │            │ name                 │
+                │ workspace_id (FK)────┐   │            │ description          │
+                │ credits_used         │   │            │ price / display_price│
+                └──────────────────────┼───┘            │ stripe_price_id      │
+                                       │                │ seat_price           │
+                                       ▼                │ product_type         │
+┌────────────────────────────────────────────────┐      │ type (free/paid)     │
+│                   Workspace                    │      │ features (JSONB)     │
+│ ────────────────────────────────────────────── │      │ max_seats, min_seats │
+│ display_name, slug (unique), description       │      │ rank                 │
+│ owner_id (FK → User), status, is_personal      │      └──────────┬───────────┘
+└─────┬──────────────┬──────────────┬────────────┘                 │
+      │              │              │                               ▼
+      ▼              ▼              ▼                  ┌──────────────────────┐
+┌────────────┐ ┌──────────────┐ ┌─────────┐          │   PlanPricingRule    │
+│ Workspace  │ │  Workspace   │ │ APIKey  │          │ ──────────────────── │
+│ Member     │ │  Invitation  │ │ ─────── │          │ plan_id (FK)         │
+│ ────────── │ │ ──────────── │ │ name    │          │ multiplier           │
+│ workspace  │ │ workspace    │ │ key_hash│          │ credits_allocation   │
+│ _id (FK)   │ │ _id (FK)     │ │ prefix  │          │ rate_limit_per_min   │
+│ user_id    │ │ email        │ │ expires │          │ rate_limit_per_day   │
+│ (FK)       │ │ token_hash   │ │ _at     │          └──────────────────────┘
+│ role       │ │ role         │ │ is_test │
+│ status     │ │ status       │ │ _key    │     ┌──────────────────────┐
+│ joined_at  │ │ expires_at   │ │ scopes  │     │  FeatureCostConfig   │
+└────────────┘ │ inviter_id   │ │workspace│     │ ──────────────────── │
+               │ (FK)         │ │ _id(FK) │     │ feature_key          │
+               └──────────────┘ └────┬────┘     │ product_type         │
+                                     │          │ internal_cost_credits│
+                    ┌────────────────┘          └──────────────────────┘
+                    ▼
+         ┌─────────────────────┐              ┌──────────────────────┐
+         │      UsageLog       │              │   CareerUsageLog     │
+         │ ─────────────────── │              │ ──────────────────── │
+         │ api_key_id (FK)     │              │ user_id (FK)         │
+         │ workspace_id (FK)   │              │ subscription_id (FK) │
+         │ request_id          │              │ request_id           │
+         │ feature_key         │              │ feature_key          │
+         │ credits_reserved    │              │ credits_reserved     │
+         │ credits_charged     │              │ credits_charged      │
+         │ status (PENDING →   │              │ status               │
+         │   SUCCESS/FAILED/   │              │ model_used, tokens,  │
+         │   EXPIRED)          │              │ latency_ms           │
+         │ model_used, tokens, │              │ failure_type/reason  │
+         │ latency_ms          │              └──────────────────────┘
+         │ failure_type/reason │
+         └─────────────────────┘    ┌──────────────────────┐
+                                    │   StripeEventLog     │
+         ┌─────────────────────┐    │ ──────────────────── │
+         │    SalesRequest     │    │ event_id (unique)    │
+         │ ─────────────────── │    │ event_type           │
+         │ first_name          │    │ processed_at         │
+         │ last_name, email    │    └──────────────────────┘
+         │ message, status     │
+         └─────────────────────┘
+```
+
+### Key Relationships
+
+| Relationship | Type | Description |
+| --- | --- | --- |
+| User → OAuthAccount | 1:N | A user can have multiple OAuth providers linked |
+| User → RefreshToken | 1:N | Multiple active sessions per user |
+| User → CareerSubscriptionContext → Subscription | 1:1:1 | One career subscription per user (via context) |
+| Workspace → APISubscriptionContext → Subscription | 1:1:1 | One API subscription per workspace (via context) |
+| Workspace → WorkspaceMember | 1:N | Multiple members per workspace |
+| Workspace → APIKey → UsageLog | 1:N:N | Keys scoped to workspace, logs scoped to key |
+| Plan → PlanPricingRule | 1:1 | Each plan has one pricing/quota configuration |
+| Subscription → Plan | N:1 | Multiple subscriptions reference the same plan |
 
 ---
 
@@ -624,6 +746,75 @@ The API is organized into 8 route groups with 53 endpoints total:
 
 ---
 
+## API Error Conventions
+
+### Standard Error Response
+
+All errors return a JSON body with a `detail` field:
+
+```json
+{
+  "detail": "Human-readable error message"
+}
+```
+
+### Stripe-specific Errors
+
+Stripe errors include additional fields:
+
+```json
+{
+  "detail": "Your card was declined",
+  "stripe_code": "card_declined",
+  "decline_code": "insufficient_funds",
+  "param": "payment_method"
+}
+```
+
+### HTTP Status Codes
+
+| Code | Exception | When |
+| ------ | ----------- | ------ |
+| 400 | `BadRequestException`, `OTPExpiredException`, `OTPInvalidException`, `OAuthException` | Invalid input or expired/invalid OTP |
+| 401 | `AuthenticationException` | Missing/invalid JWT. Response includes `WWW-Authenticate: Bearer` header |
+| 402 | `PaymentRequiredException`, `StripeCardException` | Subscription required or card declined |
+| 403 | `ForbiddenException` | Insufficient permissions (wrong role, workspace frozen, etc.) |
+| 404 | `NotFoundException` | Resource not found or user not a member of workspace |
+| 409 | `ConflictException`, `IdempotencyException` | Duplicate resource or idempotent replay |
+| 422 | (FastAPI built-in) | Request body validation failure |
+| 429 | `RateLimitExceededException`, `TooManyAttemptsException` | Rate limit hit. Response includes `Retry-After` header (seconds) |
+| 500 | `DatabaseException` | Internal server error |
+| 501 | `NotImplementedException` | Feature not yet implemented |
+| 502 | `StripeAPIException` | Stripe API unreachable or returned an error |
+
+### Rate Limiting Headers
+
+When a rate limit is exceeded, the response includes:
+
+```text
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+Content-Type: application/json
+
+{"detail": "Rate limit exceeded. Try again in 60 seconds."}
+```
+
+### Authentication
+
+All protected endpoints require a Bearer token:
+
+```text
+Authorization: Bearer <access_token>
+```
+
+Service-to-service (internal) endpoints use a separate header:
+
+```text
+X-Internal-API-Key: <INTERNAL_API_SECRET>
+```
+
+---
+
 ## Environment Variables
 
 ### Application
@@ -643,7 +834,7 @@ The API is organized into 8 route groups with 53 endpoints total:
 | `REDIS_URL` | Redis connection string | `redis://localhost:6379/0` |
 | `RABBITMQ_URL` | RabbitMQ AMQP connection string | `amqp://guest:guest@localhost:5672//` |
 
-### Authentication
+### Auth Secrets
 
 | Variable | Description | Default |
 | ---------- | ------------- | --------- |
@@ -763,60 +954,24 @@ GitHub Actions runs the full test suite on every push/PR to `main` and `dev`. Se
 
 ## Contributing
 
-### Branch naming
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full guide — branch naming, Conventional Commits format, code style (Black / Ruff / Pyright), pre-commit checks, testing requirements, PR process, and project conventions.
 
-Use the following prefixes when creating branches:
+Quick start:
 
-| Prefix | Purpose | Example |
-| -------- | --------- | --------- |
-| `feature/` | New features | `feature/dlq-dashboard` |
-| `fix/` | Bug fixes | `fix/scheduler-auth-failure` |
-| `refactor/` | Code restructuring | `refactor/quota-cache-pattern` |
+```bash
+git checkout dev && git pull origin dev
+git checkout -b feature/my-feature
+# ... make changes ...
+pytest tests/ -x -q --tb=short
+git push origin feature/my-feature
+# Open a PR targeting dev
+```
 
-### Workflow
+---
 
-1. **Sync with `dev`** — always pull the latest `dev` before starting work.
+## Security
 
-   ```bash
-   git checkout dev
-   git pull origin dev
-   ```
-
-2. **Create a branch from `dev`** — never branch from `main` directly.
-
-   ```bash
-   git checkout -b feature/my-feature
-   ```
-
-3. **Make your changes** — write tests for new functionality, ensure existing tests pass.
-
-   ```bash
-   pytest tests/ -x -q --tb=short
-   ```
-
-4. **Sync with `dev` before pushing** — rebase or merge to resolve conflicts early.
-
-   ```bash
-   git fetch origin dev
-   git rebase origin/dev
-   ```
-
-5. **Push and create a Pull Request** — target `dev` as the base branch.
-
-   ```bash
-   git push origin feature/my-feature
-   ```
-
-6. **PR requirements:**
-   - All tests pass in CI
-   - Descriptive PR title and description
-   - Link to any related GitHub issues
-
-### Code style
-
-- **Formatter:** Black
-- **Linter:** Ruff
-- **Type checker:** Pyright
+See **[SECURITY.md](SECURITY.md)** for the vulnerability reporting policy, scope, and an inventory of security controls.
 
 ---
 
@@ -830,6 +985,12 @@ Use the following prefixes when creating branches:
 
 Detailed documentation for specific subsystems:
 
+- **[CueBX API Product](app/apps/cubex_api/README.md)** — Workspace endpoints, services, access guards, schemas, adding new features
+- **[CueBX Career Product](app/apps/cubex_career/README.md)** — Career subscription endpoints, services, schemas, API vs Career comparison
 - **[Messaging Infrastructure](app/infrastructure/messaging/README.md)** — RabbitMQ queues, retry strategies, DLQ, handlers, consumer setup
 - **[Scheduler Infrastructure](app/infrastructure/scheduler/README.md)** — APScheduler jobs, job stores, standalone mode, Docker usage
+- **[Database Migrations](migrations/README.md)** — Migration workflow, naming conventions, troubleshooting
 - **[Test Suite](tests/README.md)** — Fixtures, endpoint testing guide, coverage, writing tests
+- **[Contributing Guide](CONTRIBUTING.md)** — Git workflow, commit conventions, code style, PR process
+- **[Security Policy](SECURITY.md)** — Vulnerability reporting, scope, security controls
+- **[Architecture Decision Records](docs/adr/README.md)** — 8 ADRs documenting key technical choices (services, async DB, RabbitMQ, OTP hashing, Docker, quota cache, admin auth, module structure)
