@@ -351,7 +351,7 @@ Include:
 
 ### Service pattern
 
-Services are class-based singletons that inherit from `SingletonService`. Initialize via `ClassName.init()` in lifespan:
+Services that are initialised once at startup (e.g. `AuthService`, `QuotaCacheService`) inherit from `SingletonService` and expose a `classmethod` `init()` called in the lifespan:
 
 ```python
 from app.core.services.base import SingletonService
@@ -364,32 +364,47 @@ class MyService(SingletonService):
 
     @classmethod
     def do_something(cls) -> str:
-        cls._ensure_initialized()
+        if not cls._initialized:
+            raise RuntimeError("MyService not initialised")
         return cls._config
 ```
 
-`SingletonService` provides `_initialized`, `_ensure_initialized()`, and `_reset()` (for test teardown) automatically.
+`SingletonService` provides `_initialized`, `is_initialized()`, and `_reset()` (for test teardown) automatically.
+
+Not every service inherits `SingletonService` — stateless helpers like `CloudinaryService`, `BrevoService`, and `RedisService` are plain classes with class-level state and do not need the lifecycle guard.
 
 ### CRUD pattern
 
-Database operations go in `db/crud/` modules. Each CRUD module is a class with `@staticmethod` methods taking an `AsyncSession`:
+Database operations go in `db/crud/` modules. Each CRUD class inherits from `BaseDB[T]`, a generic base that provides `get_by_id`, `get_all`, `create`, `update`, `delete`, and other common operations. Subclasses add domain-specific queries as **instance methods**:
 
 ```python
-class WorkspaceCRUD:
-    @staticmethod
-    async def get_by_id(session: AsyncSession, workspace_id: UUID) -> Workspace | None:
+from app.core.db.crud.base import BaseDB
+
+class WorkspaceDB(BaseDB[Workspace]):
+    def __init__(self) -> None:
+        super().__init__(model=Workspace)
+
+    async def get_by_slug(
+        self, session: AsyncSession, slug: str
+    ) -> Workspace | None:
         ...
+
+# Module-level singleton used throughout the app
+workspace_db = WorkspaceDB()
 ```
+
+Consumers import the pre-created instance (e.g. `from app.apps.cubex_api.db.crud import workspace_db`).
 
 ### Router pattern
 
 Routers follow FastAPI conventions. Each endpoint function should:
 
 1. Extract dependencies (auth, session, access guards)
-2. Delegate to a service method
+2. Delegate to a **service** for writes/business logic, or call a **CRUD instance** directly for simple reads
 3. Return a Pydantic response model
 
 ```python
+# Write — delegate to a service
 @router.post("/{workspace_id}/api-keys")
 async def create_api_key(
     workspace_id: UUID,
@@ -399,6 +414,15 @@ async def create_api_key(
 ) -> APIKeyCreatedResponse:
     member, workspace = member_workspace
     return await quota_service.create_api_key(session, workspace, body)
+
+# Read — CRUD directly is fine
+@router.get("/{workspace_id}/members")
+async def list_members(
+    workspace_id: UUID,
+    session: AsyncSession = Depends(get_async_session),
+) -> list[WorkspaceMemberResponse]:
+    members = await workspace_member_db.get_workspace_members(session, workspace_id)
+    return [_build_member_response(m) for m in members]
 ```
 
 ### Import ordering
