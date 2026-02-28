@@ -1,7 +1,7 @@
 # CueBX
 
 ![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)
-[![Tests](https://github.com/OluwaFavour/cubex/actions/workflows/tests.yml/badge.svg)](https://github.com/OluwaFavour/cubex/actions/workflows/tests.yml)
+[![Tests](https://github.com/OluwaFavour/cubex/actions/workflows/ci.yml/badge.svg)](https://github.com/OluwaFavour/cubex/actions/workflows/ci.yml)
 
 A multi-product SaaS platform that provides AI-powered developer tools and career services through a unified API. CueBX ships two products — **CueBX API** (workspace-based developer tooling with team collaboration, role-based access, and per-seat billing) and **CueBX Career** (an individual subscription service for AI-assisted career development).
 
