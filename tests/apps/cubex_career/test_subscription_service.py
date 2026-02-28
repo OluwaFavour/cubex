@@ -444,7 +444,7 @@ class TestHandleCheckoutCompleted:
         ) as mock_user_db, patch(
             "app.apps.cubex_career.services.subscription.plan_db"
         ) as mock_plan_db, patch(
-            "app.apps.cubex_career.services.subscription.publish_event"
+            "app.apps.cubex_career.services.subscription.get_publisher", return_value=AsyncMock()
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -492,7 +492,7 @@ class TestHandleCheckoutCompleted:
         ) as mock_user_db, patch(
             "app.apps.cubex_career.services.subscription.plan_db"
         ) as mock_plan_db, patch(
-            "app.apps.cubex_career.services.subscription.publish_event"
+            "app.apps.cubex_career.services.subscription.get_publisher", return_value=AsyncMock()
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -541,7 +541,7 @@ class TestHandleCheckoutCompleted:
         ) as mock_user_db, patch(
             "app.apps.cubex_career.services.subscription.plan_db"
         ) as mock_plan_db, patch(
-            "app.apps.cubex_career.services.subscription.publish_event"
+            "app.apps.cubex_career.services.subscription.get_publisher", return_value=AsyncMock()
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -588,7 +588,7 @@ class TestHandleCheckoutCompleted:
         ) as mock_user_db, patch(
             "app.apps.cubex_career.services.subscription.plan_db"
         ) as mock_plan_db, patch(
-            "app.apps.cubex_career.services.subscription.publish_event"
+            "app.apps.cubex_career.services.subscription.get_publisher", return_value=AsyncMock()
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -637,9 +637,9 @@ class TestHandleCheckoutCompleted:
         ) as mock_user_db, patch(
             "app.apps.cubex_career.services.subscription.plan_db"
         ) as mock_plan_db, patch(
-            "app.apps.cubex_career.services.subscription.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+            "app.apps.cubex_career.services.subscription.get_publisher",
+            return_value=AsyncMock(),
+        ) as mock_get_pub:
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
             mock_sub_db.get_by_user = AsyncMock(return_value=None)
@@ -658,8 +658,9 @@ class TestHandleCheckoutCompleted:
                 plan_id=plan_id,
             )
 
-            mock_publish.assert_called_once()
-            payload = mock_publish.call_args[0][1]
+            mock_publisher = mock_get_pub.return_value
+            mock_publisher.assert_called_once()
+            payload = mock_publisher.call_args[0][1]
             assert payload["email"] == "career@test.com"
             assert payload["plan_name"] == "Career Plus"
             assert payload["workspace_name"] is None

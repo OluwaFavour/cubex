@@ -170,14 +170,18 @@ QUEUE_CONFIG = [
 
 ### 3. Publish an Event
 
-```python
-from app.infrastructure.messaging import publish_event
+**From application code** (routers, services in `core/` or `apps/`), use the event publisher abstraction:
 
-await publish_event(
+```python
+from app.core.services.event_publisher import get_publisher
+
+await get_publisher()(
     queue_name="welcome_emails",
     event={"email": "user@example.com", "name": "John Doe"},
 )
 ```
+
+> **Note:** The direct import `from app.infrastructure.messaging import publish_event` is reserved for infrastructure-internal code and the `register_publisher()` call in `app/main.py`. Application code should always use `get_publisher()` to maintain the layer boundary (see [ADR-008](../../docs/adr/008-core-apps-infrastructure-split.md)).
 
 ### 4. Start the Consumer
 
@@ -218,16 +222,23 @@ connection = await get_connection()
 
 ### Basic Usage
 
+**Application code** (routers, services) should use the abstract publisher:
+
 ```python
-from app.infrastructure.messaging import publish_event
+from app.core.services.event_publisher import get_publisher
 
 # Simple event
-await publish_event(
+await get_publisher()(
     queue_name="notifications",
     event={"user_id": 123, "message": "Hello!"},
 )
+```
 
-# With custom headers
+**Infrastructure-internal code** (handlers, consumers) can use the direct import:
+
+```python
+from app.infrastructure.messaging import publish_event
+
 await publish_event(
     queue_name="analytics",
     event={"action": "page_view", "page": "/home"},

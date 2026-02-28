@@ -51,8 +51,6 @@ from app.core.exceptions.types import (
     StripeCardException,
     TooManyAttemptsException,
 )
-from app.infrastructure.messaging import start_consumers
-from app.infrastructure.scheduler import scheduler, initialize_scheduler
 from app.core.services import BrevoService, CloudinaryService, Renderer, RedisService
 from app.core.services.auth import AuthService
 from app.core.services.oauth import GoogleOAuthService, GitHubOAuthService
@@ -71,6 +69,15 @@ from app.core.db import AsyncSessionLocal
 from app.core.services import QuotaCacheService
 from app.core.utils import generate_openapi_json, write_to_file_async
 from app.admin import init_admin
+from app.infrastructure.scheduler import scheduler, initialize_scheduler
+from app.infrastructure.messaging import start_consumers, publish_event
+from app.infrastructure.messaging.connection import get_connection
+from app.core.services.event_publisher import register_publisher
+from app.core.services.lifecycle import register_post_signup_hook
+from app.apps.cubex_api.services.workspace import WorkspaceService
+from app.apps.cubex_career.services.subscription import (
+    CareerSubscriptionService,
+)
 
 
 @asynccontextmanager
@@ -134,8 +141,27 @@ async def lifespan(app: FastAPI):
         app_logger.info("Starting message consumers...")
         consumer_connection = await start_consumers(keep_alive=False)
         app_logger.info("Message consumers started successfully.")
+
+        # Register the concrete publisher so core/app code can publish events
+        # without importing infrastructure directly.
+        register_publisher(publish_event)
     else:
         app_logger.info("Messaging disabled via ENABLE_MESSAGING setting.")
+
+    # Register post-signup hooks from each app
+    app_logger.info("Registering post-signup hooks...")
+
+    async def _create_personal_workspace(session, user):  # type: ignore[no-untyped-def]
+        ws_svc = WorkspaceService()
+        await ws_svc.create_personal_workspace(session, user, commit_self=False)
+
+    async def _create_career_subscription(session, user):  # type: ignore[no-untyped-def]
+        career_svc = CareerSubscriptionService()
+        await career_svc.create_free_subscription(session, user, commit_self=False)
+
+    register_post_signup_hook(_create_personal_workspace)
+    register_post_signup_hook(_create_career_subscription)
+    app_logger.info("Post-signup hooks registered.")
 
     app_logger.info("Initializing template renderer...")
     Renderer.initialize("app/templates")
@@ -275,6 +301,7 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
     Checks:
         - Database connectivity
         - Redis connectivity
+        - RabbitMQ connectivity (when messaging is enabled)
     """
     health_status = {
         "status": "ok",
@@ -282,6 +309,7 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
         "checks": {
             "database": "ok",
             "redis": "ok",
+            **({"rabbitmq": "ok"} if settings.ENABLE_MESSAGING else {}),
         },
     }
 
@@ -306,6 +334,17 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
         health_status["checks"]["redis"] = "unhealthy"
         health_status["status"] = "degraded"
 
+    if settings.ENABLE_MESSAGING:
+        try:
+            conn = await get_connection()
+            if conn.is_closed:
+                health_status["checks"]["rabbitmq"] = "unhealthy"
+                health_status["status"] = "degraded"
+        except Exception as e:
+            app_logger.error(f"RabbitMQ health check failed: {e}")
+            health_status["checks"]["rabbitmq"] = "unhealthy"
+            health_status["status"] = "degraded"
+
     # Return 503 if any check failed
     if health_status["status"] != "ok":
         raise AppException(
@@ -315,4 +354,3 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_async_sessio
         )
 
     return health_status
-

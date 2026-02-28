@@ -127,6 +127,7 @@ Most endpoints require a **Bearer JWT** obtained via `/auth/signin` or `/auth/oa
     # Admin settings
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin_password_change_in_production"
+    ADMIN_TOKEN_VERSION: int = 0  # Increment to invalidate all admin sessions
     ADMIN_ALERT_EMAIL: str | None = (
         None  # Email for system alerts (DLQ, validation errors)
     )
@@ -163,6 +164,19 @@ Most endpoints require a **Bearer JWT** obtained via `/auth/signin` or `/auth/oa
                 f"ENVIRONMENT is 'production' but the following secrets still "
                 f"have their insecure default values: {', '.join(still_default)}. "
                 f"Set them via environment variables or .env file."
+            )
+
+        # Ensure production uses Redis-backed backends (not in-memory)
+        memory_backends = [
+            name
+            for name in ("QUOTA_CACHE_BACKEND", "RATE_LIMIT_BACKEND")
+            if getattr(self, name) == "memory"
+        ]
+        if memory_backends:
+            raise ValueError(
+                f"ENVIRONMENT is 'production' but the following backends are "
+                f"set to 'memory': {', '.join(memory_backends)}. "
+                f"Set them to 'redis' for multi-replica safety."
             )
 
         return self

@@ -23,6 +23,7 @@ from typing import Any
 
 from app.core.config import email_manager_logger, settings
 from app.core.enums import OTPPurpose
+from app.core.services.base import SingletonService
 from app.core.services.brevo import BrevoService, Contact, ListContact
 from app.core.services.template import Renderer
 
@@ -30,7 +31,7 @@ from app.core.services.template import Renderer
 __all__ = ["EmailManagerService"]
 
 
-class EmailManagerService:
+class EmailManagerService(SingletonService):
     """
     Centralized email management service.
 
@@ -51,8 +52,6 @@ class EmailManagerService:
         True
     """
 
-    _initialized: bool = False
-
     @classmethod
     def init(cls) -> None:
         """
@@ -67,16 +66,6 @@ class EmailManagerService:
         """
         cls._initialized = True
         email_manager_logger.info("EmailManagerService initialized")
-
-    @classmethod
-    def is_initialized(cls) -> bool:
-        """
-        Check if the service has been initialized.
-
-        Returns:
-            bool: True if initialized, False otherwise.
-        """
-        return cls._initialized
 
     @classmethod
     def _get_purpose_display_text(cls, purpose: OTPPurpose) -> str:
@@ -647,4 +636,3 @@ class EmailManagerService:
             context=context,
             recipient_name="Admin",
         )
-

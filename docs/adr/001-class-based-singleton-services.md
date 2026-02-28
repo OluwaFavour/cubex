@@ -56,5 +56,7 @@ Services are initialized in the FastAPI `lifespan` function and torn down in rev
 **Negative:**
 
 - Class-level mutable state is technically global state (harder to isolate in parallel tests)
-- `_initialized` guard adds boilerplate to every method
+- ~~`_initialized` guard adds boilerplate to every method~~ — mitigated: boilerplate extracted into a `SingletonService` base class (`app/core/services/base.py`) that provides `_initialized`, `_ensure_initialized()`, and `_reset()`; services now inherit from it
 - Cannot have two instances with different configs (not needed currently)
+
+> **Update (2026-02):** An autouse `_reset_singletons` test fixture now calls `ServiceClass._reset()` on all singletons after each test, ensuring clean state isolation without manual `_initialized = True` hacks.

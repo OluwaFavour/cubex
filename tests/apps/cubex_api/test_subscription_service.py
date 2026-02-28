@@ -821,7 +821,7 @@ class TestHandleCheckoutCompletedAmount:
         ) as mock_user_db, patch(
             "app.apps.cubex_api.services.subscription.plan_db"
         ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.publish_event"
+            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
         ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -885,7 +885,7 @@ class TestHandleCheckoutCompletedAmount:
         ) as mock_user_db, patch(
             "app.apps.cubex_api.services.subscription.plan_db"
         ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.publish_event"
+            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
         ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -1006,7 +1006,7 @@ class TestHandleCheckoutCompletedLogic:
         ) as mock_ctx_db, patch(
             "app.apps.cubex_api.services.subscription.user_db"
         ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.publish_event"
+            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1057,7 +1057,7 @@ class TestHandleCheckoutCompletedLogic:
         ) as mock_ctx_db, patch(
             "app.apps.cubex_api.services.subscription.user_db"
         ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.publish_event"
+            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1110,7 +1110,7 @@ class TestHandleCheckoutCompletedLogic:
         ) as mock_ctx_db, patch(
             "app.apps.cubex_api.services.subscription.user_db"
         ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.publish_event"
+            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1163,7 +1163,7 @@ class TestHandleCheckoutCompletedLogic:
         ) as mock_ctx_db, patch(
             "app.apps.cubex_api.services.subscription.user_db"
         ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.publish_event"
+            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1214,9 +1214,9 @@ class TestHandleCheckoutCompletedLogic:
         ) as mock_ctx_db, patch(
             "app.apps.cubex_api.services.subscription.user_db"
         ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+            "app.apps.cubex_api.services.subscription.get_publisher",
+            return_value=AsyncMock(),
+        ) as mock_get_pub:
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -1238,8 +1238,9 @@ class TestHandleCheckoutCompletedLogic:
                 seat_count=5,
             )
 
-            mock_publish.assert_called_once()
-            payload = mock_publish.call_args[0][1]
+            mock_publisher = mock_get_pub.return_value
+            mock_publisher.assert_called_once()
+            payload = mock_publisher.call_args[0][1]
             assert payload["email"] == "owner@test.com"
             assert payload["plan_name"] == "Professional"
             assert payload["workspace_name"] == "Test WS"
@@ -2234,15 +2235,14 @@ class TestUpgradePlanLogic:
         ) as mock_ws_db, patch(
             f"{self.SVC}.user_db"
         ) as mock_user_db, patch(
-            f"{self.SVC}.publish_event"
-        ) as mock_publish:
+            f"{self.SVC}.get_publisher", return_value=AsyncMock()
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             mock_plan_db.get_by_id = AsyncMock(return_value=new_plan)
             mock_stripe.update_subscription = AsyncMock()
             mock_sub_db.update = AsyncMock(return_value=updated_sub)
             mock_ws_db.get_by_id = AsyncMock(return_value=workspace)
             mock_user_db.get_by_id = AsyncMock(return_value=owner)
-            mock_publish.return_value = None
 
             result = await service.upgrade_plan(
                 session=AsyncMock(),

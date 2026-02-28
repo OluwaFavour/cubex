@@ -42,14 +42,15 @@ class AdminAuth(AuthenticationBackend):
     @staticmethod
     def _create_token(secret_key: str) -> str:
         """
-        Create a signed token containing credentials hash and timestamp.
+        Create a signed token containing credentials hash, version, and timestamp.
 
-        Token format (base64 encoded): credentials_hash:timestamp:signature
+        Token format (base64 encoded): credentials_hash:version:timestamp:signature
         """
         timestamp = int(time.time())
         credentials_hash = AdminAuth._get_credentials_hash()
+        version = str(settings.ADMIN_TOKEN_VERSION)
 
-        message = f"{credentials_hash}:{timestamp}"
+        message = f"{credentials_hash}:{version}:{timestamp}"
 
         # Sign with HMAC-SHA256
         signature = hmac.new(
@@ -63,7 +64,7 @@ class AdminAuth(AuthenticationBackend):
     @staticmethod
     def _validate_token(token: str, secret_key: str) -> bool:
         """
-        Validate a token by checking signature, credentials hash, and expiry.
+        Validate a token by checking signature, version, credentials hash, and expiry.
 
         Returns True if token is valid, False otherwise.
         """
@@ -72,13 +73,17 @@ class AdminAuth(AuthenticationBackend):
             decoded = base64.urlsafe_b64decode(token.encode()).decode()
             parts = decoded.split(":")
 
-            if len(parts) != 3:
+            if len(parts) != 4:
                 return False
 
-            credentials_hash, timestamp_str, signature = parts
+            credentials_hash, version_str, timestamp_str, signature = parts
             timestamp = int(timestamp_str)
 
             if time.time() - timestamp > TOKEN_MAX_AGE:
+                return False
+
+            # Check token version (increment ADMIN_TOKEN_VERSION to revoke all)
+            if version_str != str(settings.ADMIN_TOKEN_VERSION):
                 return False
 
             # (invalidates token if password changed)
@@ -86,7 +91,7 @@ class AdminAuth(AuthenticationBackend):
             if not hmac.compare_digest(credentials_hash, expected_hash):
                 return False
 
-            message = f"{credentials_hash}:{timestamp_str}"
+            message = f"{credentials_hash}:{version_str}:{timestamp_str}"
             expected_signature = hmac.new(
                 secret_key.encode(), message.encode(), hashlib.sha256
             ).hexdigest()[:32]
@@ -165,4 +170,3 @@ class AdminAuth(AuthenticationBackend):
 
 # Singleton instance
 admin_auth = AdminAuth(secret_key=settings.SESSION_SECRET_KEY)
-

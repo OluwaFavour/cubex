@@ -911,7 +911,8 @@ class TestAcceptInvitation:
         """Should accept invitation and join workspace."""
         import secrets
         from datetime import datetime, timedelta, timezone
-        from app.core.db.models import User, WorkspaceInvitation
+        from app.core.db.models import User
+        from app.apps.cubex_api.db.models.workspace import WorkspaceInvitation
         from app.core.config import settings
         from app.core.utils import hmac_hash_otp
         from tests.conftest import create_test_access_token
@@ -1034,4 +1035,3 @@ class TestActivatePersonalWorkspace:
         response = await client.post("/api/workspaces/activate")
 
         assert response.status_code == 401
-

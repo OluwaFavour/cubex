@@ -25,7 +25,7 @@ from app.core.exceptions.types import (
     NotFoundException,
 )
 from app.core.services.payment.stripe.main import Stripe
-from app.infrastructure.messaging.publisher import publish_event
+from app.core.services.event_publisher import get_publisher
 from app.core.services.payment.stripe.types import (
     CheckoutSession,
     Invoice,
@@ -387,7 +387,7 @@ class CareerSubscriptionService:
         user = await user_db.get_by_id(session, user_id)
         plan = await plan_db.get_by_id(session, plan_id)
         if user and plan:
-            await publish_event(
+            await get_publisher()(
                 "subscription_activated_emails",
                 {
                     "email": user.email,
@@ -861,4 +861,3 @@ __all__ = [
     "CareerPlanDowngradeNotAllowedException",
     "CareerSamePlanException",
 ]
-

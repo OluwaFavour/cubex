@@ -50,11 +50,11 @@ This project implements the following security controls:
 - **OTPs** — HMAC-SHA256 hashed, rate-limited (5 max attempts), short-lived (10 min)
 - **JWT** — signed with HS256, 15-minute access tokens, refresh token rotation
 - **API keys** — HMAC-SHA256 hashed, never stored in plaintext
-- **Admin auth** — HMAC-signed stateless tokens with 24h expiry, auto-invalidated on password change
+- **Admin auth** — HMAC-signed stateless tokens with version counter and 24h expiry, auto-invalidated on password change or `ADMIN_TOKEN_VERSION` increment
 - **Stripe webhooks** — signature verification on every event
 - **Internal API** — separate `X-Internal-API-Key` header for service-to-service calls
-- **Rate limiting** — per-IP, per-user, per-endpoint, per-email (pluggable memory/Redis backends)
-- **Production startup validation** — app refuses to start with default secrets when `ENVIRONMENT=production`
+- **Rate limiting** — per-IP, per-user, per-endpoint, per-email (pluggable memory/Redis backends; production requires Redis)
+- **Production startup validation** — app refuses to start with default secrets or in-memory cache/rate-limit backends when `ENVIRONMENT=production`
 - **Docker** — non-root user (`appuser`), no cache dirs, minimal base image
 - **Constant-time comparisons** — `hmac.compare_digest()` used for all secret comparisons
 - **Soft delete** — user data retained for 30 days before permanent deletion (scheduled cleanup)

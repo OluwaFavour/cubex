@@ -53,5 +53,5 @@ Backend selection is config-driven (`QUOTA_CACHE_BACKEND`):
 **Negative:**
 
 - ORM event listeners add coupling between models and cache layer
-- Memory backend is per-process — fine for dev, but would give inconsistent results if accidentally used in multi-replica production
+- Memory backend is per-process — fine for dev, but would give inconsistent results if accidentally used in multi-replica production. **Mitigated:** a production startup guard in `app/core/config.py` raises `ValueError` if `QUOTA_CACHE_BACKEND` or `RATE_LIMIT_BACKEND` is `"memory"` when `ENVIRONMENT=production`, preventing accidental deployment.
 - Event listeners must be registered at app startup; forgetting a new quota-affecting model means stale cache

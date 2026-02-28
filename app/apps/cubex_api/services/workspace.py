@@ -44,7 +44,7 @@ from app.core.exceptions.types import (
     NotFoundException,
 )
 from app.core.utils import hmac_hash_otp
-from app.infrastructure.messaging.publisher import publish_event
+from app.core.services.event_publisher import get_publisher
 
 
 class WorkspaceNotFoundException(NotFoundException):
@@ -810,7 +810,7 @@ class WorkspaceService:
         inviter_name = inviter.full_name if inviter else "A team member"
         invitation_link = f"{callback_url}?token={raw_token}"
 
-        await publish_event(
+        await get_publisher()(
             "workspace_invitation_emails",
             {
                 "email": email,

@@ -333,12 +333,12 @@ Include:
 
 ### Service pattern
 
-Services are class-based singletons with `@classmethod` methods. Initialize via `ClassName.init()` in lifespan:
+Services are class-based singletons that inherit from `SingletonService`. Initialize via `ClassName.init()` in lifespan:
 
 ```python
-class MyService:
-    _initialized: ClassVar[bool] = False
+from app.core.services.base import SingletonService
 
+class MyService(SingletonService):
     @classmethod
     def init(cls, config: str) -> None:
         cls._config = config
@@ -346,10 +346,11 @@ class MyService:
 
     @classmethod
     def do_something(cls) -> str:
-        if not cls._initialized:
-            raise RuntimeError("MyService not initialized")
+        cls._ensure_initialized()
         return cls._config
 ```
+
+`SingletonService` provides `_initialized`, `_ensure_initialized()`, and `_reset()` (for test teardown) automatically.
 
 ### CRUD pattern
 
@@ -403,12 +404,14 @@ class MemberRole(str, Enum):
 
 ### Background job pattern
 
-Offload non-critical work to RabbitMQ via `publish_event()`:
+Offload non-critical work to RabbitMQ via the event publisher abstraction:
 
 ```python
-from app.infrastructure.messaging.publisher import publish_event
+from app.core.services.event_publisher import get_publisher
 
-await publish_event("otp_emails", {"email": user.email, "otp": code})
+await get_publisher()("otp_emails", {"email": user.email, "otp": code})
 ```
+
+The concrete publisher is registered at startup in `app/main.py`. Application code should never import directly from `app.infrastructure.messaging` — use `get_publisher()` instead.
 
 Never call external services (Brevo, Stripe) synchronously in request handlers if it can be queued.

@@ -196,6 +196,7 @@ The following fixtures are available in `conftest.py`:
 | `authenticated_client` | Client with auth headers pre-configured |
 | `test_workspace` | Personal workspace for `test_user` |
 | `personal_workspace` | Alias for `test_workspace` |
+| `_reset_singletons` | Resets all singleton services, event publisher, and lifecycle hooks after each test (autouse) |
 | `basic_api_plan` | Basic tier API plan |
 | `professional_api_plan` | Professional tier API plan |
 | `free_career_plan` | Free tier career plan |
@@ -427,9 +428,9 @@ class TestStripeWebhook:
             "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.core.routers.webhook.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+            "app.core.routers.webhook.get_publisher",
+            return_value=AsyncMock(),
+        ) as mock_get_pub:
             response = await client.post(
                 "/webhooks/stripe",
                 content="{}",
@@ -441,7 +442,7 @@ class TestStripeWebhook:
 
         assert response.status_code == 200
         assert response.json()["status"] == "received"
-        mock_publish.assert_called_once()
+        mock_get_pub.return_value.assert_called_once()
 ```
 
 ### Testing OAuth Flows
@@ -532,9 +533,9 @@ async def test_signup_creates_user(self, client, db_session):
 @pytest.mark.asyncio
 async def test_signup_sends_verification_email(self, client):
     """Should queue verification email."""
-    with patch("app.core.services.auth.publish_event") as mock:
+    with patch("app.core.services.auth.get_publisher", return_value=AsyncMock()) as mock:
         await client.post("/auth/signup", json={...})
-    mock.assert_called_once()
+    mock.return_value.assert_called_once()
 
 # Bad - multiple unrelated assertions
 @pytest.mark.asyncio

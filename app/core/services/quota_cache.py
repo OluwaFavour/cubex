@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import app_logger
 from app.core.enums import FeatureKey
+from app.core.services.base import SingletonService
 from app.core.services.redis_service import RedisService
 
 if TYPE_CHECKING:
@@ -368,7 +369,7 @@ class RedisBackend(QuotaCacheBackend):
         await RedisService.delete_pattern(f"{self.PLAN_RATE_DAY_LIMIT_PREFIX}*")
 
 
-class QuotaCacheService:
+class QuotaCacheService(SingletonService):
     """
     Singleton service for O(1) cost lookups.
 
@@ -385,9 +386,15 @@ class QuotaCacheService:
     Supports both memory and Redis backends (configurable).
     """
 
-    _initialized: bool = False
     _backend: QuotaCacheBackend | None = None
     _events_registered: bool = False
+
+    @classmethod
+    def _reset(cls) -> None:
+        """Reset all singleton state — intended for test teardown only."""
+        super()._reset()
+        cls._backend = None
+        cls._events_registered = False
 
     @classmethod
     async def init(

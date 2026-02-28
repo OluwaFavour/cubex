@@ -19,8 +19,6 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.apps.cubex_api.services.workspace import WorkspaceService
-from app.apps.cubex_career.services.subscription import CareerSubscriptionService
 from app.core.dependencies import CurrentActiveUser, get_async_session
 from app.core.config import auth_logger, settings
 from app.core.db.crud import user_db
@@ -59,6 +57,7 @@ from app.core.schemas.auth import (
     OTPVerifyRequest,
 )
 from app.core.services.auth import AuthService
+from app.core.services.lifecycle import run_post_signup_hooks
 from app.core.services.cloudinary import (
     CloudinaryService,
     CloudinaryUploadCredentials,
@@ -68,10 +67,6 @@ from app.core.utils import get_device_info
 
 
 router = APIRouter()
-
-# Service instances for product setup
-_workspace_service = WorkspaceService()
-_career_subscription_service = CareerSubscriptionService()
 
 
 # Signup: 5 requests per hour per IP (prevent mass account creation)
@@ -128,29 +123,14 @@ async def _setup_user_products(session: AsyncSession, user: User) -> None:
     - Email signup verification
     - OAuth signup/signin
 
-    The operations are idempotent - they check for existing resources before creating.
+    Delegates to registered post-signup hooks (see ``app.core.services.lifecycle``).
+    Individual failures are logged but do not abort the sign-up flow.
 
     Args:
         session: Database session (should be within a transaction).
         user: User to set up products for.
     """
-    try:
-        await _workspace_service.create_personal_workspace(
-            session, user, commit_self=False
-        )
-        auth_logger.debug(f"Personal workspace ensured for user {user.id}")
-    except Exception as e:
-        auth_logger.warning(f"Failed to create personal workspace for {user.id}: {e}")
-        # Don't fail the signup flow - user can manually activate later
-
-    try:
-        await _career_subscription_service.create_free_subscription(
-            session, user, commit_self=False
-        )
-        auth_logger.debug(f"Career subscription ensured for user {user.id}")
-    except Exception as e:
-        auth_logger.warning(f"Failed to create Career subscription for {user.id}: {e}")
-        # Don't fail the signup flow - user can manually activate later
+    await run_post_signup_hooks(session, user)
 
 
 @router.post(
@@ -2674,4 +2654,3 @@ async def get_sessions(
 
 
 __all__ = ["router"]
-

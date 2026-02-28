@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import webhook_logger
 from app.core.exceptions.types import BadRequestException
 from app.core.services.payment.stripe.main import Stripe
-from app.infrastructure.messaging.publisher import publish_event
+from app.core.services.event_publisher import get_publisher
 
 
 router = APIRouter(prefix="/webhooks")
@@ -160,7 +160,7 @@ async def handle_stripe_webhook(request: Request) -> dict[str, str] | Response:
 
     try:
         message = _build_queue_message(event_id, event_type, obj)
-        await publish_event(queue_name, message)
+        await get_publisher()(queue_name, message)
         webhook_logger.info(f"Published {event_type} to queue {queue_name}")
     except Exception as e:
         webhook_logger.error(f"Failed to publish event {event_id} to queue: {e}")

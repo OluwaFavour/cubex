@@ -76,7 +76,7 @@ Run `python manage.py migrate` to apply pending migrations.
 
 ### "Can't autogenerate — no changes detected"
 
-Ensure your model file is imported in `app/core/db/models/__init__.py` (or the relevant app's `db/models/__init__.py`). Alembic only sees models that are imported when it runs.
+Ensure your model file is imported in the relevant app's `db/models/__init__.py` (for app-specific models like `Workspace`, `CareerUsageLog`) or `app/core/db/models/__init__.py` (for shared core models). App-specific models live in their respective `app/apps/*/db/models/` packages and are not re-exported from core. Alembic only sees models that are imported when it runs.
 
 ### Migration conflicts after rebasing
 

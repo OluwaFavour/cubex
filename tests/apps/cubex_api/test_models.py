@@ -10,8 +10,8 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-# Import from core models which handles the import order correctly
-from app.core.db.models import Workspace  # noqa: F401
+# Import workspace model to ensure SQLAlchemy registration
+from app.apps.cubex_api.db.models.workspace import Workspace  # noqa: F401
 from app.core.enums import PlanType, ProductType, SubscriptionStatus
 from app.core.db.models.plan import Plan, FeatureSchema
 
@@ -352,4 +352,3 @@ class TestStripeEventLogModel:
         assert event.event_id == "evt_test123"
         assert event.event_type == "checkout.session.completed"
         assert event.processed_at is not None
-

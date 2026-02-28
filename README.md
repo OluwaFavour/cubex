@@ -580,7 +580,7 @@ cubex/
 │   │   ├── exceptions/                 #   Custom exception types + 17 handlers
 │   │   ├── routers/                    #   Auth router, Webhook router
 │   │   ├── schemas/                    #   Shared Pydantic schemas
-│   │   └── services/                   #   Auth, Redis, Brevo, Cloudinary, QuotaCache, OAuth…
+│   │   └── services/                   #   Auth, Redis, Brevo, Cloudinary, QuotaCache, OAuth, EventPublisher, Lifecycle…
 │   ├── infrastructure/
 │   │   ├── messaging/                  # RabbitMQ: connection, publisher, consumer, queues
 │   │   │   └── handlers/              #   Email, Stripe event, usage commit handlers
@@ -740,7 +740,7 @@ The API is organized into 8 route groups with 53 endpoints total:
 | `/api` | API - Internal API | 2 | Usage validate + commit (service-to-service) |
 | `/career` | Career - Subscriptions | 8 | Plans, checkout, upgrade, cancel, activate |
 | `/career` | Career - Internal API | 2 | Usage validate + commit (service-to-service) |
-| `/health` | Health Check | 1 | DB + Redis connectivity check |
+| `/health` | Health Check | 1 | DB + Redis + RabbitMQ (when enabled) connectivity check |
 
 **Full reference:** Start the server and visit `/docs` (Swagger) or `/redoc`.
 
@@ -881,8 +881,13 @@ X-Internal-API-Key: <INTERNAL_API_SECRET>
 | ---------- | ------------- | --------- |
 | `ENABLE_SCHEDULER` | Start APScheduler in API process | `true` |
 | `ENABLE_MESSAGING` | Start RabbitMQ consumers in API process | `true` |
+| `QUOTA_CACHE_BACKEND` | Quota cache backend (`memory` or `redis`) | `memory` ** |
+| `RATE_LIMIT_BACKEND` | Rate limit backend (`memory` or `redis`) | `memory` ** |
+| `ADMIN_TOKEN_VERSION` | Increment to revoke all admin sessions | `0` |
 
 > \* Marked variables **must** be changed in production. The app validates this at startup when `ENVIRONMENT=production` and will refuse to start if insecure defaults are detected.
+>
+> \*\* Must be `redis` in production. The app refuses to start with in-memory backends when `ENVIRONMENT=production`.
 
 See `.env.example` for a copy-paste template with all variables.
 

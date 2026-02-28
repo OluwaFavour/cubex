@@ -72,4 +72,4 @@ Each product surface has its own router tree, dependencies, and README.
 
 - Shared models live in `core/models/` even when only one product surface uses them — requires discipline to avoid bloating `core/`
 - Cross-product features (e.g., "career listing links to API workspace") require coordination through `core/services/` rather than direct imports
-- The dependency rule is enforced by convention, not by tooling (no import linter configured yet)
+- The dependency rule is enforced by `import-linter` (added to `requirements-dev.txt`) and by architectural abstractions: cross-layer communication uses **hook registries** (`app/core/services/lifecycle.py`) and **protocol-based publishers** (`app/core/services/event_publisher.py`) registered at startup in `app/main.py`

@@ -17,22 +17,24 @@ The admin panel (`/admin`) needs authentication separate from the main user JWT 
 Use **HMAC-signed tokens** stored in the session cookie. The token format:
 
 ```text
-<credentials_hash>:<timestamp>:<signature>
+<credentials_hash>:<version>:<timestamp>:<signature>
 ```
 
 Where:
 
 - `credentials_hash` = first 8 chars of SHA-256(email + hashed_password)
+- `version` = current `ADMIN_TOKEN_VERSION` from settings (increment to revoke all admin sessions)
 - `timestamp` = Unix epoch when the token was created
-- `signature` = HMAC-SHA256(credentials_hash:timestamp, secret=SECRET_KEY)
+- `signature` = HMAC-SHA256(credentials_hash:version:timestamp, secret=SECRET_KEY)
 
 **Verification flow:**
 
 1. Extract token from session
-2. Split into parts, verify HMAC signature
-3. Check `timestamp` is within 24 h
-4. Recompute `credentials_hash` from the current DB record
-5. Compare — if the admin changed their password, `credentials_hash` diverges → token rejected
+2. Split into 4 parts, verify HMAC signature
+3. Check `version` matches current `ADMIN_TOKEN_VERSION` setting
+4. Check `timestamp` is within 24 h
+5. Recompute `credentials_hash` from the current DB record
+6. Compare — if the admin changed their password, `credentials_hash` diverges → token rejected
 
 This gives us stateless verification (no session table) with automatic credential-change invalidation.
 
@@ -56,6 +58,6 @@ This gives us stateless verification (no session table) with automatic credentia
 
 **Negative:**
 
-- Can't revoke a token before expiry without changing `SECRET_KEY` (which invalidates *all* tokens) or changing the admin's password
+- Can't revoke an *individual* token before expiry, but all admin sessions can be revoked by incrementing `ADMIN_TOKEN_VERSION` (lighter-weight than rotating `SECRET_KEY`)
 - Session cookie size increases slightly (~120 bytes for the token)
 - Relies on `SECRET_KEY` staying secret; if leaked, tokens can be forged

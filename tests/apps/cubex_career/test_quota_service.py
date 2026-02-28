@@ -768,7 +768,7 @@ class TestCareerUsageLogModel:
         assert CareerUsageLog is not None
 
     def test_model_in_core_init(self):
-        from app.core.db.models import CareerUsageLog
+        from app.apps.cubex_career.db.models.usage_log import CareerUsageLog
 
         assert CareerUsageLog is not None
 
