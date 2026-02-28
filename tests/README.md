@@ -136,8 +136,14 @@ pytest --tb=short
 - `infrastructure/messaging/test_queues.py` - Queue configuration (17 tests)
 - `infrastructure/messaging/test_publisher.py` - Event publishing (7 tests)
 - `infrastructure/messaging/test_consumer.py` - Message processing (13 tests)
+- `infrastructure/messaging/test_dlq_handler.py` - DLQ message handler (TBD tests)
 - `infrastructure/messaging/test_main.py` - Consumer startup (10 tests)
 - `infrastructure/scheduler/test_main.py` - Scheduler initialization (4 tests)
+
+### Admin Tests
+
+- `admin/test_admin.py` - Admin panel configuration and views
+- `admin/test_dlq.py` - DLQ admin view configuration and metrics endpoint (TBD tests)
 
 ### Core Module Tests
 

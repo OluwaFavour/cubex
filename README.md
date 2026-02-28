@@ -104,7 +104,7 @@ A multi-product SaaS platform that provides AI-powered developer tools and caree
 
 ## Database Schema
 
-16 models across 19 tables. All models inherit from `BaseModel` which provides `id` (UUID PK), `created_at`, `updated_at`, `is_deleted`, `deleted_at`.
+17 models across 20 tables. All models inherit from `BaseModel` which provides `id` (UUID PK), `created_at`, `updated_at`, `is_deleted`, `deleted_at`.
 
 ```text
 ┌──────────────────────┐
@@ -215,7 +215,17 @@ A multi-product SaaS platform that provides AI-powered developer tools and caree
          │ first_name          │    │ processed_at         │
          │ last_name, email    │    └──────────────────────┘
          │ message, status     │
-         └─────────────────────┘
+         └─────────────────────┘    ┌──────────────────────┐
+                                    │     DLQMessage       │
+                                    │ ──────────────────── │
+                                    │ queue_name (indexed) │
+                                    │ message_body         │
+                                    │ error_message        │
+                                    │ headers (JSON)       │
+                                    │ attempt_count        │
+                                    │ status (pending →    │
+                                    │   retried/discarded) │
+                                    └──────────────────────┘
 ```
 
 ### Key Relationships
@@ -742,7 +752,7 @@ All commands are run via `python manage.py <command>`.
 
 ## API Endpoints
 
-The API is organized into 9 route groups with 56 endpoints total:
+The API is organized into 10 route groups with 57 endpoints total:
 
 | Prefix | Tag | Endpoints | Description |
 | -------- | ----- | ----------- | ------------- |
@@ -755,6 +765,7 @@ The API is organized into 9 route groups with 56 endpoints total:
 | `/career` | Career - Subscriptions | 8 | Plans, checkout, upgrade, cancel, activate |
 | `/career` | Career - Internal API | 2 | Usage validate + commit (service-to-service) |
 | `/career` | Career - History | 3 | List, get, delete analysis results |
+| `/admin/api` | Admin - DLQ | 1 | DLQ metrics (total, by status, by queue) |
 | `/health` | Health Check | 1 | DB + Redis + RabbitMQ (when enabled) connectivity check |
 
 **Full reference:** Start the server and visit `/docs` (Swagger) or `/redoc`.

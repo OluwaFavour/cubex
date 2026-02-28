@@ -8,18 +8,20 @@ Defines admin views for managing application models:
 - UserAdmin: Read-only user view
 - WorkspaceAdmin: Read-only workspace view
 - SubscriptionAdmin: View/edit subscriptions
-- UsageLogAdmin: Read-only usage log view
+- UsageLogAdmin: Read-only usage log view- DLQMessageAdmin: DLQ monitoring with retry/discard actions
 """
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, Tuple
 
-from sqladmin import ModelView
+from sqladmin import ModelView, action
 from sqladmin.filters import BooleanFilter, StaticValuesFilter
 from sqlalchemy.sql.expression import Select
 from starlette.requests import Request
+from starlette.responses import RedirectResponse
 
 from app.core.db.crud.quota import plan_pricing_rule_db
+from app.core.db.models.dlq_message import DLQMessage
 from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule
 from app.apps.cubex_api.db.models.workspace import UsageLog, Workspace, WorkspaceMember
 from app.core.db.models.plan import Plan
@@ -27,6 +29,7 @@ from app.core.db.models.subscription import Subscription
 from app.core.db.models.user import User
 from app.core.enums import (
     AccessStatus,
+    DLQMessageStatus,
     FailureType,
     MemberRole,
     MemberStatus,
@@ -760,6 +763,183 @@ class UsageLogAdmin(ModelView, model=UsageLog):
     page_size_options = [25, 50, 100, 200]
 
 
+class DLQMessageAdmin(ModelView, model=DLQMessage):
+    """Admin view for dead-letter queue messages.
+
+    Read-only with retry and discard bulk actions.
+    """
+
+    name = "DLQ Message"
+    name_plural = "DLQ Messages"
+    icon = "fa-solid fa-skull-crossbones"
+
+    # List view configuration
+    column_list = [
+        DLQMessage.id,
+        DLQMessage.queue_name,
+        DLQMessage.status,
+        DLQMessage.attempt_count,
+        DLQMessage.error_message,
+        DLQMessage.created_at,
+    ]
+
+    column_searchable_list = ["queue_name", "error_message"]
+    column_sortable_list = [
+        DLQMessage.queue_name,
+        DLQMessage.status,
+        DLQMessage.attempt_count,
+        DLQMessage.created_at,
+    ]
+    column_default_sort = [(DLQMessage.created_at, True)]  # Newest first
+
+    # Filters
+    column_filters = [
+        StaticValuesFilter(
+            DLQMessage.status,
+            values=[(e.value, e.value.title()) for e in DLQMessageStatus],
+            title="Status",
+        ),
+    ]
+
+    # Detail view — expose all fields including full payload
+    column_details_list = [
+        DLQMessage.id,
+        DLQMessage.queue_name,
+        DLQMessage.status,
+        DLQMessage.attempt_count,
+        DLQMessage.error_message,
+        DLQMessage.message_body,
+        DLQMessage.headers,
+        DLQMessage.created_at,
+        DLQMessage.updated_at,
+    ]
+
+    # Labels
+    column_labels = {
+        DLQMessage.id: "ID",
+        DLQMessage.queue_name: "Queue",
+        DLQMessage.status: "Status",
+        DLQMessage.attempt_count: "Attempts",
+        DLQMessage.error_message: "Error",
+        DLQMessage.message_body: "Message Body",
+        DLQMessage.headers: "Headers",
+        DLQMessage.created_at: "Created",
+        DLQMessage.updated_at: "Updated",
+    }
+
+    # Formatting — truncate large text on the list view
+    column_formatters = {
+        DLQMessage.error_message: lambda m, a: (
+            (m.error_message[:120] + "…")
+            if m.error_message and len(m.error_message) > 120
+            else m.error_message or "-"
+        ),
+    }
+
+    # Pretty-print JSON on detail view
+    column_formatters_detail = {
+        DLQMessage.message_body: lambda m, a: _format_json_field(m.message_body),
+        DLQMessage.headers: lambda m, a: _format_json_field(m.headers),
+    }
+
+    # Read-only — mutations only through actions
+    can_create = False
+    can_edit = False
+    can_delete = False
+    can_view_details = True
+    can_export = True
+
+    page_size = 50
+    page_size_options = [25, 50, 100, 200]
+
+    @action(
+        name="retry_messages",
+        label="Retry",
+        confirmation_message="Re-publish selected messages to their original queues?",
+        add_in_detail=True,
+        add_in_list=True,
+    )
+    async def action_retry(self, request: Request, pks: list[str]) -> RedirectResponse:
+        """Re-publish selected DLQ messages to their original queues."""
+        import json
+        from uuid import UUID
+
+        from app.core.db import AsyncSessionLocal
+        from app.core.db.crud.dlq_message import dlq_message_db
+        from app.infrastructure.messaging.publisher import publish_event
+
+        async with AsyncSessionLocal() as session:
+            for pk in pks:
+                msg = await dlq_message_db.get_by_id(session, UUID(pk))
+                if not msg or msg.status != DLQMessageStatus.PENDING:
+                    continue
+
+                # Determine the original queue to re-publish to
+                original_queue = (
+                    (msg.headers or {}).get("x-original-queue") if msg.headers else None
+                )
+                if not original_queue and msg.queue_name.endswith("_dead"):
+                    original_queue = msg.queue_name[: -len("_dead")]
+
+                if original_queue:
+                    try:
+                        payload = json.loads(msg.message_body)
+                    except (json.JSONDecodeError, TypeError):
+                        payload = {"raw": msg.message_body}
+
+                    await publish_event(original_queue, payload)
+
+                msg.status = DLQMessageStatus.RETRIED
+            await session.commit()
+
+        referer = request.headers.get("referer", "/admin/dlq-message/list")
+        return RedirectResponse(referer, status_code=302)
+
+    @action(
+        name="discard_messages",
+        label="Discard",
+        confirmation_message="Mark selected messages as discarded? This cannot be undone.",
+        add_in_detail=True,
+        add_in_list=True,
+    )
+    async def action_discard(
+        self, request: Request, pks: list[str]
+    ) -> RedirectResponse:
+        """Mark selected DLQ messages as discarded."""
+        from uuid import UUID
+
+        from app.core.db import AsyncSessionLocal
+        from app.core.db.crud.dlq_message import dlq_message_db
+
+        async with AsyncSessionLocal() as session:
+            for pk in pks:
+                msg = await dlq_message_db.get_by_id(session, UUID(pk))
+                if not msg or msg.status != DLQMessageStatus.PENDING:
+                    continue
+                msg.status = DLQMessageStatus.DISCARDED
+            await session.commit()
+
+        referer = request.headers.get("referer", "/admin/dlq-message/list")
+        return RedirectResponse(referer, status_code=302)
+
+
+def _format_json_field(value: Any) -> str:
+    """Pretty-print a JSON-serialisable value for the detail view."""
+    import json as _json
+
+    if value is None:
+        return "-"
+    if isinstance(value, str):
+        try:
+            parsed = _json.loads(value)
+            return _json.dumps(parsed, indent=2, ensure_ascii=False)
+        except (ValueError, TypeError):
+            return value
+    if isinstance(value, dict):
+        return _json.dumps(value, indent=2, ensure_ascii=False)
+    return str(value)
+
+
 # Export all admin views
 __all__ = [
     "PlanAdmin",
@@ -770,4 +950,5 @@ __all__ = [
     "WorkspaceMemberAdmin",
     "SubscriptionAdmin",
     "UsageLogAdmin",
+    "DLQMessageAdmin",
 ]
