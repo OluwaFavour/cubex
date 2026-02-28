@@ -5902,7 +5902,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/app__apps__cubex_api__schemas__workspace__UsageValidateRequest"
+                                "$ref": "#/components/schemas/UsageValidateRequest"
                             }
                         }
                     }
@@ -6130,7 +6130,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/app__apps__cubex_api__schemas__workspace__UsageCommitRequest"
+                                "$ref": "#/components/schemas/UsageCommitRequest"
                             }
                         }
                     }
@@ -7158,7 +7158,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/UsageValidateRequest"
+                                "$ref": "#/components/schemas/app__apps__cubex_career__schemas__internal__UsageValidateRequest"
                             }
                         }
                     }
@@ -7353,7 +7353,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/UsageCommitRequest"
+                                "$ref": "#/components/schemas/app__apps__cubex_career__schemas__internal__UsageCommitRequest"
                             }
                         }
                     }
@@ -9786,11 +9786,10 @@
             },
             "UsageCommitRequest": {
                 "properties": {
-                    "user_id": {
+                    "api_key": {
                         "type": "string",
-                        "format": "uuid",
-                        "title": "User Id",
-                        "description": "The ID of the user that made the original request. This value is returned in the `UsageValidateResponse`."
+                        "title": "Api Key",
+                        "description": "The API key that made the original request"
                     },
                     "usage_id": {
                         "type": "string",
@@ -9828,13 +9827,14 @@
                 },
                 "type": "object",
                 "required": [
-                    "user_id",
+                    "api_key",
                     "usage_id",
                     "success"
                 ],
                 "title": "UsageCommitRequest",
                 "description": "Schema for committing API usage (internal endpoint).\n\nWhen success=True, optionally provide metrics (model, tokens, latency).\nWhen success=False, failure details are REQUIRED.",
                 "example": {
+                    "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
                     "metrics": {
                         "input_tokens": 1500,
                         "latency_ms": 1200,
@@ -9842,8 +9842,7 @@
                         "output_tokens": 500
                     },
                     "success": true,
-                    "usage_id": "550e8400-e29b-41d4-a716-446655440000",
-                    "user_id": "550e8400-e29b-41d4-a716-446655440000"
+                    "usage_id": "550e8400-e29b-41d4-a716-446655440000"
                 }
             },
             "UsageCommitResponse": {
@@ -9992,9 +9991,20 @@
                         "title": "Request Id",
                         "description": "Globally unique request ID for idempotency"
                     },
+                    "client_id": {
+                        "type": "string",
+                        "pattern": "^ws_[a-f0-9]{32}$",
+                        "title": "Client Id",
+                        "description": "Workspace client ID in format ws_<workspace_uuid_hex>"
+                    },
                     "feature_key": {
                         "$ref": "#/components/schemas/FeatureKey",
-                        "description": "The feature key identifying the career feature being used"
+                        "description": "Feature Key (e.g., 'api.analyze')"
+                    },
+                    "api_key": {
+                        "type": "string",
+                        "title": "Api Key",
+                        "description": "The full API key to validate"
                     },
                     "endpoint": {
                         "type": "string",
@@ -10040,7 +10050,9 @@
                 "type": "object",
                 "required": [
                     "request_id",
+                    "client_id",
                     "feature_key",
+                    "api_key",
                     "endpoint",
                     "method",
                     "payload_hash"
@@ -10048,12 +10060,14 @@
                 "title": "UsageValidateRequest",
                 "description": "Schema for validating API usage (internal endpoint).",
                 "example": {
+                    "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
                     "client": {
                         "ip": "102.89.1.22",
                         "user_agent": "Mozilla/5.0"
                     },
+                    "client_id": "ws_550e8400e29b41d4a716446655440000",
                     "endpoint": "/v1/extract-cues/resume",
-                    "feature_key": "career.career_path",
+                    "feature_key": "api.analyze",
                     "method": "POST",
                     "payload_hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
                     "request_id": "req_9f0c2a7e-acde-4b9a-8b2f-83cc71a3c9a2",
@@ -10635,12 +10649,13 @@
                     "slug": "my-startup-renamed"
                 }
             },
-            "app__apps__cubex_api__schemas__workspace__UsageCommitRequest": {
+            "app__apps__cubex_career__schemas__internal__UsageCommitRequest": {
                 "properties": {
-                    "api_key": {
+                    "user_id": {
                         "type": "string",
-                        "title": "Api Key",
-                        "description": "The API key that made the original request"
+                        "format": "uuid",
+                        "title": "User Id",
+                        "description": "The ID of the user that made the original request. This value is returned in the `UsageValidateResponse`."
                     },
                     "usage_id": {
                         "type": "string",
@@ -10678,14 +10693,13 @@
                 },
                 "type": "object",
                 "required": [
-                    "api_key",
+                    "user_id",
                     "usage_id",
                     "success"
                 ],
                 "title": "UsageCommitRequest",
                 "description": "Schema for committing API usage (internal endpoint).\n\nWhen success=True, optionally provide metrics (model, tokens, latency).\nWhen success=False, failure details are REQUIRED.",
                 "example": {
-                    "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
                     "metrics": {
                         "input_tokens": 1500,
                         "latency_ms": 1200,
@@ -10693,30 +10707,20 @@
                         "output_tokens": 500
                     },
                     "success": true,
-                    "usage_id": "550e8400-e29b-41d4-a716-446655440000"
+                    "usage_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "user_id": "550e8400-e29b-41d4-a716-446655440000"
                 }
             },
-            "app__apps__cubex_api__schemas__workspace__UsageValidateRequest": {
+            "app__apps__cubex_career__schemas__internal__UsageValidateRequest": {
                 "properties": {
                     "request_id": {
                         "type": "string",
                         "title": "Request Id",
                         "description": "Globally unique request ID for idempotency"
                     },
-                    "client_id": {
-                        "type": "string",
-                        "pattern": "^ws_[a-f0-9]{32}$",
-                        "title": "Client Id",
-                        "description": "Workspace client ID in format ws_<workspace_uuid_hex>"
-                    },
                     "feature_key": {
                         "$ref": "#/components/schemas/FeatureKey",
-                        "description": "Feature Key (e.g., 'api.analyze')"
-                    },
-                    "api_key": {
-                        "type": "string",
-                        "title": "Api Key",
-                        "description": "The full API key to validate"
+                        "description": "The feature key identifying the career feature being used"
                     },
                     "endpoint": {
                         "type": "string",
@@ -10762,9 +10766,7 @@
                 "type": "object",
                 "required": [
                     "request_id",
-                    "client_id",
                     "feature_key",
-                    "api_key",
                     "endpoint",
                     "method",
                     "payload_hash"
@@ -10772,14 +10774,12 @@
                 "title": "UsageValidateRequest",
                 "description": "Schema for validating API usage (internal endpoint).",
                 "example": {
-                    "api_key": "cbx_live_abc123def456ghi789jkl012mno345pqr678stu901",
                     "client": {
                         "ip": "102.89.1.22",
                         "user_agent": "Mozilla/5.0"
                     },
-                    "client_id": "ws_550e8400e29b41d4a716446655440000",
                     "endpoint": "/v1/extract-cues/resume",
-                    "feature_key": "api.analyze",
+                    "feature_key": "career.career_path",
                     "method": "POST",
                     "payload_hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
                     "request_id": "req_9f0c2a7e-acde-4b9a-8b2f-83cc71a3c9a2",
