@@ -2,10 +2,12 @@
 Schemas for cubex_api.
 """
 
-from app.apps.cubex_api.schemas.subscription import (
+from app.core.schemas.plan import (
     FeatureResponse,
     PlanResponse,
     PlanListResponse,
+)
+from app.apps.cubex_api.schemas.subscription import (
     SubscriptionResponse,
     CheckoutRequest,
     CheckoutResponse,

@@ -72,9 +72,10 @@ class TestSendOtpEmail:
     async def test_send_otp_email_for_verification(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             # Setup mocks
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>OTP: 123456</html>", "OTP: 123456"]
@@ -104,9 +105,10 @@ class TestSendOtpEmail:
     async def test_send_otp_email_for_password_reset(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Reset OTP</html>", "Reset OTP"]
             )
@@ -130,9 +132,10 @@ class TestSendOtpEmail:
     async def test_send_otp_email_default_user_name(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>OTP</html>", "OTP"]
             )
@@ -155,11 +158,11 @@ class TestSendOtpEmail:
     async def test_send_otp_email_includes_app_name(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo, patch(
-            "app.core.services.email_manager.settings"
-        ) as mock_settings:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+            patch("app.core.services.email_manager.settings") as mock_settings,
+        ):
             mock_settings.APP_NAME = "TestApp"
             mock_settings.OTP_EXPIRY_MINUTES = 10
             mock_renderer.render_template = AsyncMock(
@@ -183,9 +186,10 @@ class TestSendOtpEmail:
     async def test_send_otp_email_includes_year(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>OTP</html>", "OTP"]
             )
@@ -206,11 +210,11 @@ class TestSendOtpEmail:
     async def test_send_otp_email_correct_subject_for_verification(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo, patch(
-            "app.core.services.email_manager.settings"
-        ) as mock_settings:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+            patch("app.core.services.email_manager.settings") as mock_settings,
+        ):
             mock_settings.APP_NAME = "MyApp"
             mock_settings.OTP_EXPIRY_MINUTES = 10
             mock_renderer.render_template = AsyncMock(
@@ -233,11 +237,11 @@ class TestSendOtpEmail:
     async def test_send_otp_email_correct_subject_for_password_reset(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo, patch(
-            "app.core.services.email_manager.settings"
-        ) as mock_settings:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+            patch("app.core.services.email_manager.settings") as mock_settings,
+        ):
             mock_settings.APP_NAME = "MyApp"
             mock_settings.OTP_EXPIRY_MINUTES = 10
             mock_renderer.render_template = AsyncMock(
@@ -260,9 +264,10 @@ class TestSendOtpEmail:
     async def test_send_otp_email_handles_brevo_failure(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>OTP</html>", "OTP"]
             )
@@ -311,11 +316,11 @@ class TestSendWelcomeEmail:
     async def test_send_welcome_email_success(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo, patch(
-            "app.core.services.email_manager.settings"
-        ) as mock_settings:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+            patch("app.core.services.email_manager.settings") as mock_settings,
+        ):
             mock_settings.APP_NAME = "CueBX"
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Welcome</html>", "Welcome"]
@@ -344,9 +349,10 @@ class TestSendWelcomeEmail:
     async def test_send_welcome_email_default_user_name(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Welcome</html>", "Welcome"]
             )
@@ -367,9 +373,10 @@ class TestSendWelcomeEmail:
     async def test_send_welcome_email_handles_failure(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Welcome</html>", "Welcome"]
             )
@@ -400,11 +407,11 @@ class TestSendPasswordResetConfirmationEmail:
     async def test_send_password_reset_confirmation_success(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo, patch(
-            "app.core.services.email_manager.settings"
-        ) as mock_settings:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+            patch("app.core.services.email_manager.settings") as mock_settings,
+        ):
             mock_settings.APP_NAME = "CueBX"
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Password changed</html>", "Password changed"]
@@ -431,9 +438,10 @@ class TestSendPasswordResetConfirmationEmail:
     async def test_send_password_reset_confirmation_handles_failure(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Changed</html>", "Changed"]
             )
@@ -464,9 +472,10 @@ class TestSendGenericEmail:
     async def test_send_email_with_custom_template(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Custom</html>", "Custom"]
             )
@@ -495,9 +504,10 @@ class TestSendGenericEmail:
     async def test_send_email_passes_recipient_correctly(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Test</html>", "Test"]
             )
@@ -522,9 +532,10 @@ class TestSendGenericEmail:
     async def test_send_email_with_recipient_name(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Test</html>", "Test"]
             )
@@ -549,9 +560,10 @@ class TestSendGenericEmail:
     async def test_send_email_html_only(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+        ):
             mock_renderer.render_template = AsyncMock(
                 return_value="<html>HTML Only</html>"
             )
@@ -573,11 +585,13 @@ class TestSendGenericEmail:
     async def test_send_email_logs_on_success(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo, patch(
-            "app.core.services.email_manager.email_manager_logger"
-        ) as mock_logger:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+            patch(
+                "app.core.services.email_manager.email_manager_logger"
+            ) as mock_logger,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Test</html>", "Test"]
             )
@@ -599,11 +613,13 @@ class TestSendGenericEmail:
     async def test_send_email_logs_on_failure(self):
         from app.core.services.email_manager import EmailManagerService
 
-        with patch("app.core.services.email_manager.Renderer") as mock_renderer, patch(
-            "app.core.services.email_manager.BrevoService"
-        ) as mock_brevo, patch(
-            "app.core.services.email_manager.email_manager_logger"
-        ) as mock_logger:
+        with (
+            patch("app.core.services.email_manager.Renderer") as mock_renderer,
+            patch("app.core.services.email_manager.BrevoService") as mock_brevo,
+            patch(
+                "app.core.services.email_manager.email_manager_logger"
+            ) as mock_logger,
+        ):
             mock_renderer.render_template = AsyncMock(
                 side_effect=["<html>Test</html>", "Test"]
             )

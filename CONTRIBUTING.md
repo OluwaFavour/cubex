@@ -13,6 +13,15 @@ Thank you for contributing to CueBX! This guide covers everything you need to kn
 - [Testing Requirements](#testing-requirements)
 - [Pull Request Process](#pull-request-process)
 - [Project Conventions](#project-conventions)
+  - [Service pattern](#service-pattern)
+  - [CRUD pattern](#crud-pattern)
+  - [Router pattern](#router-pattern)
+  - [Import rules](#import-rules)
+  - [Enum naming](#enum-naming)
+  - [Logging](#logging)
+  - [Orchestration vs. responsibility](#orchestration-vs-responsibility)
+  - [OpenAPI endpoint documentation](#openapi-endpoint-documentation)
+  - [Background job pattern](#background-job-pattern)
 
 ---
 
@@ -235,7 +244,7 @@ Run the management command before every commit:
 python manage.py precommit
 ```
 
-This runs Black → Ruff → Pyright → Pytest in sequence, stopping on the first failure.
+This runs Black → Ruff → Pyright → Import Linter → Pytest in sequence, stopping on the first failure.
 
 Useful flags:
 
@@ -259,11 +268,14 @@ ruff check --fix app/ tests/
 # 3. Type check
 pyright app/
 
-# 4. Test
+# 4. Import contracts
+lint-imports
+
+# 5. Test
 pytest tests/ -x -q --tb=short
 ```
 
-If all four pass, you're safe to commit. CI will run the same checks.
+If all five pass, you're safe to commit. CI will run the same checks.
 
 ---
 
@@ -439,13 +451,67 @@ async with AsyncSessionLocal.begin() as session:
     )
 ```
 
-### Import ordering
+### Import rules
+
+**Ordering** — three groups, separated by a blank line:
 
 1. Standard library
 2. Third-party packages
 3. Local imports (`app.*`)
 
 Ruff handles sorting automatically.
+
+**All imports must be at module level.** Inline (deferred) imports inside functions, methods, or conditional blocks are **not allowed**.
+
+The only acceptable exception is a **genuine circular import** that cannot be resolved by restructuring the modules. In that case, add a comment explaining why:
+
+```python
+# ✅ Correct — module-level imports
+from app.core.config import stripe_logger
+from app.core.db import AsyncSessionLocal
+from app.infrastructure.messaging.publisher import publish_event
+
+
+async def action_retry(self, request: Request) -> RedirectResponse:
+    await publish_event(queue, payload)
+
+
+# ❌ Wrong — inline import with no circular-dependency justification
+async def action_retry(self, request: Request) -> RedirectResponse:
+    from app.infrastructure.messaging.publisher import publish_event  # bad
+    await publish_event(queue, payload)
+
+
+# ⚠️ Exception — documented circular import (rare)
+def some_edge_case():
+    # Circular: module X imports module Y which imports module X at class level.
+    from app.core.some_module import SomeClass  # noqa: circular
+    ...
+```
+
+The import-linter contracts in `pyproject.toml` enforce architectural boundaries. The dependency graph is:
+
+```text
+admin          → core, apps
+infrastructure → core, apps
+apps           → core only
+core           → nothing above it
+```
+
+Each app product (`cubex_api`, `cubex_career`) must also be **independent** — no cross-imports between products. Shared schemas live in `app.core.schemas`.
+
+| Contract | Rule |
+| -------- | ---- |
+| Core → Apps | Forbidden |
+| Core → Infrastructure | Forbidden |
+| Core → Admin | Forbidden |
+| Apps → Infrastructure | Forbidden |
+| Apps → Admin | Forbidden |
+| Infrastructure → Admin | Forbidden |
+| Admin → Infrastructure | Forbidden |
+| cubex_api ↔ cubex_career | Independent (no cross-imports) |
+
+Ruff enforces sorting and unused-import removal.
 
 ### Enum naming
 
@@ -457,6 +523,202 @@ class MemberRole(str, Enum):
     ADMIN = "admin"
     MEMBER = "member"
 ```
+
+### Logging
+
+The project uses a **centralised logging system** — never create ad-hoc loggers.
+
+#### Setup
+
+`app/core/logger.py` defines `setup_logger()`, which creates a `logging.Logger` with:
+
+- **`RotatingFileHandler`** — writes to `logs/<component>.log` (5 MB, 3 backups)
+- **`StreamHandler`** — mirrors to console
+- **Sentry tag** — optional component label for filtering in Sentry
+- **Format:** `%(asctime)s - %(name)s - %(levelname)s - %(message)s`
+
+`app/core/config.py` instantiates **18 component-specific loggers** and exports them via `__all__`:
+
+| Logger | File | Sentry tag | Use for |
+| ------ | ---- | ---------- | ------- |
+| `app_logger` | `logs/app.log` | `app` | Application lifecycle, startup/shutdown |
+| `database_logger` | `logs/database.log` | `database` | DB connections, migrations |
+| `request_logger` | `logs/requests.log` | `request` | HTTP request handling in routers |
+| `auth_logger` | `logs/auth.log` | `auth` | Authentication, OAuth, OTP |
+| `stripe_logger` | `logs/stripe.log` | `stripe` | Stripe API calls, webhook processing |
+| `rabbitmq_logger` | `logs/rabbitmq.log` | `messaging` | RabbitMQ connections, consumers |
+| `scheduler_logger` | `logs/scheduler.log` | `scheduler` | APScheduler jobs |
+| `workspace_logger` | `logs/workspace.log` | `workspace` | Workspace CRUD, members |
+| `usage_logger` | `logs/usage.log` | `usage` | Usage tracking, quota |
+| `career_logger` | `logs/career.log` | `career` | Career product |
+| `webhook_logger` | `logs/webhook.log` | `webhook` | Webhook dispatch |
+| `redis_logger` | `logs/redis.log` | `redis` | Redis connections, caching |
+| `rate_limit_logger` | `logs/rate_limit.log` | `rate_limit` | Rate limiting |
+| `plan_logger` | `logs/plan.log` | `plan` | Plan management |
+| `brevo_logger` | `logs/brevo.log` | `email` | Brevo email API |
+| `email_manager_logger` | `logs/email_manager.log` | `email_manager` | Email orchestration |
+| `cloudinary_logger` | `logs/cloudinary.log` | `cloudinary` | Cloudinary uploads |
+| `utils_logger` | `logs/utils.log` | `utils` | General utilities |
+
+#### Logging rules
+
+1. **Always import an existing domain-specific logger** from `app.core.config`. Never use `logging.getLogger(__name__)` or create a new logger.
+2. **Use f-string interpolation** with structured `key=value` pairs for context.
+3. **Pick the correct severity:**
+   - `debug` — verbose diagnostics (disabled in production)
+   - `info` — happy-path milestones (request received, task completed)
+   - `warning` — recoverable issues (retry succeeded, optional feature unavailable)
+   - `error` — failures that need attention (always include the exception)
+4. **Log at boundaries** — on entry, on success, and on error. Don't litter intermediate lines unless debugging.
+5. If none of the 18 loggers fit your new module, **add a new one** in `app/core/config.py` following the same `setup_logger()` pattern and export it in `__all__`.
+
+#### Logging example
+
+```python
+# ✅ Correct — domain-specific logger, structured key=value, correct severity
+from app.core.config import auth_logger
+
+async def send_otp(email: str, purpose: OTPPurpose) -> None:
+    auth_logger.info(f"Processing OTP email: email={email}, purpose={purpose.value}")
+    try:
+        sent = await brevo_service.send_otp_email(email, code)
+        if sent:
+            auth_logger.info(f"OTP email sent successfully: email={email}")
+        else:
+            auth_logger.warning(f"OTP email service returned False: email={email}")
+    except Exception as e:
+        auth_logger.error(f"Failed to send OTP email: email={email}, error={e}")
+        raise
+
+
+# ❌ Wrong — ad-hoc logger, no context, wrong severity
+import logging
+logger = logging.getLogger(__name__)
+
+async def send_otp(email: str, purpose: OTPPurpose) -> None:
+    logger.debug("sending otp")  # too low severity, no context
+    await brevo_service.send_otp_email(email, code)
+    logger.debug("done")  # useless
+```
+
+### Orchestration vs. responsibility
+
+Every function or method should be either an **orchestrator** or an **actor** — never both.
+
+| Role | Responsibility | Examples |
+| ---- | -------------- | -------- |
+| **Orchestrator** | Coordinates multiple steps by delegating to actors. Contains no low-level logic of its own. | Router endpoints, service methods like `create_personal_workspace` |
+| **Actor** | Performs a single, focused piece of work. Does not coordinate other actors. | CRUD methods (`get_by_id`, `bulk_discard`), private helpers (`_check_email_not_member`), publisher calls |
+
+**If a function is doing its own low-level work _and_ coordinating other calls, split it** — extract the low-level work into a private helper (actor) and keep the parent as a pure orchestrator.
+
+This keeps each unit small, testable, and easy to reason about.
+
+#### Orchestration example
+
+```python
+# ✅ Correct — orchestrator delegates, actors do focused work
+
+# Orchestrator (service method)
+async def create_personal_workspace(
+    self, session: AsyncSession, user: User
+) -> Workspace:
+    """Orchestrates personal workspace creation."""
+    existing = await workspace_db.get_personal(session, user.id)
+    if existing:
+        return existing
+
+    slug, display_name = self._generate_workspace_identity(user)
+    workspace = await workspace_db.create(session, slug=slug, ...)
+    await workspace_member_db.create(session, workspace_id=workspace.id, ...)
+    await subscription_db.create(session, workspace_id=workspace.id, ...)
+    return workspace
+
+# Actor (private helper) — does ONE thing
+def _generate_workspace_identity(self, user: User) -> tuple[str, str]:
+    """Derive slug and display name from user profile."""
+    base = user.full_name or user.email.split("@")[0]
+    slug = slugify(base)
+    return slug, f"{base}'s Workspace"
+
+
+# ❌ Wrong — mixed orchestration and low-level work in one function
+async def create_personal_workspace(
+    self, session: AsyncSession, user: User
+) -> Workspace:
+    existing = await workspace_db.get_personal(session, user.id)
+    if existing:
+        return existing
+
+    # Low-level slug generation mixed into orchestrator
+    base = user.full_name or user.email.split("@")[0]
+    slug = slugify(base)
+    display_name = f"{base}'s Workspace"
+
+    workspace = await workspace_db.create(session, slug=slug, ...)
+    await workspace_member_db.create(session, workspace_id=workspace.id, ...)
+    await subscription_db.create(session, workspace_id=workspace.id, ...)
+    return workspace
+```
+
+### OpenAPI endpoint documentation
+
+Every endpoint must have comprehensive, developer-friendly OpenAPI documentation. This is a **non-negotiable** standard.
+
+#### Required fields
+
+| Decorator param | Purpose | Guidelines |
+| --------------- | ------- | ---------- |
+| `summary` | Short label in docs UI | Imperative phrase, ≤ 10 words (e.g. `"List workspace members"`) |
+| `description` | Full Markdown documentation | See structure below |
+| `responses` | Custom non-200 examples | Add when the default error model isn't descriptive enough |
+
+#### Description structure
+
+Every `description` should follow this template (adapt sections as needed):
+
+```markdown
+## Endpoint Title
+
+One-sentence summary of what the endpoint does.
+
+### Authorization
+
+Who can call this and what credentials are required.
+
+### Request
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| ...   | ...  | ...      | ...         |
+
+### Response
+
+| Field | Type | Description |
+|-------|------|-------------|
+| ...   | ...  | ...         |
+
+### Errors
+
+| Status | Condition |
+|--------|-----------|
+| 401    | Missing or invalid token |
+| 404    | Resource not found |
+| ...    | ...       |
+
+### Notes
+
+- Any caveats, rate limiting, pagination details, etc.
+```
+
+#### Reference examples
+
+The following endpoints are the gold standard — match their level of detail:
+
+- `POST /auth/signup` — `app/core/routers/auth.py`
+- `GET /career/history` — `app/apps/cubex_career/routers/history.py`
+- `POST /api/internal/usage/validate` — `app/apps/cubex_api/routers/internal.py`
+- `POST /support/contact-sales` — `app/apps/cubex_api/routers/support.py`
 
 ### Background job pattern
 

@@ -551,9 +551,10 @@ class TestQuotaCacheServiceLookups:
 
     async def test_calculate_billable_cost_returns_none_when_missing_config(self):
         session = AsyncMock()
-        with patch("app.core.db.crud.quota.feature_cost_config_db") as mock_fc, patch(
-            "app.core.db.crud.quota.plan_pricing_rule_db"
-        ) as mock_pp:
+        with (
+            patch("app.core.db.crud.quota.feature_cost_config_db") as mock_fc,
+            patch("app.core.db.crud.quota.plan_pricing_rule_db") as mock_pp,
+        ):
             mock_fc.get_by_feature_key = AsyncMock(return_value=None)
             mock_pp.get_by_plan_id = AsyncMock(return_value=None)
 

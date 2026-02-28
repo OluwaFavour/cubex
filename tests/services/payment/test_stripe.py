@@ -280,11 +280,12 @@ class TestUpdateSubscriptionWithSeatPriceId:
     ):
         from unittest.mock import patch, AsyncMock
 
-        with patch.object(
-            Stripe, "get_subscription", new_callable=AsyncMock
-        ) as mock_get_sub, patch.object(
-            Stripe, "_request", new_callable=AsyncMock
-        ) as mock_request:
+        with (
+            patch.object(
+                Stripe, "get_subscription", new_callable=AsyncMock
+            ) as mock_get_sub,
+            patch.object(Stripe, "_request", new_callable=AsyncMock) as mock_request,
+        ):
             mock_get_sub.return_value = mock_subscription_items
             # Return a valid subscription response for the update
             mock_request.return_value = {"id": "sub_test123", "object": "subscription"}
@@ -315,11 +316,12 @@ class TestUpdateSubscriptionWithSeatPriceId:
     async def test_update_subscription_fails(self, mock_subscription_items):
         from unittest.mock import patch, AsyncMock
 
-        with patch.object(
-            Stripe, "get_subscription", new_callable=AsyncMock
-        ) as mock_get_sub, patch.object(
-            Stripe, "_request", new_callable=AsyncMock
-        ) as mock_request:
+        with (
+            patch.object(
+                Stripe, "get_subscription", new_callable=AsyncMock
+            ) as mock_get_sub,
+            patch.object(Stripe, "_request", new_callable=AsyncMock) as mock_request,
+        ):
             mock_get_sub.return_value = mock_subscription_items
             mock_request.return_value = {"id": "sub_test123", "object": "subscription"}
 
@@ -347,11 +349,12 @@ class TestUpdateSubscriptionWithSeatPriceId:
     ):
         from unittest.mock import patch, AsyncMock
 
-        with patch.object(
-            Stripe, "get_subscription", new_callable=AsyncMock
-        ) as mock_get_sub, patch.object(
-            Stripe, "_request", new_callable=AsyncMock
-        ) as mock_request:
+        with (
+            patch.object(
+                Stripe, "get_subscription", new_callable=AsyncMock
+            ) as mock_get_sub,
+            patch.object(Stripe, "_request", new_callable=AsyncMock) as mock_request,
+        ):
             mock_get_sub.return_value = mock_subscription_items
             mock_request.return_value = {"id": "sub_test123", "object": "subscription"}
 

@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-from app.apps.cubex_api.schemas.subscription import PlanResponse
+from app.core.schemas.plan import PlanResponse
 from app.core.enums import SubscriptionStatus
 
 

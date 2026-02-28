@@ -316,18 +316,23 @@ def mock_stripe():
             cancel_at_period_end=kwargs.get("cancel_at_period_end", False),
         )
 
-    with patch(
-        "app.core.services.payment.stripe.main.Stripe.cancel_subscription",
-        side_effect=mock_cancel_subscription,
-    ), patch(
-        "app.core.services.payment.stripe.main.Stripe.create_checkout_session",
-        new_callable=AsyncMock,
-    ), patch(
-        "app.core.services.payment.stripe.main.Stripe.create_customer_portal_session",
-        new_callable=AsyncMock,
-    ), patch(
-        "app.core.services.payment.stripe.main.Stripe._request",
-        new_callable=AsyncMock,
+    with (
+        patch(
+            "app.core.services.payment.stripe.main.Stripe.cancel_subscription",
+            side_effect=mock_cancel_subscription,
+        ),
+        patch(
+            "app.core.services.payment.stripe.main.Stripe.create_checkout_session",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.core.services.payment.stripe.main.Stripe.create_customer_portal_session",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.core.services.payment.stripe.main.Stripe._request",
+            new_callable=AsyncMock,
+        ),
     ):
         yield
 
@@ -353,12 +358,15 @@ def mock_email_service():
     # Register mock as the event publisher so get_publisher() returns it
     register_publisher(mock_publish_event)
 
-    with patch(
-        "app.infrastructure.messaging.publisher.publish_event",
-        side_effect=mock_publish_event,
-    ), patch(
-        "app.infrastructure.messaging.handlers.stripe.publish_event",
-        side_effect=mock_publish_event,
+    with (
+        patch(
+            "app.infrastructure.messaging.publisher.publish_event",
+            side_effect=mock_publish_event,
+        ),
+        patch(
+            "app.infrastructure.messaging.handlers.stripe.publish_event",
+            side_effect=mock_publish_event,
+        ),
     ):
         yield
 

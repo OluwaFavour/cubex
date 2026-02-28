@@ -42,6 +42,9 @@ jobs:
             - name: Type check (Pyright)
               run: pyright app/
 
+            - name: Import contracts (lint-imports)
+              run: lint-imports
+
     test:
         name: Tests
         needs: lint

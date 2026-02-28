@@ -147,12 +147,15 @@ class TestOAuthStateManagerValidateCallback:
     def test_validate_callback_url_allowed_origin(self):
         from app.core.services.oauth import OAuthStateManager
 
-        with patch(
-            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
-            ["https://myapp.com"],
-        ), patch(
-            "app.core.services.oauth.base.settings.ENVIRONMENT",
-            "development",
+        with (
+            patch(
+                "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+                ["https://myapp.com"],
+            ),
+            patch(
+                "app.core.services.oauth.base.settings.ENVIRONMENT",
+                "development",
+            ),
         ):
             result = OAuthStateManager.validate_callback_url(
                 "https://myapp.com/auth/callback"
@@ -162,12 +165,15 @@ class TestOAuthStateManagerValidateCallback:
     def test_validate_callback_url_not_in_origins(self):
         from app.core.services.oauth import OAuthStateManager
 
-        with patch(
-            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
-            ["https://myapp.com"],
-        ), patch(
-            "app.core.services.oauth.base.settings.ENVIRONMENT",
-            "development",
+        with (
+            patch(
+                "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+                ["https://myapp.com"],
+            ),
+            patch(
+                "app.core.services.oauth.base.settings.ENVIRONMENT",
+                "development",
+            ),
         ):
             result = OAuthStateManager.validate_callback_url(
                 "https://evil-site.com/callback"
@@ -177,12 +183,15 @@ class TestOAuthStateManagerValidateCallback:
     def test_validate_callback_url_wildcard_origin(self):
         from app.core.services.oauth import OAuthStateManager
 
-        with patch(
-            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
-            ["*"],
-        ), patch(
-            "app.core.services.oauth.base.settings.ENVIRONMENT",
-            "development",
+        with (
+            patch(
+                "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+                ["*"],
+            ),
+            patch(
+                "app.core.services.oauth.base.settings.ENVIRONMENT",
+                "development",
+            ),
         ):
             result = OAuthStateManager.validate_callback_url(
                 "https://any-site.com/callback"
@@ -192,12 +201,15 @@ class TestOAuthStateManagerValidateCallback:
     def test_validate_callback_url_production_requires_https(self):
         from app.core.services.oauth import OAuthStateManager
 
-        with patch(
-            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
-            ["http://myapp.com", "https://myapp.com"],
-        ), patch(
-            "app.core.services.oauth.base.settings.ENVIRONMENT",
-            "production",
+        with (
+            patch(
+                "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+                ["http://myapp.com", "https://myapp.com"],
+            ),
+            patch(
+                "app.core.services.oauth.base.settings.ENVIRONMENT",
+                "production",
+            ),
         ):
             # HTTP should fail in production
             result = OAuthStateManager.validate_callback_url(
@@ -214,12 +226,15 @@ class TestOAuthStateManagerValidateCallback:
     def test_validate_callback_url_development_allows_http(self):
         from app.core.services.oauth import OAuthStateManager
 
-        with patch(
-            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
-            ["http://localhost:3000"],
-        ), patch(
-            "app.core.services.oauth.base.settings.ENVIRONMENT",
-            "development",
+        with (
+            patch(
+                "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+                ["http://localhost:3000"],
+            ),
+            patch(
+                "app.core.services.oauth.base.settings.ENVIRONMENT",
+                "development",
+            ),
         ):
             result = OAuthStateManager.validate_callback_url(
                 "http://localhost:3000/callback"
@@ -229,12 +244,15 @@ class TestOAuthStateManagerValidateCallback:
     def test_validate_callback_url_trailing_slash_handling(self):
         from app.core.services.oauth import OAuthStateManager
 
-        with patch(
-            "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
-            ["https://myapp.com/"],
-        ), patch(
-            "app.core.services.oauth.base.settings.ENVIRONMENT",
-            "development",
+        with (
+            patch(
+                "app.core.services.oauth.base.settings.CORS_ALLOW_ORIGINS",
+                ["https://myapp.com/"],
+            ),
+            patch(
+                "app.core.services.oauth.base.settings.ENVIRONMENT",
+                "development",
+            ),
         ):
             # Should match despite different trailing slash
             result = OAuthStateManager.validate_callback_url(

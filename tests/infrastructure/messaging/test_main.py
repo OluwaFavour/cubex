@@ -37,11 +37,15 @@ class TestStartConsumers:
 
         queue_config = QueueConfig(name="test_queue", handler=sample_handler)
 
-        with patch(
-            "app.infrastructure.messaging.main.get_connection", new_callable=AsyncMock
-        ) as mock_get_conn, patch(
-            "app.infrastructure.messaging.main.get_queue_configs"
-        ) as mock_get_configs:
+        with (
+            patch(
+                "app.infrastructure.messaging.main.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch(
+                "app.infrastructure.messaging.main.get_queue_configs"
+            ) as mock_get_configs,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_get_configs.return_value = [queue_config]
 
@@ -88,11 +92,15 @@ class TestStartConsumers:
             max_retries=3,
         )
 
-        with patch(
-            "app.infrastructure.messaging.main.get_connection", new_callable=AsyncMock
-        ) as mock_get_conn, patch(
-            "app.infrastructure.messaging.main.get_queue_configs"
-        ) as mock_get_configs:
+        with (
+            patch(
+                "app.infrastructure.messaging.main.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch(
+                "app.infrastructure.messaging.main.get_queue_configs"
+            ) as mock_get_configs,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_get_configs.return_value = [queue_config]
 
@@ -143,11 +151,15 @@ class TestStartConsumers:
             ],
         )
 
-        with patch(
-            "app.infrastructure.messaging.main.get_connection", new_callable=AsyncMock
-        ) as mock_get_conn, patch(
-            "app.infrastructure.messaging.main.get_queue_configs"
-        ) as mock_get_configs:
+        with (
+            patch(
+                "app.infrastructure.messaging.main.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch(
+                "app.infrastructure.messaging.main.get_queue_configs"
+            ) as mock_get_configs,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_get_configs.return_value = [queue_config]
 
@@ -202,11 +214,15 @@ class TestStartConsumers:
             dead_letter_queue="test_queue_dead",
         )
 
-        with patch(
-            "app.infrastructure.messaging.main.get_connection", new_callable=AsyncMock
-        ) as mock_get_conn, patch(
-            "app.infrastructure.messaging.main.get_queue_configs"
-        ) as mock_get_configs:
+        with (
+            patch(
+                "app.infrastructure.messaging.main.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch(
+                "app.infrastructure.messaging.main.get_queue_configs"
+            ) as mock_get_configs,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_get_configs.return_value = [queue_config]
 
@@ -253,11 +269,15 @@ class TestStartConsumers:
             dead_letter_queue="test_dead",
         )
 
-        with patch(
-            "app.infrastructure.messaging.main.get_connection", new_callable=AsyncMock
-        ) as mock_get_conn, patch(
-            "app.infrastructure.messaging.main.get_queue_configs"
-        ) as mock_get_configs:
+        with (
+            patch(
+                "app.infrastructure.messaging.main.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch(
+                "app.infrastructure.messaging.main.get_queue_configs"
+            ) as mock_get_configs,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_get_configs.return_value = [queue_config]
 
@@ -317,11 +337,15 @@ class TestStartConsumers:
             QueueConfig(name="queue2", handler=handler2),
         ]
 
-        with patch(
-            "app.infrastructure.messaging.main.get_connection", new_callable=AsyncMock
-        ) as mock_get_conn, patch(
-            "app.infrastructure.messaging.main.get_queue_configs"
-        ) as mock_get_configs:
+        with (
+            patch(
+                "app.infrastructure.messaging.main.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch(
+                "app.infrastructure.messaging.main.get_queue_configs"
+            ) as mock_get_configs,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_get_configs.return_value = queue_configs
 
@@ -352,11 +376,15 @@ class TestStartConsumers:
 
         queue_config = QueueConfig(name="test_queue", handler=sample_handler)
 
-        with patch(
-            "app.infrastructure.messaging.main.get_connection", new_callable=AsyncMock
-        ) as mock_get_conn, patch(
-            "app.infrastructure.messaging.main.get_queue_configs"
-        ) as mock_get_configs:
+        with (
+            patch(
+                "app.infrastructure.messaging.main.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch(
+                "app.infrastructure.messaging.main.get_queue_configs"
+            ) as mock_get_configs,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_get_configs.return_value = [queue_config]
 
@@ -387,12 +415,15 @@ class TestStartConsumers:
             await asyncio.sleep(0.1)
             future.cancel()
 
-        with patch(
-            "app.infrastructure.messaging.main.get_connection", new_callable=AsyncMock
-        ) as mock_get_conn, patch(
-            "app.infrastructure.messaging.main.get_queue_configs"
-        ) as mock_get_configs, patch(
-            "asyncio.Future", return_value=future
+        with (
+            patch(
+                "app.infrastructure.messaging.main.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch(
+                "app.infrastructure.messaging.main.get_queue_configs"
+            ) as mock_get_configs,
+            patch("asyncio.Future", return_value=future),
         ):
             mock_get_conn.return_value = mock_connection
             mock_get_configs.return_value = [queue_config]
@@ -432,11 +463,15 @@ class TestStartConsumers:
             ],
         )
 
-        with patch(
-            "app.infrastructure.messaging.main.get_connection", new_callable=AsyncMock
-        ) as mock_get_conn, patch(
-            "app.infrastructure.messaging.main.get_queue_configs"
-        ) as mock_get_configs:
+        with (
+            patch(
+                "app.infrastructure.messaging.main.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch(
+                "app.infrastructure.messaging.main.get_queue_configs"
+            ) as mock_get_configs,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_get_configs.return_value = [queue_config]
 
@@ -477,11 +512,15 @@ class TestStartConsumers:
             dead_letter_queue="main_queue_dead",
         )
 
-        with patch(
-            "app.infrastructure.messaging.main.get_connection", new_callable=AsyncMock
-        ) as mock_get_conn, patch(
-            "app.infrastructure.messaging.main.get_queue_configs"
-        ) as mock_get_configs:
+        with (
+            patch(
+                "app.infrastructure.messaging.main.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch(
+                "app.infrastructure.messaging.main.get_queue_configs"
+            ) as mock_get_configs,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_get_configs.return_value = [queue_config]
 

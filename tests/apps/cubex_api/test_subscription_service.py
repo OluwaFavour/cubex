@@ -367,15 +367,16 @@ class TestCheckoutSessionLineItems:
         workspace_id = uuid4()
         seat_count = 5
 
-        with patch.object(
-            service, "get_plan", new_callable=AsyncMock
-        ) as mock_get_plan, patch.object(
-            service, "_ensure_stripe_customer", new_callable=AsyncMock
-        ) as mock_ensure_customer, patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe:
+        with (
+            patch.object(service, "get_plan", new_callable=AsyncMock) as mock_get_plan,
+            patch.object(
+                service, "_ensure_stripe_customer", new_callable=AsyncMock
+            ) as mock_ensure_customer,
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+        ):
             mock_get_plan.return_value = mock_plan_with_seats
             mock_ensure_customer.return_value = "cus_123"
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -416,15 +417,16 @@ class TestCheckoutSessionLineItems:
         workspace_id = uuid4()
         seat_count = 1
 
-        with patch.object(
-            service, "get_plan", new_callable=AsyncMock
-        ) as mock_get_plan, patch.object(
-            service, "_ensure_stripe_customer", new_callable=AsyncMock
-        ) as mock_ensure_customer, patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe:
+        with (
+            patch.object(service, "get_plan", new_callable=AsyncMock) as mock_get_plan,
+            patch.object(
+                service, "_ensure_stripe_customer", new_callable=AsyncMock
+            ) as mock_ensure_customer,
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+        ):
             mock_get_plan.return_value = mock_plan_without_seats
             mock_ensure_customer.return_value = "cus_123"
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -487,13 +489,15 @@ class TestUpdateSeatCountWithSeatPriceId:
         workspace_id = uuid4()
         new_seat_count = 10
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_member_db"
-        ) as mock_member_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_member_db"
+            ) as mock_member_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(
                 return_value=mock_subscription_with_seats
             )
@@ -523,13 +527,15 @@ class TestUpdateSeatCountWithSeatPriceId:
         workspace_id = uuid4()
         new_seat_count = 3  # Less than current 5
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_member_db"
-        ) as mock_member_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_member_db"
+            ) as mock_member_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(
                 return_value=mock_subscription_with_seats
             )
@@ -657,15 +663,16 @@ class TestHandleSubscriptionUpdated:
     ):
         from decimal import Decimal
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ), patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_context_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch("app.apps.cubex_api.services.subscription.workspace_db"),
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_context_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=mock_db_subscription_with_seats
             )
@@ -704,15 +711,16 @@ class TestHandleSubscriptionUpdated:
     ):
         from decimal import Decimal
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ), patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_context_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch("app.apps.cubex_api.services.subscription.workspace_db"),
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_context_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=mock_db_subscription_with_seats
             )
@@ -808,21 +816,23 @@ class TestHandleCheckoutCompletedAmount:
         from decimal import Decimal
         from uuid import uuid4
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_workspace_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db, patch(
-            "app.apps.cubex_api.services.subscription.user_db"
-        ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.plan_db"
-        ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher",
-            return_value=AsyncMock(),
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_workspace_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+            patch("app.apps.cubex_api.services.subscription.user_db") as mock_user_db,
+            patch("app.apps.cubex_api.services.subscription.plan_db") as mock_plan_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.get_publisher",
+                return_value=AsyncMock(),
+            ),
         ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -873,21 +883,23 @@ class TestHandleCheckoutCompletedAmount:
         from decimal import Decimal
         from uuid import uuid4
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_workspace_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db, patch(
-            "app.apps.cubex_api.services.subscription.user_db"
-        ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.plan_db"
-        ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher",
-            return_value=AsyncMock(),
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_workspace_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+            patch("app.apps.cubex_api.services.subscription.user_db") as mock_user_db,
+            patch("app.apps.cubex_api.services.subscription.plan_db") as mock_plan_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.get_publisher",
+                return_value=AsyncMock(),
+            ),
         ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -965,11 +977,12 @@ class TestHandleCheckoutCompletedLogic:
     async def test_idempotency_returns_existing(self, service, mock_stripe_sub):
         existing = MagicMock(id=uuid4())
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+        ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=existing)
             mock_sub_db.create = AsyncMock()
@@ -995,21 +1008,23 @@ class TestHandleCheckoutCompletedLogic:
         new_sub = MagicMock(id=uuid4())
         workspace_id = uuid4()
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.plan_db"
-        ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db, patch(
-            "app.apps.cubex_api.services.subscription.user_db"
-        ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher",
-            return_value=AsyncMock(),
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch("app.apps.cubex_api.services.subscription.plan_db") as mock_plan_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+            patch("app.apps.cubex_api.services.subscription.user_db") as mock_user_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.get_publisher",
+                return_value=AsyncMock(),
+            ),
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1047,21 +1062,23 @@ class TestHandleCheckoutCompletedLogic:
         new_sub = MagicMock(id=uuid4())
         workspace_id = uuid4()
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.plan_db"
-        ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db, patch(
-            "app.apps.cubex_api.services.subscription.user_db"
-        ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher",
-            return_value=AsyncMock(),
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch("app.apps.cubex_api.services.subscription.plan_db") as mock_plan_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+            patch("app.apps.cubex_api.services.subscription.user_db") as mock_user_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.get_publisher",
+                return_value=AsyncMock(),
+            ),
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1101,21 +1118,23 @@ class TestHandleCheckoutCompletedLogic:
         workspace_id = uuid4()
         existing_ctx = MagicMock(id=uuid4())
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.plan_db"
-        ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db, patch(
-            "app.apps.cubex_api.services.subscription.user_db"
-        ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher",
-            return_value=AsyncMock(),
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch("app.apps.cubex_api.services.subscription.plan_db") as mock_plan_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+            patch("app.apps.cubex_api.services.subscription.user_db") as mock_user_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.get_publisher",
+                return_value=AsyncMock(),
+            ),
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1155,21 +1174,23 @@ class TestHandleCheckoutCompletedLogic:
         new_sub = MagicMock(id=uuid4())
         workspace_id = uuid4()
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.plan_db"
-        ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db, patch(
-            "app.apps.cubex_api.services.subscription.user_db"
-        ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher",
-            return_value=AsyncMock(),
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch("app.apps.cubex_api.services.subscription.plan_db") as mock_plan_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+            patch("app.apps.cubex_api.services.subscription.user_db") as mock_user_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.get_publisher",
+                return_value=AsyncMock(),
+            ),
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1207,22 +1228,24 @@ class TestHandleCheckoutCompletedLogic:
         workspace = MagicMock(owner_id=uuid4())
         workspace.display_name = "Test WS"
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.plan_db"
-        ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db, patch(
-            "app.apps.cubex_api.services.subscription.user_db"
-        ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher",
-            return_value=AsyncMock(),
-        ) as mock_get_pub:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch("app.apps.cubex_api.services.subscription.plan_db") as mock_plan_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+            patch("app.apps.cubex_api.services.subscription.user_db") as mock_user_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.get_publisher",
+                return_value=AsyncMock(),
+            ) as mock_get_pub,
+        ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -1257,13 +1280,13 @@ class TestHandleCheckoutCompletedLogic:
     async def test_plan_not_found_raises(self, service, mock_stripe_sub):
         from app.apps.cubex_api.services.subscription import PlanNotFoundException
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.plan_db"
-        ) as mock_plan_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch("app.apps.cubex_api.services.subscription.plan_db") as mock_plan_db,
+        ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -1316,13 +1339,17 @@ class TestHandleSubscriptionDeleted:
             api_context=api_context,
         )
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_member_db"
-        ) as mock_member_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_member_db"
+            ) as mock_member_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=subscription
             )
@@ -1359,13 +1386,17 @@ class TestHandleSubscriptionDeleted:
         )
         updated_sub = MagicMock(id=subscription.id)
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_member_db"
-        ) as mock_member_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_member_db"
+            ) as mock_member_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=subscription
             )
@@ -1395,11 +1426,14 @@ class TestHandleSubscriptionDeleted:
         )
         updated_sub = MagicMock(id=subscription.id)
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=subscription
             )
@@ -1494,15 +1528,18 @@ class TestHandleSubscriptionUpdatedLogic:
     async def test_status_mapping_active(self, service, mock_db_sub):
         stripe_sub = self._make_stripe_sub(status="active")
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=mock_db_sub
             )
@@ -1528,15 +1565,18 @@ class TestHandleSubscriptionUpdatedLogic:
     async def test_status_mapping_past_due(self, service, mock_db_sub):
         stripe_sub = self._make_stripe_sub(status="past_due")
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=mock_db_sub
             )
@@ -1564,17 +1604,21 @@ class TestHandleSubscriptionUpdatedLogic:
 
         stripe_sub = self._make_stripe_sub(status="canceled")
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_member_db"
-        ) as mock_member_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_member_db"
+            ) as mock_member_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=mock_db_sub
             )
@@ -1603,15 +1647,18 @@ class TestHandleSubscriptionUpdatedLogic:
         stripe_sub = self._make_stripe_sub(status="active")
         frozen_ws = MagicMock(status=WorkspaceStatus.FROZEN)
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=mock_db_sub
             )
@@ -1635,17 +1682,21 @@ class TestHandleSubscriptionUpdatedLogic:
         stripe_sub = self._make_stripe_sub(status="canceled")
         stripe_sub.canceled_at = 1702000000
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.workspace_member_db"
-        ) as mock_member_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_member_db"
+            ) as mock_member_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=mock_db_sub
             )
@@ -1677,15 +1728,18 @@ class TestHandleSubscriptionUpdatedLogic:
 
         context = MagicMock(id=uuid4())
 
-        with patch(
-            "app.apps.cubex_api.services.subscription.subscription_db"
-        ) as mock_sub_db, patch(
-            "app.apps.cubex_api.services.subscription.Stripe"
-        ) as mock_stripe, patch(
-            "app.apps.cubex_api.services.subscription.workspace_db"
-        ) as mock_ws_db, patch(
-            "app.apps.cubex_api.services.subscription.api_subscription_context_db"
-        ) as mock_ctx_db:
+        with (
+            patch(
+                "app.apps.cubex_api.services.subscription.subscription_db"
+            ) as mock_sub_db,
+            patch("app.apps.cubex_api.services.subscription.Stripe") as mock_stripe,
+            patch(
+                "app.apps.cubex_api.services.subscription.workspace_db"
+            ) as mock_ws_db,
+            patch(
+                "app.apps.cubex_api.services.subscription.api_subscription_context_db"
+            ) as mock_ctx_db,
+        ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(
                 return_value=mock_db_sub
             )
@@ -1734,9 +1788,11 @@ class TestCreateCheckoutSessionLogic:
         user.stripe_customer_id = "cus_123"
         stripe_session = MagicMock(id="cs_abc", url="https://checkout.stripe.com")
 
-        with patch(f"{self.SVC}.plan_db") as mock_plan_db, patch(
-            f"{self.SVC}.subscription_db"
-        ) as mock_sub_db, patch(f"{self.SVC}.Stripe") as mock_stripe:
+        with (
+            patch(f"{self.SVC}.plan_db") as mock_plan_db,
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.Stripe") as mock_stripe,
+        ):
             mock_plan_db.get_by_id = AsyncMock(return_value=plan)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
             mock_stripe.create_checkout_session = AsyncMock(return_value=stripe_session)
@@ -1805,9 +1861,10 @@ class TestCreateCheckoutSessionLogic:
         plan = self._make_plan()
         existing_sub = MagicMock(stripe_subscription_id="sub_existing")
 
-        with patch(f"{self.SVC}.plan_db") as mock_plan_db, patch(
-            f"{self.SVC}.subscription_db"
-        ) as mock_sub_db:
+        with (
+            patch(f"{self.SVC}.plan_db") as mock_plan_db,
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+        ):
             mock_plan_db.get_by_id = AsyncMock(return_value=plan)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=existing_sub)
 
@@ -1829,11 +1886,12 @@ class TestCreateCheckoutSessionLogic:
         user.stripe_customer_id = None
         stripe_customer = MagicMock(id="cus_new")
 
-        with patch(f"{self.SVC}.plan_db") as mock_plan_db, patch(
-            f"{self.SVC}.subscription_db"
-        ) as mock_sub_db, patch(f"{self.SVC}.Stripe") as mock_stripe, patch(
-            f"{self.SVC}.user_db"
-        ) as mock_user_db:
+        with (
+            patch(f"{self.SVC}.plan_db") as mock_plan_db,
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.Stripe") as mock_stripe,
+            patch(f"{self.SVC}.user_db") as mock_user_db,
+        ):
             mock_plan_db.get_by_id = AsyncMock(return_value=plan)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
             mock_stripe.create_customer = AsyncMock(return_value=stripe_customer)
@@ -1874,11 +1932,12 @@ class TestCancelSubscriptionLogic:
         updated_sub = MagicMock(id=sub.id)
         mock_session = AsyncMock()
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.Stripe"
-        ) as mock_stripe, patch(f"{self.SVC}.workspace_db") as mock_ws_db, patch(
-            f"{self.SVC}.workspace_member_db"
-        ) as mock_member_db:
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.Stripe") as mock_stripe,
+            patch(f"{self.SVC}.workspace_db") as mock_ws_db,
+            patch(f"{self.SVC}.workspace_member_db") as mock_member_db,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             mock_sub_db.update = AsyncMock(return_value=updated_sub)
             mock_stripe.cancel_subscription = AsyncMock()
@@ -1907,11 +1966,12 @@ class TestCancelSubscriptionLogic:
         updated_sub = MagicMock(id=sub.id)
         mock_session = AsyncMock()
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.Stripe"
-        ) as mock_stripe, patch(f"{self.SVC}.workspace_db") as mock_ws_db, patch(
-            f"{self.SVC}.workspace_member_db"
-        ) as mock_member_db:
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.Stripe") as mock_stripe,
+            patch(f"{self.SVC}.workspace_db") as mock_ws_db,
+            patch(f"{self.SVC}.workspace_member_db") as mock_member_db,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             mock_sub_db.update = AsyncMock(return_value=updated_sub)
             mock_stripe.cancel_subscription = AsyncMock()
@@ -1977,9 +2037,11 @@ class TestReactivateWorkspaceLogic:
         workspace = MagicMock(id=workspace_id, owner_id=owner_id)
         mock_session = AsyncMock()
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.workspace_member_db"
-        ) as mock_member_db, patch(f"{self.SVC}.workspace_db") as mock_ws_db:
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.workspace_member_db") as mock_member_db,
+            patch(f"{self.SVC}.workspace_db") as mock_ws_db,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             mock_member_db.get_workspace_members = AsyncMock(
                 return_value=[owner_member]
@@ -2014,9 +2076,10 @@ class TestReactivateWorkspaceLogic:
         member2 = MagicMock(user_id=uuid4(), is_owner=False)
         member3 = MagicMock(user_id=uuid4(), is_owner=False)
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.workspace_member_db"
-        ) as mock_member_db:
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.workspace_member_db") as mock_member_db,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             mock_member_db.get_workspace_members = AsyncMock(
                 return_value=[owner_member, member2, member3]
@@ -2092,10 +2155,11 @@ class TestPreviewSubscriptionChangeLogic:
         new_plan.name = "Enterprise"
         invoice = MagicMock(amount_due=5000)
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.plan_db"
-        ) as mock_plan_db, patch(f"{self.SVC}.Stripe") as mock_stripe, patch(
-            f"{self.SVC}.workspace_member_db"
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.plan_db") as mock_plan_db,
+            patch(f"{self.SVC}.Stripe") as mock_stripe,
+            patch(f"{self.SVC}.workspace_member_db"),
         ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             mock_plan_db.get_by_id = AsyncMock(return_value=new_plan)
@@ -2116,9 +2180,10 @@ class TestPreviewSubscriptionChangeLogic:
 
         sub = self._make_sub()
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.plan_db"
-        ) as mock_plan_db:
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.plan_db") as mock_plan_db,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             same_plan = MagicMock(
                 id=sub.plan_id,
@@ -2155,9 +2220,10 @@ class TestPreviewSubscriptionChangeLogic:
         )
         lower_plan.name = "Lower"
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.plan_db"
-        ) as mock_plan_db:
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.plan_db") as mock_plan_db,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             mock_plan_db.get_by_id = AsyncMock(return_value=lower_plan)
 
@@ -2234,14 +2300,13 @@ class TestUpgradePlanLogic:
         workspace.display_name = "Test WS"
         owner = MagicMock(email="owner@test.com", full_name="Owner")
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.plan_db"
-        ) as mock_plan_db, patch(f"{self.SVC}.Stripe") as mock_stripe, patch(
-            f"{self.SVC}.workspace_db"
-        ) as mock_ws_db, patch(
-            f"{self.SVC}.user_db"
-        ) as mock_user_db, patch(
-            f"{self.SVC}.get_publisher", return_value=AsyncMock()
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.plan_db") as mock_plan_db,
+            patch(f"{self.SVC}.Stripe") as mock_stripe,
+            patch(f"{self.SVC}.workspace_db") as mock_ws_db,
+            patch(f"{self.SVC}.user_db") as mock_user_db,
+            patch(f"{self.SVC}.get_publisher", return_value=AsyncMock()),
         ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             mock_plan_db.get_by_id = AsyncMock(return_value=new_plan)
@@ -2272,9 +2337,10 @@ class TestUpgradePlanLogic:
 
         sub = self._make_sub()
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.plan_db"
-        ) as mock_plan_db:
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.plan_db") as mock_plan_db,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             same_plan = MagicMock(
                 id=sub.plan_id,
@@ -2309,9 +2375,10 @@ class TestUpgradePlanLogic:
         )
         lower_plan.name = "Lower"
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.plan_db"
-        ) as mock_plan_db:
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.plan_db") as mock_plan_db,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             mock_plan_db.get_by_id = AsyncMock(return_value=lower_plan)
 
@@ -2341,9 +2408,10 @@ class TestUpgradePlanLogic:
         )
         new_plan.name = "New Plan"
 
-        with patch(f"{self.SVC}.subscription_db") as mock_sub_db, patch(
-            f"{self.SVC}.plan_db"
-        ) as mock_plan_db:
+        with (
+            patch(f"{self.SVC}.subscription_db") as mock_sub_db,
+            patch(f"{self.SVC}.plan_db") as mock_plan_db,
+        ):
             mock_sub_db.get_by_workspace = AsyncMock(return_value=sub)
             mock_plan_db.get_by_id = AsyncMock(return_value=new_plan)
 

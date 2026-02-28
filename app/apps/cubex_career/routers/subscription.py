@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentActiveUser, get_async_session
 from app.core.config import request_logger
-from app.apps.cubex_api.schemas.subscription import (
+from app.core.schemas.plan import (
     PlanResponse,
     PlanListResponse,
     FeatureResponse,

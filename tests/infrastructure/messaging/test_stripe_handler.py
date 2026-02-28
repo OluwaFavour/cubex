@@ -127,14 +127,17 @@ class TestIdempotency:
             "seat_count": 1,
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=True,
-        ) as mock_check, patch(
-            f"{HANDLER_MODULE}._process_api_checkout",
-            new_callable=AsyncMock,
-        ) as mock_process:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as mock_check,
+            patch(
+                f"{HANDLER_MODULE}._process_api_checkout",
+                new_callable=AsyncMock,
+            ) as mock_process,
+        ):
             await handle_stripe_checkout_completed(event)
 
             mock_check.assert_called_once_with("evt_dup_checkout")
@@ -151,14 +154,17 @@ class TestIdempotency:
             "stripe_subscription_id": "sub_123",
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=True,
-        ) as mock_check, patch(
-            f"{HANDLER_MODULE}._process_subscription_update",
-            new_callable=AsyncMock,
-        ) as mock_process:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as mock_check,
+            patch(
+                f"{HANDLER_MODULE}._process_subscription_update",
+                new_callable=AsyncMock,
+            ) as mock_process,
+        ):
             await handle_stripe_subscription_updated(event)
 
             mock_check.assert_called_once_with("evt_dup_update")
@@ -175,14 +181,17 @@ class TestIdempotency:
             "stripe_subscription_id": "sub_123",
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=True,
-        ) as mock_check, patch(
-            f"{HANDLER_MODULE}._process_subscription_deletion",
-            new_callable=AsyncMock,
-        ) as mock_process:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as mock_check,
+            patch(
+                f"{HANDLER_MODULE}._process_subscription_deletion",
+                new_callable=AsyncMock,
+            ) as mock_process,
+        ):
             await handle_stripe_subscription_deleted(event)
 
             mock_check.assert_called_once_with("evt_dup_delete")
@@ -201,14 +210,17 @@ class TestIdempotency:
             "amount_due": 2999,
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=True,
-        ) as mock_check, patch(
-            f"{HANDLER_MODULE}._process_payment_failure",
-            new_callable=AsyncMock,
-        ) as mock_process:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as mock_check,
+            patch(
+                f"{HANDLER_MODULE}._process_payment_failure",
+                new_callable=AsyncMock,
+            ) as mock_process,
+        ):
             await handle_stripe_payment_failed(event)
 
             mock_check.assert_called_once_with("evt_dup_payment")
@@ -235,20 +247,25 @@ class TestHandleCheckoutCompleted:
             "seat_count": 5,
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
-        ) as mock_mark, patch(
-            f"{HANDLER_MODULE}._process_api_checkout",
-            new_callable=AsyncMock,
-        ) as mock_api, patch(
-            f"{HANDLER_MODULE}._process_career_checkout",
-            new_callable=AsyncMock,
-        ) as mock_career:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ) as mock_mark,
+            patch(
+                f"{HANDLER_MODULE}._process_api_checkout",
+                new_callable=AsyncMock,
+            ) as mock_api,
+            patch(
+                f"{HANDLER_MODULE}._process_career_checkout",
+                new_callable=AsyncMock,
+            ) as mock_career,
+        ):
             await handle_stripe_checkout_completed(event)
 
             mock_api.assert_called_once()
@@ -279,20 +296,25 @@ class TestHandleCheckoutCompleted:
             "seat_count": 1,
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
-        ) as mock_mark, patch(
-            f"{HANDLER_MODULE}._process_career_checkout",
-            new_callable=AsyncMock,
-        ) as mock_career, patch(
-            f"{HANDLER_MODULE}._process_api_checkout",
-            new_callable=AsyncMock,
-        ) as mock_api:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ) as mock_mark,
+            patch(
+                f"{HANDLER_MODULE}._process_career_checkout",
+                new_callable=AsyncMock,
+            ) as mock_career,
+            patch(
+                f"{HANDLER_MODULE}._process_api_checkout",
+                new_callable=AsyncMock,
+            ) as mock_api,
+        ):
             await handle_stripe_checkout_completed(event)
 
             mock_career.assert_called_once()
@@ -319,17 +341,21 @@ class TestHandleCheckoutCompleted:
             "seat_count": 1,
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
-        ), patch(
-            f"{HANDLER_MODULE}._process_api_checkout",
-            new_callable=AsyncMock,
-        ) as mock_api:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._process_api_checkout",
+                new_callable=AsyncMock,
+            ) as mock_api,
+        ):
             await handle_stripe_checkout_completed(event)
             mock_api.assert_called_once()
 
@@ -349,17 +375,21 @@ class TestHandleCheckoutCompleted:
             "seat_count": 1,
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
-        ) as mock_mark, patch(
-            f"{HANDLER_MODULE}._process_api_checkout",
-            new_callable=AsyncMock,
-            side_effect=Exception("DB error"),
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ) as mock_mark,
+            patch(
+                f"{HANDLER_MODULE}._process_api_checkout",
+                new_callable=AsyncMock,
+                side_effect=Exception("DB error"),
+            ),
         ):
             with pytest.raises(Exception, match="DB error"):
                 await handle_stripe_checkout_completed(event)
@@ -380,17 +410,21 @@ class TestHandleSubscriptionUpdated:
             "stripe_subscription_id": "sub_update_123",
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._process_subscription_update",
-            new_callable=AsyncMock,
-        ) as mock_update, patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
-        ) as mock_mark:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._process_subscription_update",
+                new_callable=AsyncMock,
+            ) as mock_update,
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ) as mock_mark,
+        ):
             await handle_stripe_subscription_updated(event)
 
             mock_update.assert_called_once_with("sub_update_123")
@@ -407,18 +441,22 @@ class TestHandleSubscriptionUpdated:
             "stripe_subscription_id": "sub_update_err",
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._process_subscription_update",
-            new_callable=AsyncMock,
-            side_effect=Exception("Service error"),
-        ), patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
-        ) as mock_mark:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._process_subscription_update",
+                new_callable=AsyncMock,
+                side_effect=Exception("Service error"),
+            ),
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ) as mock_mark,
+        ):
             with pytest.raises(Exception, match="Service error"):
                 await handle_stripe_subscription_updated(event)
 
@@ -438,17 +476,21 @@ class TestHandleSubscriptionDeleted:
             "stripe_subscription_id": "sub_delete_123",
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._process_subscription_deletion",
-            new_callable=AsyncMock,
-        ) as mock_delete, patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
-        ) as mock_mark:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._process_subscription_deletion",
+                new_callable=AsyncMock,
+            ) as mock_delete,
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ) as mock_mark,
+        ):
             await handle_stripe_subscription_deleted(event)
 
             mock_delete.assert_called_once_with("sub_delete_123")
@@ -465,18 +507,22 @@ class TestHandleSubscriptionDeleted:
             "stripe_subscription_id": "sub_delete_err",
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._process_subscription_deletion",
-            new_callable=AsyncMock,
-            side_effect=Exception("Deletion failed"),
-        ), patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
-        ) as mock_mark:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._process_subscription_deletion",
+                new_callable=AsyncMock,
+                side_effect=Exception("Deletion failed"),
+            ),
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ) as mock_mark,
+        ):
             with pytest.raises(Exception, match="Deletion failed"):
                 await handle_stripe_subscription_deleted(event)
 
@@ -498,17 +544,21 @@ class TestHandlePaymentFailed:
             "amount_due": 4999,
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._process_payment_failure",
-            new_callable=AsyncMock,
-        ) as mock_process, patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
-        ) as mock_mark:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._process_payment_failure",
+                new_callable=AsyncMock,
+            ) as mock_process,
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ) as mock_mark,
+        ):
             await handle_stripe_payment_failed(event)
 
             mock_process.assert_called_once_with("sub_pf_123", 4999)
@@ -527,18 +577,22 @@ class TestHandlePaymentFailed:
             "amount_due": 2999,
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._process_payment_failure",
-            new_callable=AsyncMock,
-            side_effect=Exception("Email queue down"),
-        ), patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
-        ) as mock_mark:
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._process_payment_failure",
+                new_callable=AsyncMock,
+                side_effect=Exception("Email queue down"),
+            ),
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ) as mock_mark,
+        ):
             await handle_stripe_payment_failed(event)
 
             mock_mark.assert_called_once_with("evt_pf_email_err")
@@ -555,16 +609,20 @@ class TestHandlePaymentFailed:
             "customer_email": "user@example.com",
         }
 
-        with patch(
-            f"{HANDLER_MODULE}._is_event_already_processed",
-            new_callable=AsyncMock,
-            return_value=False,
-        ), patch(
-            f"{HANDLER_MODULE}._process_payment_failure",
-            new_callable=AsyncMock,
-        ) as mock_process, patch(
-            f"{HANDLER_MODULE}._mark_event_as_processed",
-            new_callable=AsyncMock,
+        with (
+            patch(
+                f"{HANDLER_MODULE}._is_event_already_processed",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._process_payment_failure",
+                new_callable=AsyncMock,
+            ) as mock_process,
+            patch(
+                f"{HANDLER_MODULE}._mark_event_as_processed",
+                new_callable=AsyncMock,
+            ),
         ):
             await handle_stripe_payment_failed(event)
 
@@ -586,21 +644,26 @@ class TestProcessSubscriptionUpdate:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ), patch(
-            f"{HANDLER_MODULE}.career_subscription_service.handle_subscription_updated",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ) as mock_career, patch(
-            f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_updated",
-            new_callable=AsyncMock,
-        ) as mock_api:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_service.handle_subscription_updated",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ) as mock_career,
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_updated",
+                new_callable=AsyncMock,
+            ) as mock_api,
+        ):
             await _process_subscription_update("sub_career_update")
 
             mock_career.assert_called_once_with(
@@ -623,21 +686,26 @@ class TestProcessSubscriptionUpdate:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ), patch(
-            f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_updated",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ) as mock_api, patch(
-            f"{HANDLER_MODULE}.career_subscription_service.handle_subscription_updated",
-            new_callable=AsyncMock,
-        ) as mock_career:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_updated",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ) as mock_api,
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_service.handle_subscription_updated",
+                new_callable=AsyncMock,
+            ) as mock_career,
+        ):
             await _process_subscription_update("sub_api_update")
 
             mock_api.assert_called_once_with(
@@ -658,20 +726,25 @@ class TestProcessSubscriptionUpdate:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=None,
-        ), patch(
-            f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_updated",
-            new_callable=AsyncMock,
-        ) as mock_api, patch(
-            f"{HANDLER_MODULE}.career_subscription_service.handle_subscription_updated",
-            new_callable=AsyncMock,
-        ) as mock_career:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_updated",
+                new_callable=AsyncMock,
+            ) as mock_api,
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_service.handle_subscription_updated",
+                new_callable=AsyncMock,
+            ) as mock_career,
+        ):
             await _process_subscription_update("sub_not_found")
 
             mock_api.assert_not_called()
@@ -697,21 +770,26 @@ class TestProcessSubscriptionUpdate:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ), patch(
-            f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_updated",
-            new_callable=AsyncMock,
-            return_value=updated_sub,
-        ), patch(
-            f"{HANDLER_MODULE}._send_subscription_activated_email",
-            new_callable=AsyncMock,
-        ) as mock_email:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_updated",
+                new_callable=AsyncMock,
+                return_value=updated_sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._send_subscription_activated_email",
+                new_callable=AsyncMock,
+            ) as mock_email,
+        ):
             await _process_subscription_update("sub_plan_change")
 
             mock_email.assert_called_once_with(mock_session, updated_sub, "Basic")
@@ -734,21 +812,26 @@ class TestProcessSubscriptionUpdate:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ), patch(
-            f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_updated",
-            new_callable=AsyncMock,
-            return_value=updated_sub,
-        ), patch(
-            f"{HANDLER_MODULE}._send_subscription_activated_email",
-            new_callable=AsyncMock,
-        ) as mock_email:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_updated",
+                new_callable=AsyncMock,
+                return_value=updated_sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._send_subscription_activated_email",
+                new_callable=AsyncMock,
+            ) as mock_email,
+        ):
             await _process_subscription_update("sub_no_change")
 
             mock_email.assert_not_called()
@@ -770,26 +853,33 @@ class TestProcessSubscriptionDeletion:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ), patch(
-            f"{HANDLER_MODULE}.plan_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=plan,
-        ), patch(
-            f"{HANDLER_MODULE}.career_subscription_service.handle_subscription_deleted",
-            new_callable=AsyncMock,
-        ) as mock_career, patch(
-            f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_deleted",
-            new_callable=AsyncMock,
-        ) as mock_api, patch(
-            f"{HANDLER_MODULE}._send_subscription_canceled_email",
-            new_callable=AsyncMock,
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.plan_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=plan,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_service.handle_subscription_deleted",
+                new_callable=AsyncMock,
+            ) as mock_career,
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_deleted",
+                new_callable=AsyncMock,
+            ) as mock_api,
+            patch(
+                f"{HANDLER_MODULE}._send_subscription_canceled_email",
+                new_callable=AsyncMock,
+            ),
         ):
             await _process_subscription_deletion("sub_career_del")
 
@@ -814,26 +904,33 @@ class TestProcessSubscriptionDeletion:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ), patch(
-            f"{HANDLER_MODULE}.plan_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=plan,
-        ), patch(
-            f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_deleted",
-            new_callable=AsyncMock,
-        ) as mock_api, patch(
-            f"{HANDLER_MODULE}.career_subscription_service.handle_subscription_deleted",
-            new_callable=AsyncMock,
-        ) as mock_career, patch(
-            f"{HANDLER_MODULE}._send_subscription_canceled_email",
-            new_callable=AsyncMock,
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.plan_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=plan,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_deleted",
+                new_callable=AsyncMock,
+            ) as mock_api,
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_service.handle_subscription_deleted",
+                new_callable=AsyncMock,
+            ) as mock_career,
+            patch(
+                f"{HANDLER_MODULE}._send_subscription_canceled_email",
+                new_callable=AsyncMock,
+            ),
         ):
             await _process_subscription_deletion("sub_api_del")
 
@@ -855,17 +952,21 @@ class TestProcessSubscriptionDeletion:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=None,
-        ), patch(
-            f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_deleted",
-            new_callable=AsyncMock,
-        ) as mock_api:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_deleted",
+                new_callable=AsyncMock,
+            ) as mock_api,
+        ):
             await _process_subscription_deletion("sub_not_found")
             mock_api.assert_not_called()
 
@@ -883,24 +984,30 @@ class TestProcessSubscriptionDeletion:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ), patch(
-            f"{HANDLER_MODULE}.plan_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=plan,
-        ), patch(
-            f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_deleted",
-            new_callable=AsyncMock,
-        ), patch(
-            f"{HANDLER_MODULE}._send_subscription_canceled_email",
-            new_callable=AsyncMock,
-        ) as mock_email:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.plan_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=plan,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_service.handle_subscription_deleted",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._send_subscription_canceled_email",
+                new_callable=AsyncMock,
+            ) as mock_email,
+        ):
             await _process_subscription_deletion("sub_email_del")
 
             mock_email.assert_called_once_with(mock_session, sub, "Professional")
@@ -931,17 +1038,21 @@ class TestProcessPaymentFailure:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=None,
-        ), patch(
-            f"{HANDLER_MODULE}._send_payment_failed_email",
-            new_callable=AsyncMock,
-        ) as mock_email:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._send_payment_failed_email",
+                new_callable=AsyncMock,
+            ) as mock_email,
+        ):
             await _process_payment_failure("sub_not_found", 2999)
             mock_email.assert_not_called()
 
@@ -959,21 +1070,26 @@ class TestProcessPaymentFailure:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ), patch(
-            f"{HANDLER_MODULE}.plan_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=plan,
-        ), patch(
-            f"{HANDLER_MODULE}._send_payment_failed_email",
-            new_callable=AsyncMock,
-        ) as mock_email:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.plan_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=plan,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._send_payment_failed_email",
+                new_callable=AsyncMock,
+            ) as mock_email,
+        ):
             await _process_payment_failure("sub_pf_123", 4999)
 
             mock_email.assert_called_once_with(
@@ -994,21 +1110,26 @@ class TestProcessPaymentFailure:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
-            new_callable=AsyncMock,
-            return_value=sub,
-        ), patch(
-            f"{HANDLER_MODULE}.plan_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=plan,
-        ), patch(
-            f"{HANDLER_MODULE}._send_payment_failed_email",
-            new_callable=AsyncMock,
-        ) as mock_email:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.subscription_db.get_by_stripe_subscription_id",
+                new_callable=AsyncMock,
+                return_value=sub,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.plan_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=plan,
+            ),
+            patch(
+                f"{HANDLER_MODULE}._send_payment_failed_email",
+                new_callable=AsyncMock,
+            ) as mock_email,
+        ):
             await _process_payment_failure("sub_no_amount", None)
 
             mock_email.assert_called_once_with(mock_session, sub, "Plus", None)
@@ -1030,13 +1151,16 @@ class TestProcessCheckoutHelpers:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.career_subscription_service.handle_checkout_completed",
-            new_callable=AsyncMock,
-        ) as mock_service:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_service.handle_checkout_completed",
+                new_callable=AsyncMock,
+            ) as mock_service,
+        ):
             await _process_career_checkout(
                 "sub_career_co", "cus_career_co", user_id, plan_id
             )
@@ -1064,13 +1188,16 @@ class TestProcessCheckoutHelpers:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
-            return_value=mock_ctx,
-        ), patch(
-            f"{HANDLER_MODULE}.api_subscription_service.handle_checkout_completed",
-            new_callable=AsyncMock,
-        ) as mock_service:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.AsyncSessionLocal.begin",
+                return_value=mock_ctx,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_service.handle_checkout_completed",
+                new_callable=AsyncMock,
+            ) as mock_service,
+        ):
             await _process_api_checkout("sub_api_co", "cus_api_co", ws_id, plan_id, 5)
 
             mock_service.assert_called_once_with(
@@ -1102,18 +1229,22 @@ class TestEmailHelpers:
         context = MagicMock()
         context.user_id = uuid4()
 
-        with patch(
-            f"{HANDLER_MODULE}.career_subscription_context_db.get_by_subscription",
-            new_callable=AsyncMock,
-            return_value=context,
-        ), patch(
-            f"{HANDLER_MODULE}.user_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=user,
-        ), patch(
-            f"{HANDLER_MODULE}.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_context_db.get_by_subscription",
+                new_callable=AsyncMock,
+                return_value=context,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.user_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=user,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.publish_event",
+                new_callable=AsyncMock,
+            ) as mock_publish,
+        ):
             await _send_subscription_activated_email(mock_session, sub, "Free")
 
             mock_publish.assert_called_once()
@@ -1144,18 +1275,22 @@ class TestEmailHelpers:
         context = MagicMock()
         context.workspace_id = uuid4()
 
-        with patch(
-            f"{HANDLER_MODULE}.api_subscription_context_db.get_by_subscription",
-            new_callable=AsyncMock,
-            return_value=context,
-        ), patch(
-            f"{HANDLER_MODULE}.workspace_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=workspace,
-        ), patch(
-            f"{HANDLER_MODULE}.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_context_db.get_by_subscription",
+                new_callable=AsyncMock,
+                return_value=context,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.workspace_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=workspace,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.publish_event",
+                new_callable=AsyncMock,
+            ) as mock_publish,
+        ):
             await _send_subscription_activated_email(mock_session, sub, "Basic")
 
             mock_publish.assert_called_once()
@@ -1182,18 +1317,22 @@ class TestEmailHelpers:
         context = MagicMock()
         context.user_id = uuid4()
 
-        with patch(
-            f"{HANDLER_MODULE}.career_subscription_context_db.get_by_subscription",
-            new_callable=AsyncMock,
-            return_value=context,
-        ), patch(
-            f"{HANDLER_MODULE}.user_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=user,
-        ), patch(
-            f"{HANDLER_MODULE}.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_context_db.get_by_subscription",
+                new_callable=AsyncMock,
+                return_value=context,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.user_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=user,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.publish_event",
+                new_callable=AsyncMock,
+            ) as mock_publish,
+        ):
             await _send_subscription_canceled_email(mock_session, sub, "Plus")
 
             mock_publish.assert_called_once()
@@ -1225,18 +1364,22 @@ class TestEmailHelpers:
         context = MagicMock()
         context.workspace_id = uuid4()
 
-        with patch(
-            f"{HANDLER_MODULE}.api_subscription_context_db.get_by_subscription",
-            new_callable=AsyncMock,
-            return_value=context,
-        ), patch(
-            f"{HANDLER_MODULE}.workspace_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=workspace,
-        ), patch(
-            f"{HANDLER_MODULE}.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_context_db.get_by_subscription",
+                new_callable=AsyncMock,
+                return_value=context,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.workspace_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=workspace,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.publish_event",
+                new_callable=AsyncMock,
+            ) as mock_publish,
+        ):
             await _send_subscription_canceled_email(mock_session, sub, "Professional")
 
             mock_publish.assert_called_once()
@@ -1263,18 +1406,22 @@ class TestEmailHelpers:
         context = MagicMock()
         context.user_id = uuid4()
 
-        with patch(
-            f"{HANDLER_MODULE}.career_subscription_context_db.get_by_subscription",
-            new_callable=AsyncMock,
-            return_value=context,
-        ), patch(
-            f"{HANDLER_MODULE}.user_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=user,
-        ), patch(
-            f"{HANDLER_MODULE}.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_context_db.get_by_subscription",
+                new_callable=AsyncMock,
+                return_value=context,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.user_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=user,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.publish_event",
+                new_callable=AsyncMock,
+            ) as mock_publish,
+        ):
             await _send_payment_failed_email(mock_session, sub, "Plus", "$29.99")
 
             mock_publish.assert_called_once()
@@ -1305,18 +1452,22 @@ class TestEmailHelpers:
         context = MagicMock()
         context.workspace_id = uuid4()
 
-        with patch(
-            f"{HANDLER_MODULE}.api_subscription_context_db.get_by_subscription",
-            new_callable=AsyncMock,
-            return_value=context,
-        ), patch(
-            f"{HANDLER_MODULE}.workspace_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=workspace,
-        ), patch(
-            f"{HANDLER_MODULE}.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_context_db.get_by_subscription",
+                new_callable=AsyncMock,
+                return_value=context,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.workspace_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=workspace,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.publish_event",
+                new_callable=AsyncMock,
+            ) as mock_publish,
+        ):
             await _send_payment_failed_email(
                 mock_session, sub, "Professional", "$99.99"
             )
@@ -1338,14 +1489,17 @@ class TestEmailHelpers:
         sub = _make_subscription(ProductType.CAREER, "Plus")
         mock_session = AsyncMock()
 
-        with patch(
-            f"{HANDLER_MODULE}.career_subscription_context_db.get_by_subscription",
-            new_callable=AsyncMock,
-            return_value=None,
-        ), patch(
-            f"{HANDLER_MODULE}.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_context_db.get_by_subscription",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.publish_event",
+                new_callable=AsyncMock,
+            ) as mock_publish,
+        ):
             await _send_subscription_activated_email(mock_session, sub, "Free")
 
             mock_publish.assert_not_called()
@@ -1362,18 +1516,22 @@ class TestEmailHelpers:
         context = MagicMock()
         context.user_id = uuid4()
 
-        with patch(
-            f"{HANDLER_MODULE}.career_subscription_context_db.get_by_subscription",
-            new_callable=AsyncMock,
-            return_value=context,
-        ), patch(
-            f"{HANDLER_MODULE}.user_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=None,
-        ), patch(
-            f"{HANDLER_MODULE}.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.career_subscription_context_db.get_by_subscription",
+                new_callable=AsyncMock,
+                return_value=context,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.user_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.publish_event",
+                new_callable=AsyncMock,
+            ) as mock_publish,
+        ):
             await _send_subscription_activated_email(mock_session, sub, "Free")
 
             mock_publish.assert_not_called()
@@ -1393,18 +1551,22 @@ class TestEmailHelpers:
         workspace = MagicMock()
         workspace.owner = None
 
-        with patch(
-            f"{HANDLER_MODULE}.api_subscription_context_db.get_by_subscription",
-            new_callable=AsyncMock,
-            return_value=context,
-        ), patch(
-            f"{HANDLER_MODULE}.workspace_db.get_by_id",
-            new_callable=AsyncMock,
-            return_value=workspace,
-        ), patch(
-            f"{HANDLER_MODULE}.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+        with (
+            patch(
+                f"{HANDLER_MODULE}.api_subscription_context_db.get_by_subscription",
+                new_callable=AsyncMock,
+                return_value=context,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.workspace_db.get_by_id",
+                new_callable=AsyncMock,
+                return_value=workspace,
+            ),
+            patch(
+                f"{HANDLER_MODULE}.publish_event",
+                new_callable=AsyncMock,
+            ) as mock_publish,
+        ):
             await _send_subscription_activated_email(mock_session, sub, "Free")
 
             mock_publish.assert_not_called()
