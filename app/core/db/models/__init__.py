@@ -1,3 +1,4 @@
+from app.core.db.models.dlq_message import DLQMessage
 from app.core.db.models.otp import OTPToken
 from app.core.db.models.plan import Plan, FeatureSchema
 from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule
@@ -14,6 +15,7 @@ from app.core.db.models.subscription_context import (
 __all__ = [
     "APISubscriptionContext",
     "CareerSubscriptionContext",
+    "DLQMessage",
     "FeatureSchema",
     "OAuthAccount",
     "OTPToken",

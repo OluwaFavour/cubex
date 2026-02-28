@@ -103,6 +103,16 @@ pytest --tb=short
 - `apps/cubex_api/routers/test_workspace.py` - Workspace management endpoints
 - `apps/cubex_api/routers/test_subscription.py` - API subscription endpoints
 - `apps/cubex_career/routers/test_subscription.py` - Career subscription endpoints
+- `apps/cubex_career/routers/test_history.py` - Analysis history endpoints (29 tests)
+- `apps/cubex_career/routers/test_internal.py` - Career internal API (50 tests)
+
+### CRUD Tests
+
+- `apps/cubex_career/db/test_analysis_result_crud.py` - Analysis result CRUD operations (34 tests)
+
+### Schema Tests
+
+- `apps/cubex_career/test_schemas.py` - Career schema validation (30 tests)
 
 ### Core Tests
 
@@ -126,8 +136,14 @@ pytest --tb=short
 - `infrastructure/messaging/test_queues.py` - Queue configuration (17 tests)
 - `infrastructure/messaging/test_publisher.py` - Event publishing (7 tests)
 - `infrastructure/messaging/test_consumer.py` - Message processing (13 tests)
+- `infrastructure/messaging/test_dlq_handler.py` - DLQ message handler (TBD tests)
 - `infrastructure/messaging/test_main.py` - Consumer startup (10 tests)
 - `infrastructure/scheduler/test_main.py` - Scheduler initialization (4 tests)
+
+### Admin Tests
+
+- `admin/test_admin.py` - Admin panel configuration and views
+- `admin/test_dlq.py` - DLQ admin view configuration and metrics endpoint (TBD tests)
 
 ### Core Module Tests
 
@@ -204,6 +220,7 @@ The following fixtures are available in `conftest.py`:
 | `pro_career_plan` | Pro tier career plan |
 | `career_subscription` | Active career subscription for `test_user` |
 | `paid_career_subscription` | Paid Plus tier career subscription |
+| `career_feature_cost_config` | FeatureCostConfig for `CAREER_CAREER_PATH` (required by commit/history tests) |
 
 ### Writing Your First Endpoint Test
 
@@ -703,7 +720,7 @@ async def test_with_mock(client: AsyncClient):
 
 ## Coverage
 
-### Current Test Count: 1600+ tests
+### Current Test Count: 1700+ tests
 
 Check coverage with:
 

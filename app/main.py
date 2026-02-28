@@ -68,6 +68,7 @@ from app.apps.cubex_api.routers import (
     subscription_router as api_subscription_router,
 )
 from app.apps.cubex_career.routers import (
+    history_router as career_history_router,
     subscription_router as career_subscription_router,
     internal_router as career_internal_router,
 )
@@ -75,6 +76,7 @@ from app.core.db import AsyncSessionLocal
 from app.core.services import QuotaCacheService
 from app.core.utils import generate_openapi_json, write_to_file_async
 from app.admin import init_admin
+from app.admin.dlq_router import router as dlq_router
 from app.infrastructure.scheduler import scheduler, initialize_scheduler
 from app.infrastructure.messaging import start_consumers, publish_event
 from app.infrastructure.messaging.connection import get_connection
@@ -280,9 +282,13 @@ app.include_router(
 app.include_router(
     career_internal_router, prefix="/career", tags=["Career - Internal API"]
 )
+app.include_router(career_history_router, prefix="/career", tags=["Career - History"])
 
 # Mount admin interface
 init_admin(app)
+
+# Admin API endpoints (separate from SQLAdmin UI)
+app.include_router(dlq_router, prefix="/admin/api", tags=["Admin - DLQ"])
 
 
 @app.get("/", include_in_schema=False)

@@ -130,6 +130,14 @@ class FailureType(str, Enum):
     VALIDATION_ERROR = "validation_error"  # Request/response validation failed
 
 
+class DLQMessageStatus(str, Enum):
+    """Lifecycle status of a dead-letter queue message."""
+
+    PENDING = "pending"  # Stored but not yet acted upon
+    RETRIED = "retried"  # Re-published to the original queue
+    DISCARDED = "discarded"  # Manually dismissed by an admin
+
+
 class FeatureKey(str, Enum):
     API_CAREER_PATH = "api.career_path"
     API_EXTRACT_KEYWORDS = "api.extract_keywords"
@@ -158,6 +166,7 @@ __all__ = [
     "AccessStatus",
     "APIPlanName",
     "CareerPlanName",
+    "DLQMessageStatus",
     "FailureType",
     "InvitationStatus",
     "MemberRole",

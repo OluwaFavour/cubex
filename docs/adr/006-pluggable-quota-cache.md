@@ -1,7 +1,7 @@
 # ADR-006: Pluggable Quota Cache
 
 **Status:** Accepted
-**Date:** 2025-02
+**Date:** 2026-02
 
 ## Context
 

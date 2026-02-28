@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from pydantic import (
@@ -156,57 +156,126 @@ class UsageValidateResponse(BaseModel):
 
 
 class UsageCommitRequest(BaseModel):
-    """Schema for committing API usage (internal endpoint).
+    """Schema for committing career API usage (internal endpoint).
 
-    When success=True, optionally provide metrics (model, tokens, latency).
-    When success=False, failure details are REQUIRED.
+    Cross-field rules:
+
+    * **success=True** — ``metrics`` and ``result_data`` are accepted;
+      ``failure`` must be absent. If ``result_data`` is provided, a
+      ``CareerAnalysisResult`` row is created for the user's history.
+    * **success=False** — ``failure`` is **required**; ``result_data``
+      is silently discarded; ``metrics`` is ignored.
     """
 
     model_config = ConfigDict(
         json_schema_extra={
-            "example": {
-                "user_id": "550e8400-e29b-41d4-a716-446655440000",
-                "usage_id": "550e8400-e29b-41d4-a716-446655440000",
-                "success": True,
-                "metrics": {
-                    "model_used": "gpt-4o",
-                    "input_tokens": 1500,
-                    "output_tokens": 500,
-                    "latency_ms": 1200,
+            "examples": [
+                {
+                    "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "usage_id": "550e8400-e29b-41d4-a716-446655440001",
+                    "success": True,
+                    "metrics": {
+                        "model_used": "gpt-4o",
+                        "input_tokens": 1500,
+                        "output_tokens": 500,
+                        "latency_ms": 1200,
+                    },
+                    "result_data": {
+                        "match_score": 0.85,
+                        "strengths": ["Python", "FastAPI"],
+                        "gaps": ["Kubernetes"],
+                    },
                 },
-            }
+                {
+                    "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "usage_id": "550e8400-e29b-41d4-a716-446655440001",
+                    "success": False,
+                    "failure": {
+                        "failure_type": "internal_error",
+                        "reason": "Model API returned 500 Internal Server Error",
+                    },
+                },
+            ]
         }
     )
 
     user_id: Annotated[
         UUID,
         Field(
-            description="The ID of the user that made the original request. "
-            "This value is returned in the `UsageValidateResponse`."
+            description=(
+                "The ID of the user that made the original request. "
+                "Returned in the `UsageValidateResponse`."
+            ),
         ),
     ]
     usage_id: Annotated[
         UUID,
-        Field(description="The usage log ID to commit"),
+        Field(
+            description=(
+                "The usage log ID obtained from " "`POST /internal/usage/validate`."
+            ),
+        ),
     ]
     success: Annotated[
         bool,
-        Field(description="True if request succeeded, False if failed"),
+        Field(
+            description=(
+                "True if the AI analysis completed successfully, "
+                "False if it failed. Controls which optional fields "
+                "are required or ignored."
+            ),
+        ),
     ]
     metrics: Annotated[
         "UsageMetrics | None",
-        Field(description="Optional metrics for successful requests"),
+        Field(
+            description=(
+                "Optional performance metrics for successful requests. "
+                "Ignored when `success` is false."
+            ),
+        ),
     ] = None
     failure: Annotated[
         "FailureDetails | None",
-        Field(description="Required failure details when success=False"),
+        Field(
+            description=(
+                "Failure details — **required** when `success` is false. "
+                "Must be null or omitted when `success` is true."
+            ),
+        ),
+    ] = None
+    result_data: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description=(
+                "Structured JSON output from a successful AI analysis. "
+                "When provided on a successful commit, a "
+                "`CareerAnalysisResult` row is created so the user "
+                "can view and manage their analysis history via "
+                "`GET /career/history`. "
+                "Silently ignored when `success` is false."
+            ),
+        ),
     ] = None
 
     @model_validator(mode="after")
-    def failure_required_when_not_success(self) -> "UsageCommitRequest":
-        """Ensure failure details are provided when success=False."""
-        if not self.success and self.failure is None:
-            raise ValueError("failure details are required when success=False")
+    def validate_success_fields(self) -> "UsageCommitRequest":
+        """Cross-field validation for success/failure/result_data.
+
+        * ``success=False`` → ``failure`` is required, ``result_data`` is
+          cleared (silently ignored).
+        * ``success=True`` → ``failure`` must not be provided.
+        """
+        if not self.success:
+            if self.failure is None:
+                raise ValueError("failure details are required when success=False")
+            # Silently discard result_data on failed commits
+            self.result_data = None
+        else:
+            if self.failure is not None:
+                raise ValueError(
+                    "failure details must not be provided when success=True"
+                )
         return self
 
 

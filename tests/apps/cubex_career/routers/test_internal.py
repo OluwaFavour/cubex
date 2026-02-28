@@ -355,6 +355,48 @@ class TestCareerInternalRequestValidation:
         )
         assert response.status_code == 422
 
+    @pytest.mark.asyncio
+    async def test_commit_success_with_failure_details_returns_422(
+        self, client: AsyncClient
+    ):
+        """success=True with failure details must be rejected."""
+        headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
+        response = await client.post(
+            "/career/internal/usage/commit",
+            json={
+                "user_id": str(uuid4()),
+                "usage_id": str(uuid4()),
+                "success": True,
+                "failure": {
+                    "failure_type": "internal_error",
+                    "reason": "Should not be here",
+                },
+            },
+            headers=headers,
+        )
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_commit_failure_with_result_data_accepted(self, client: AsyncClient):
+        """success=False with result_data is accepted (result_data silently discarded)."""
+        headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
+        response = await client.post(
+            "/career/internal/usage/commit",
+            json={
+                "user_id": str(uuid4()),
+                "usage_id": str(uuid4()),
+                "success": False,
+                "failure": {
+                    "failure_type": "timeout",
+                    "reason": "Request timed out",
+                },
+                "result_data": {"should": "be discarded"},
+            },
+            headers=headers,
+        )
+        # Accepted (not 422), though the usage_id won't exist
+        assert response.status_code == 200
+
 
 class TestCareerInternalResponseFormat:
 
@@ -912,6 +954,160 @@ class TestCareerCommitUsageE2E:
         )
         assert commit2.status_code == 200
         assert commit2.json()["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_commit_with_result_data_creates_history(
+        self,
+        client: AsyncClient,
+        test_user,
+        career_subscription,
+        career_pricing_rule,
+        auth_headers,
+    ):
+        """Commit with result_data should create an analysis result
+        visible via GET /career/history."""
+        headers = _make_auth_headers(test_user)
+
+        # Step 1: Validate (uses default CAREER_CAREER_PATH)
+        validate_response = await client.post(
+            "/career/internal/usage/validate",
+            json=make_validate_request(),
+            headers=headers,
+        )
+        assert validate_response.status_code == 200
+        usage_id = validate_response.json()["usage_id"]
+
+        # Step 2: Commit with result_data
+        result_payload = {
+            "match_score": 0.85,
+            "strengths": ["Python", "FastAPI"],
+            "gaps": ["Kubernetes"],
+        }
+        internal_headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
+        commit_response = await client.post(
+            "/career/internal/usage/commit",
+            json={
+                "user_id": str(test_user.id),
+                "usage_id": usage_id,
+                "success": True,
+                "result_data": result_payload,
+            },
+            headers=internal_headers,
+        )
+        assert commit_response.status_code == 200
+        assert commit_response.json()["success"] is True
+
+        # Step 3: Verify in history list
+        list_response = await client.get(
+            "/career/history",
+            headers=auth_headers,
+        )
+        assert list_response.status_code == 200
+        items = list_response.json()["items"]
+        assert len(items) == 1
+        assert items[0]["feature_key"] == FeatureKey.CAREER_CAREER_PATH.value
+        assert items[0]["title"] == "Career Path Analysis"
+        assert items[0]["result_data"] == result_payload
+
+        # Step 4: Verify via detail endpoint
+        result_id = items[0]["id"]
+        detail_response = await client.get(
+            f"/career/history/{result_id}",
+            headers=auth_headers,
+        )
+        assert detail_response.status_code == 200
+        detail = detail_response.json()
+        assert detail["usage_log_id"] == usage_id
+        assert detail["result_data"] == result_payload
+
+    @pytest.mark.asyncio
+    async def test_commit_without_result_data_creates_no_history(
+        self,
+        client: AsyncClient,
+        test_user,
+        career_subscription,
+        career_pricing_rule,
+        auth_headers,
+    ):
+        """Commit without result_data should NOT create an analysis result."""
+        headers = _make_auth_headers(test_user)
+
+        # Step 1: Validate
+        validate_response = await client.post(
+            "/career/internal/usage/validate",
+            json=make_validate_request(),
+            headers=headers,
+        )
+        assert validate_response.status_code == 200
+        usage_id = validate_response.json()["usage_id"]
+
+        # Step 2: Commit without result_data
+        internal_headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
+        commit_response = await client.post(
+            "/career/internal/usage/commit",
+            json={
+                "user_id": str(test_user.id),
+                "usage_id": usage_id,
+                "success": True,
+            },
+            headers=internal_headers,
+        )
+        assert commit_response.status_code == 200
+
+        # Step 3: History should be empty
+        list_response = await client.get(
+            "/career/history",
+            headers=auth_headers,
+        )
+        assert list_response.status_code == 200
+        assert list_response.json()["items"] == []
+
+    @pytest.mark.asyncio
+    async def test_commit_failure_with_result_data_creates_no_history(
+        self,
+        client: AsyncClient,
+        test_user,
+        career_subscription,
+        career_pricing_rule,
+        auth_headers,
+    ):
+        """Commit as failure with result_data should NOT create analysis history."""
+        headers = _make_auth_headers(test_user)
+
+        # Step 1: Validate
+        validate_response = await client.post(
+            "/career/internal/usage/validate",
+            json=make_validate_request(),
+            headers=headers,
+        )
+        assert validate_response.status_code == 200
+        usage_id = validate_response.json()["usage_id"]
+
+        # Step 2: Commit as failure — result_data is silently discarded
+        internal_headers = {"X-Internal-API-Key": settings.INTERNAL_API_SECRET}
+        commit_response = await client.post(
+            "/career/internal/usage/commit",
+            json={
+                "user_id": str(test_user.id),
+                "usage_id": usage_id,
+                "success": False,
+                "failure": {
+                    "failure_type": "internal_error",
+                    "reason": "Model crashed",
+                },
+                "result_data": {"should": "be discarded"},
+            },
+            headers=internal_headers,
+        )
+        assert commit_response.status_code == 200
+
+        # Step 3: History should be empty
+        list_response = await client.get(
+            "/career/history",
+            headers=auth_headers,
+        )
+        assert list_response.status_code == 200
+        assert list_response.json()["items"] == []
 
 
 class TestCareerRateLimitE2E:

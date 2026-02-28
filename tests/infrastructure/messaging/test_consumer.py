@@ -342,3 +342,111 @@ class TestProcessMessage:
 
             call_kwargs = mock_message_class.call_args[1]
             assert call_kwargs["delivery_mode"] == aio_pika.DeliveryMode.PERSISTENT
+
+
+class TestDeadLetterHeaderEnrichment:
+    """Tests for x-error-message and x-original-queue headers added during dead-lettering."""
+
+    @pytest.mark.asyncio
+    async def test_dead_letter_includes_error_message_header(self):
+        mock_message = AsyncMock(spec=aio_pika.IncomingMessage)
+        mock_message.body = json.dumps({"data": "test"}).encode()
+        mock_message.headers = {"x-retry-attempt": 3}
+
+        mock_context = AsyncMock()
+        mock_context.__aenter__ = AsyncMock()
+        mock_context.__aexit__ = AsyncMock()
+        mock_message.process.return_value = mock_context
+
+        async def failing_handler(event):
+            raise ValueError("Connection timed out")
+
+        mock_channel = AsyncMock(spec=aio_pika.Channel)
+        mock_exchange = AsyncMock()
+        mock_channel.default_exchange = mock_exchange
+
+        with patch(
+            "app.infrastructure.messaging.consumer.EmailManagerService"
+        ) as mock_email:
+            mock_email.send_dlq_alert = AsyncMock()
+            with patch("aio_pika.Message") as mock_msg_cls:
+                await process_message(
+                    mock_message,
+                    failing_handler,
+                    mock_channel,
+                    max_retries=3,
+                    dead_letter_queue="test_dead",
+                )
+
+                call_kwargs = mock_msg_cls.call_args[1]
+                assert (
+                    call_kwargs["headers"]["x-error-message"] == "Connection timed out"
+                )
+
+    @pytest.mark.asyncio
+    async def test_dead_letter_includes_original_queue_header(self):
+        mock_message = AsyncMock(spec=aio_pika.IncomingMessage)
+        mock_message.body = json.dumps({"data": "test"}).encode()
+        mock_message.headers = {"x-retry-attempt": 3}
+
+        mock_context = AsyncMock()
+        mock_context.__aenter__ = AsyncMock()
+        mock_context.__aexit__ = AsyncMock()
+        mock_message.process.return_value = mock_context
+
+        async def failing_handler(event):
+            raise Exception("Failure")
+
+        mock_channel = AsyncMock(spec=aio_pika.Channel)
+        mock_exchange = AsyncMock()
+        mock_channel.default_exchange = mock_exchange
+
+        with patch(
+            "app.infrastructure.messaging.consumer.EmailManagerService"
+        ) as mock_email:
+            mock_email.send_dlq_alert = AsyncMock()
+            with patch("aio_pika.Message") as mock_msg_cls:
+                await process_message(
+                    mock_message,
+                    failing_handler,
+                    mock_channel,
+                    max_retries=3,
+                    dead_letter_queue="otp_emails_dead",
+                )
+
+                call_kwargs = mock_msg_cls.call_args[1]
+                assert call_kwargs["headers"]["x-original-queue"] == "otp_emails"
+
+    @pytest.mark.asyncio
+    async def test_dead_letter_no_original_queue_for_non_dead_suffix(self):
+        mock_message = AsyncMock(spec=aio_pika.IncomingMessage)
+        mock_message.body = json.dumps({"data": "test"}).encode()
+        mock_message.headers = {"x-retry-attempt": 3}
+
+        mock_context = AsyncMock()
+        mock_context.__aenter__ = AsyncMock()
+        mock_context.__aexit__ = AsyncMock()
+        mock_message.process.return_value = mock_context
+
+        async def failing_handler(event):
+            raise Exception("Failure")
+
+        mock_channel = AsyncMock(spec=aio_pika.Channel)
+        mock_exchange = AsyncMock()
+        mock_channel.default_exchange = mock_exchange
+
+        with patch(
+            "app.infrastructure.messaging.consumer.EmailManagerService"
+        ) as mock_email:
+            mock_email.send_dlq_alert = AsyncMock()
+            with patch("aio_pika.Message") as mock_msg_cls:
+                await process_message(
+                    mock_message,
+                    failing_handler,
+                    mock_channel,
+                    max_retries=3,
+                    dead_letter_queue="custom_dlq",
+                )
+
+                call_kwargs = mock_msg_cls.call_args[1]
+                assert "x-original-queue" not in call_kwargs["headers"]

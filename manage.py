@@ -33,7 +33,7 @@ async def clear_alembic_task():
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         print("[red]Error: DATABASE_URL environment variable is not set[/red]")
-        # This is a hard configuration error – fail fast so it can be fixed.
+        # This is a hard configuration error - fail fast so it can be fixed.
         raise typer.Exit(1)
 
     engine = create_async_engine(database_url, echo=False)

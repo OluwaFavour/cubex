@@ -226,12 +226,20 @@ class TestStartConsumers:
     async def test_start_consumers_registers_consumer_with_correct_handler(self):
         mock_connection = AsyncMock(spec=aio_pika.RobustConnection)
         mock_channel = AsyncMock(spec=aio_pika.Channel)
-        mock_queue = AsyncMock()
+        mock_main_queue = AsyncMock()
+        mock_dlq_queue = AsyncMock()
 
         mock_connection.channel = AsyncMock(return_value=mock_channel)
         mock_channel.set_qos = AsyncMock()
-        mock_channel.declare_queue = AsyncMock(return_value=mock_queue)
-        mock_queue.consume = AsyncMock()
+
+        # Return different mock queues for main vs dead-letter declarations
+        queue_mocks = {
+            "test_queue": mock_main_queue,
+            "test_dead": mock_dlq_queue,
+        }
+        mock_channel.declare_queue = AsyncMock(
+            side_effect=lambda name, **kw: queue_mocks.get(name, AsyncMock())
+        )
 
         def sample_handler(msg):
             pass
@@ -255,8 +263,9 @@ class TestStartConsumers:
 
             result = await start_consumers(keep_alive=False)
 
-            mock_queue.consume.assert_called_once()
-            consume_call = mock_queue.consume.call_args
+            # Main queue consumer
+            mock_main_queue.consume.assert_called_once()
+            consume_call = mock_main_queue.consume.call_args
 
             consumer_callback = consume_call.args[0]
             assert isinstance(consumer_callback, partial)
@@ -270,6 +279,15 @@ class TestStartConsumers:
             assert consumer_callback.keywords["dead_letter_queue"] == "test_dead"
 
             assert consume_call.kwargs["no_ack"] is False
+
+            # DLQ consumer
+            mock_dlq_queue.consume.assert_called_once()
+            dlq_call = mock_dlq_queue.consume.call_args
+            dlq_callback = dlq_call.args[0]
+            assert isinstance(dlq_callback, partial)
+            assert dlq_callback.func.__name__ == "handle_dlq_message"
+            assert dlq_callback.keywords["queue_name"] == "test_dead"
+            assert dlq_call.kwargs["no_ack"] is False
 
             assert result == mock_connection
 

@@ -1,7 +1,7 @@
 # ADR-003: RabbitMQ over Celery
 
 **Status:** Accepted
-**Date:** 2025-01
+**Date:** 2026-02
 
 ## Context
 
@@ -50,6 +50,6 @@ Retry strategies vary by criticality:
 
 **Negative:**
 
-- More operational overhead than Celery (no built-in monitoring dashboard like Flower)
+- More operational overhead than Celery (~~no built-in monitoring dashboard like Flower~~ mitigated by the DLQ Dashboard — see *Admin → Dead-Letter Queue* SQLAdmin view and `GET /admin/api/dlq/metrics`)
 - Custom consumer code vs. Celery's decorator-based task registration
 - RabbitMQ is heavier to run locally than Redis (mitigated by Docker Compose)
