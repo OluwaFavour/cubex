@@ -480,4 +480,3 @@ class TestStartConsumers:
             queue_returns[0].consume.assert_called_once()
 
             assert result == mock_connection
-

@@ -34,7 +34,6 @@ from app.core.db.models import User
 from app.core.exceptions.types import AuthenticationException, ForbiddenException
 from app.core.utils import decode_jwt_token
 
-
 # Security scheme for Bearer token authentication
 # auto_error=True returns 401 if no token, auto_error=False returns None
 bearer_scheme = HTTPBearer(auto_error=True)
@@ -254,4 +253,3 @@ __all__ = [
     "bearer_scheme",
     "optional_bearer_scheme",
 ]
-

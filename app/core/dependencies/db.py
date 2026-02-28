@@ -14,4 +14,3 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """
     async with AsyncSessionLocal() as async_session:
         yield async_session
-

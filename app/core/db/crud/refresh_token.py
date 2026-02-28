@@ -265,4 +265,3 @@ class RefreshTokenDB(BaseDB[RefreshToken]):
             session=session,
             conditions=conditions,
         )
-

@@ -69,4 +69,3 @@ class TestDatabaseException:
 
         # DatabaseException always sets status to 500 internally
         assert exc.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-

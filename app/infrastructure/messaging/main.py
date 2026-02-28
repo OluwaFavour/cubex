@@ -186,4 +186,3 @@ async def main() -> None:
 # to process messages from those queues.
 if __name__ == "__main__":
     asyncio.run(main())
-

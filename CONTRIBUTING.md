@@ -229,7 +229,25 @@ All new code should include type hints. Use `from __future__ import annotations`
 
 ## Pre-commit Checks
 
-Run this sequence before every commit:
+Run the management command before every commit:
+
+```bash
+python manage.py precommit
+```
+
+This runs Black → Ruff → Pyright → Pytest in sequence, stopping on the first failure.
+
+Useful flags:
+
+```bash
+# Auto-fix formatting and safe lint issues
+python manage.py precommit --fix
+
+# Skip tests (e.g. for a docs-only change)
+python manage.py precommit --skip-tests
+```
+
+Or run each step manually:
 
 ```bash
 # 1. Format
@@ -333,7 +351,7 @@ Include:
 
 ### Service pattern
 
-Services are class-based singletons that inherit from `SingletonService`. Initialize via `ClassName.init()` in lifespan:
+Services that are initialised once at startup (e.g. `AuthService`, `QuotaCacheService`) inherit from `SingletonService` and expose a `classmethod` `init()` called in the lifespan:
 
 ```python
 from app.core.services.base import SingletonService
@@ -346,32 +364,49 @@ class MyService(SingletonService):
 
     @classmethod
     def do_something(cls) -> str:
-        cls._ensure_initialized()
+        if not cls._initialized:
+            raise RuntimeError("MyService not initialised")
         return cls._config
 ```
 
-`SingletonService` provides `_initialized`, `_ensure_initialized()`, and `_reset()` (for test teardown) automatically.
+`SingletonService` provides `_initialized`, `is_initialized()`, and `_reset()` (for test teardown) automatically.
+
+Not every service inherits `SingletonService` — stateless helpers like `CloudinaryService`, `BrevoService`, and `RedisService` are plain classes with class-level state and do not need the lifecycle guard.
 
 ### CRUD pattern
 
-Database operations go in `db/crud/` modules. Each CRUD module is a class with `@staticmethod` methods taking an `AsyncSession`:
+Database operations go in `db/crud/` modules. Each CRUD class inherits from `BaseDB[T]`, a generic base that provides `get_by_id`, `get_all`, `create`, `update`, `delete`, and other common operations. Subclasses add domain-specific queries as **instance methods**:
 
 ```python
-class WorkspaceCRUD:
-    @staticmethod
-    async def get_by_id(session: AsyncSession, workspace_id: UUID) -> Workspace | None:
+from app.core.db.crud.base import BaseDB
+
+class WorkspaceDB(BaseDB[Workspace]):
+    def __init__(self) -> None:
+        super().__init__(model=Workspace)
+
+    async def get_by_slug(
+        self, session: AsyncSession, slug: str
+    ) -> Workspace | None:
         ...
+
+# Module-level singleton used throughout the app
+workspace_db = WorkspaceDB()
 ```
+
+Consumers import the pre-created instance (e.g. `from app.apps.cubex_api.db.crud import workspace_db`).
 
 ### Router pattern
 
 Routers follow FastAPI conventions. Each endpoint function should:
 
 1. Extract dependencies (auth, session, access guards)
-2. Delegate to a service method
+2. Delegate to a **service** for writes/business logic, or call a **CRUD instance** directly for simple reads
 3. Return a Pydantic response model
 
+All database mutations use the **`async with session.begin()`** pattern — the block auto-commits on success and auto-rolls back on exception. Service and CRUD calls inside the block pass `commit_self=False` to defer the commit to the transaction manager:
+
 ```python
+# Write — delegate to a service inside a transaction block
 @router.post("/{workspace_id}/api-keys")
 async def create_api_key(
     workspace_id: UUID,
@@ -380,7 +415,28 @@ async def create_api_key(
     session: AsyncSession = Depends(get_async_session),
 ) -> APIKeyCreatedResponse:
     member, workspace = member_workspace
-    return await quota_service.create_api_key(session, workspace, body)
+    async with session.begin():
+        return await quota_service.create_api_key(
+            session, workspace, body, commit_self=False
+        )
+
+# Read — CRUD directly is fine (no transaction block needed)
+@router.get("/{workspace_id}/members")
+async def list_members(
+    workspace_id: UUID,
+    session: AsyncSession = Depends(get_async_session),
+) -> list[WorkspaceMemberResponse]:
+    members = await workspace_member_db.get_workspace_members(session, workspace_id)
+    return [_build_member_response(m) for m in members]
+```
+
+Infrastructure code (scheduler jobs, message handlers) that doesn't receive a session via dependency injection creates its own transactional session:
+
+```python
+async with AsyncSessionLocal.begin() as session:
+    await user_db.permanently_delete_soft_deleted(
+        session, cutoff_date, commit_self=False
+    )
 ```
 
 ### Import ordering
@@ -414,4 +470,4 @@ await get_publisher()("otp_emails", {"email": user.email, "otp": code})
 
 The concrete publisher is registered at startup in `app/main.py`. Application code should never import directly from `app.infrastructure.messaging` — use `get_publisher()` instead.
 
-Never call external services (Brevo, Stripe) synchronously in request handlers if it can be queued.
+Prefer queuing external service calls (email, notifications) via RabbitMQ when the response is not needed by the caller. Synchronous calls are acceptable when the endpoint must return data from the external service (e.g. Stripe checkout URLs, OAuth token exchange).

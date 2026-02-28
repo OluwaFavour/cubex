@@ -240,4 +240,3 @@ class CareerUsageLog(BaseModel):
 
 
 __all__ = ["CareerUsageLog"]
-

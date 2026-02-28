@@ -550,4 +550,3 @@ class TestSubscriptionEdgeCases:
         assert float(data["credits_allocation"]) > 0
         # Credits used should be 0 for new subscription
         assert float(data["credits_used"]) == 0.0
-

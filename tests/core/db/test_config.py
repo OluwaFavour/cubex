@@ -102,4 +102,3 @@ class TestDisposeDb:
             # dispose_db returns None
             assert result is None
             mock_engine.dispose.assert_called_once()
-

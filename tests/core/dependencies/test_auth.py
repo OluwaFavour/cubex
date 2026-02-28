@@ -419,10 +419,6 @@ class TestModuleExports:
             get_current_active_user,
             get_current_verified_user,
             get_optional_user,
-            CurrentUser,
-            CurrentActiveUser,
-            CurrentVerifiedUser,
-            OptionalUser,
         )
 
         # All exports should be callable or defined
@@ -439,10 +435,6 @@ class TestModuleExports:
             get_current_active_user,
             get_current_verified_user,
             get_optional_user,
-            CurrentUser,
-            CurrentActiveUser,
-            CurrentVerifiedUser,
-            OptionalUser,
         )
 
         # All should be importable from __init__
@@ -450,4 +442,3 @@ class TestModuleExports:
         assert callable(get_current_active_user)
         assert callable(get_current_verified_user)
         assert callable(get_optional_user)
-

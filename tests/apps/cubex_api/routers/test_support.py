@@ -357,4 +357,3 @@ class TestSupportSchemas:
 
         assert ContactSalesRequest is not None
         assert ContactSalesResponse is not None
-

@@ -362,7 +362,6 @@ class TestRateLimitHeadersInResponse:
     async def test_validate_response_may_have_rate_limit_headers(
         self, client, internal_api_headers: dict[str, str]
     ):
-        from httpx import AsyncClient
 
         # Make a request (will fail for other reasons, but headers may be present)
         response = await client.post(

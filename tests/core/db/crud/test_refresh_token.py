@@ -359,4 +359,3 @@ class TestRefreshTokenHashingUtility:
 
         assert len(token_hash) == 64
         assert all(c in "0123456789abcdef" for c in token_hash)
-

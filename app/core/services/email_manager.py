@@ -27,7 +27,6 @@ from app.core.services.base import SingletonService
 from app.core.services.brevo import BrevoService, Contact, ListContact
 from app.core.services.template import Renderer
 
-
 __all__ = ["EmailManagerService"]
 
 

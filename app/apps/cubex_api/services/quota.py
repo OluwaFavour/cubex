@@ -33,7 +33,6 @@ from app.core.enums import AccessStatus, FeatureKey
 from app.core.exceptions.types import NotFoundException
 from app.core.utils import create_request_fingerprint, hmac_hash_otp
 
-
 # API key prefixes for identification
 API_KEY_PREFIX = "cbx_live_"  # Live keys (consume credits)
 TEST_API_KEY_PREFIX = "cbx_test_"  # Test keys (no credits charged)

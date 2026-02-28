@@ -166,4 +166,3 @@ __all__ = [
     "CareerCancelRequest",
     "CareerMessageResponse",
 ]
-

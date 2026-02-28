@@ -38,7 +38,6 @@ from app.apps.cubex_career.services.subscription import (
 )
 from app.core.db.models import Plan, Subscription
 
-
 router = APIRouter(prefix="/subscriptions")
 
 
@@ -639,4 +638,3 @@ async def activate_career_subscription(
 
 
 __all__ = ["router"]
-

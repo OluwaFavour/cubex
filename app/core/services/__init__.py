@@ -38,6 +38,7 @@ from app.core.services.oauth import (
 __all__ = [
     # Core services
     "AuthService",
+    "SingletonService",
     "BrevoService",
     "CloudinaryService",
     "EmailManagerService",

@@ -36,7 +36,6 @@ from app.core.services.oauth.base import (
     OAuthUserInfo,
 )
 
-
 __all__ = ["GoogleOAuthService"]
 
 
@@ -335,4 +334,3 @@ class GoogleOAuthService(BaseOAuthProvider):
         raise OAuthException(
             message="Failed to retrieve Google user info: network error"
         ) from last_error
-

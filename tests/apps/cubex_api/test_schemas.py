@@ -6,18 +6,10 @@ This module tests the Pydantic schemas for workspaces, members, and invitations.
 
 import pytest
 from datetime import datetime, timezone
-from uuid import uuid4, UUID
+from uuid import uuid4
 
 from pydantic import ValidationError
 
-from app.core.enums import (
-    WorkspaceStatus,
-    MemberStatus,
-    MemberRole,
-    InvitationStatus,
-    PlanType,
-    SubscriptionStatus,
-)
 from app.apps.cubex_api.schemas.workspace import (
     WorkspaceCreate,
     WorkspaceUpdate,
@@ -214,4 +206,3 @@ class TestMemberRoleUpdate:
         data = MemberRoleUpdate(role="member")
 
         assert data.role == "member"
-

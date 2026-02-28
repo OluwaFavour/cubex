@@ -821,7 +821,8 @@ class TestHandleCheckoutCompletedAmount:
         ) as mock_user_db, patch(
             "app.apps.cubex_api.services.subscription.plan_db"
         ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
+            "app.apps.cubex_api.services.subscription.get_publisher",
+            return_value=AsyncMock(),
         ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -885,7 +886,8 @@ class TestHandleCheckoutCompletedAmount:
         ) as mock_user_db, patch(
             "app.apps.cubex_api.services.subscription.plan_db"
         ) as mock_plan_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
+            "app.apps.cubex_api.services.subscription.get_publisher",
+            return_value=AsyncMock(),
         ):
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
             mock_sub_db.get_by_workspace = AsyncMock(return_value=None)
@@ -1006,7 +1008,8 @@ class TestHandleCheckoutCompletedLogic:
         ) as mock_ctx_db, patch(
             "app.apps.cubex_api.services.subscription.user_db"
         ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
+            "app.apps.cubex_api.services.subscription.get_publisher",
+            return_value=AsyncMock(),
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1057,7 +1060,8 @@ class TestHandleCheckoutCompletedLogic:
         ) as mock_ctx_db, patch(
             "app.apps.cubex_api.services.subscription.user_db"
         ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
+            "app.apps.cubex_api.services.subscription.get_publisher",
+            return_value=AsyncMock(),
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1110,7 +1114,8 @@ class TestHandleCheckoutCompletedLogic:
         ) as mock_ctx_db, patch(
             "app.apps.cubex_api.services.subscription.user_db"
         ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
+            "app.apps.cubex_api.services.subscription.get_publisher",
+            return_value=AsyncMock(),
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -1163,7 +1168,8 @@ class TestHandleCheckoutCompletedLogic:
         ) as mock_ctx_db, patch(
             "app.apps.cubex_api.services.subscription.user_db"
         ) as mock_user_db, patch(
-            "app.apps.cubex_api.services.subscription.get_publisher", return_value=AsyncMock()
+            "app.apps.cubex_api.services.subscription.get_publisher",
+            return_value=AsyncMock(),
         ):
             mock_stripe.get_subscription = AsyncMock(return_value=mock_stripe_sub)
             mock_sub_db.get_by_stripe_subscription_id = AsyncMock(return_value=None)
@@ -2363,4 +2369,3 @@ class TestUpgradePlanLogic:
                     workspace_id=uuid4(),
                     new_plan_id=uuid4(),
                 )
-

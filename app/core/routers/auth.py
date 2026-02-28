@@ -65,7 +65,6 @@ from app.core.services.cloudinary import (
 from app.core.services.oauth import OAuthStateManager
 from app.core.utils import get_device_info
 
-
 router = APIRouter()
 
 

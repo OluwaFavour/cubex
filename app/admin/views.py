@@ -18,7 +18,6 @@ from sqladmin import ModelView
 from sqladmin.filters import BooleanFilter, StaticValuesFilter
 from sqlalchemy.sql.expression import Select
 from starlette.requests import Request
-import wtforms
 
 from app.core.db.crud.quota import plan_pricing_rule_db
 from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule

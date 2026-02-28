@@ -38,7 +38,6 @@ from app.core.services.oauth.base import (
 from app.core.services.oauth.github import GitHubOAuthService
 from app.core.services.oauth.google import GoogleOAuthService
 
-
 __all__ = [
     "BaseOAuthProvider",
     "OAuthTokens",
@@ -49,4 +48,3 @@ __all__ = [
     "GoogleOAuthService",
     "GitHubOAuthService",
 ]
-

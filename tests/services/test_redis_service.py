@@ -476,4 +476,3 @@ class TestRedisServiceIsConnected:
         RedisService._client = None
 
         assert RedisService.is_connected() is False
-

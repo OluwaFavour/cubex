@@ -241,4 +241,3 @@ class TestGetQueueConfigs:
         assert config.name == "test_queue"
         assert config.handler == test_handler
         assert config.dead_letter_queue == "test_dead"
-

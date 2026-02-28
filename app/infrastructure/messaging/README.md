@@ -770,10 +770,10 @@ async def get_connection() -> aio_pika.RobustConnection:
 
 ```python
 # handlers/email_handler.py
-from app.shared.services import BrevoService
+from app.core.services.email_manager import EmailManagerService
 
 async def handle_email_notification(event: dict[str, Any]) -> None:
-    await BrevoService.send_transactional_email(
+    await EmailManagerService.send_transactional_email(
         to_email=event["email"],
         template_id=event["template_id"],
         params=event.get("params", {}),

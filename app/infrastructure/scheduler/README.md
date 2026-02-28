@@ -134,17 +134,17 @@ from app.infrastructure.scheduler import scheduler
 ### 2. Define a Job Function
 
 ```python
-# app/scheduler/jobs.py
+# app/infrastructure/scheduler/jobs.py
 
-from app.shared.db import get_db
+from app.core.db import AsyncSessionLocal
 
 async def process_pending_refunds() -> None:
     """Process all pending refunds in the system."""
-    async for db in get_db():
+    async with AsyncSessionLocal.begin() as session:
         # Your refund processing logic here
-        pending_refunds = await get_pending_refunds(db)
+        pending_refunds = await get_pending_refunds(session)
         for refund in pending_refunds:
-            await process_refund(db, refund)
+            await process_refund(session, refund)
 ```
 
 ### 3. Schedule the Job
@@ -154,7 +154,7 @@ from datetime import datetime
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.infrastructure.scheduler import scheduler
-from app.shared.config import scheduler_logger
+from app.core.config import scheduler_logger
 
 def schedule_pending_refunds_job(minutes: int):
     """Schedule a job to process pending refunds at regular intervals."""
@@ -189,7 +189,7 @@ def schedule_pending_refunds_job(minutes: int):
 
 ### Dedicated Logger
 
-The scheduler has its own logger configured in `app/shared/config.py`:
+The scheduler has its own logger configured in `app/core/config.py`:
 
 ```python
 scheduler_logger = setup_logger(
@@ -203,7 +203,7 @@ scheduler_logger = setup_logger(
 Use it for all scheduler-related logging:
 
 ```python
-from app.shared.config import scheduler_logger
+from app.core.config import scheduler_logger
 
 scheduler_logger.info("Job started")
 scheduler_logger.error("Job failed", exc_info=True)

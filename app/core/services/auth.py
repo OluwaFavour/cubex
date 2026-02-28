@@ -71,7 +71,6 @@ from app.core.services.oauth.base import BaseOAuthProvider, OAuthUserInfo
 from app.core.services.payment.stripe.main import Stripe
 from app.core.utils import create_jwt_token, hmac_hash_otp
 
-
 __all__ = ["AuthService", "TokenPair"]
 
 

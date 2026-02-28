@@ -85,22 +85,37 @@ class TestLifespanEvents:
     @pytest.fixture(autouse=True)
     def lifespan_mocks(self):
         """Provide common mocks for all lifespan tests."""
-        with patch("app.main.scheduler") as mock_scheduler, \
-             patch("app.main.initialize_scheduler") as mock_init_sched, \
-             patch("app.main.start_consumers", new_callable=AsyncMock, return_value=None) as mock_start, \
-             patch("app.main.register_publisher"), \
-             patch("app.main.register_post_signup_hook"), \
-             patch("app.main.AsyncSessionLocal") as mock_session_local, \
-             patch("app.main.QuotaCacheService") as mock_quota, \
-             patch("app.main.AuthService"), \
-             patch("app.main.CloudinaryService") as mock_cloudinary, \
-             patch("app.main.BrevoService") as mock_brevo, \
-             patch("app.main.Renderer") as mock_renderer, \
-             patch("app.main.generate_openapi_json") as mock_openapi, \
-             patch("app.main.write_to_file_async", new_callable=AsyncMock) as mock_write, \
-             patch("app.main.RedisService") as mock_redis, \
-             patch("app.main.GoogleOAuthService") as mock_google, \
-             patch("app.main.GitHubOAuthService") as mock_github:
+        with patch("app.main.scheduler") as mock_scheduler, patch(
+            "app.main.initialize_scheduler"
+        ) as mock_init_sched, patch(
+            "app.main.start_consumers", new_callable=AsyncMock, return_value=None
+        ) as mock_start, patch(
+            "app.main.register_publisher"
+        ), patch(
+            "app.main.register_post_signup_hook"
+        ), patch(
+            "app.main.AsyncSessionLocal"
+        ) as mock_session_local, patch(
+            "app.main.QuotaCacheService"
+        ) as mock_quota, patch(
+            "app.main.AuthService"
+        ), patch(
+            "app.main.CloudinaryService"
+        ) as mock_cloudinary, patch(
+            "app.main.BrevoService"
+        ) as mock_brevo, patch(
+            "app.main.Renderer"
+        ) as mock_renderer, patch(
+            "app.main.generate_openapi_json"
+        ) as mock_openapi, patch(
+            "app.main.write_to_file_async", new_callable=AsyncMock
+        ) as mock_write, patch(
+            "app.main.RedisService"
+        ) as mock_redis, patch(
+            "app.main.GoogleOAuthService"
+        ) as mock_google, patch(
+            "app.main.GitHubOAuthService"
+        ) as mock_github:
 
             mock_session_local.return_value = AsyncMock()
             mock_quota.init = AsyncMock()

@@ -23,4 +23,3 @@ __all__ = [
     "SalesRequestDB",
     "sales_request_db",
 ]
-

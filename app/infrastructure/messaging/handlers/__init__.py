@@ -30,4 +30,3 @@ __all__ = [
     "handle_stripe_payment_failed",
     "handle_career_usage_commit",
 ]
-

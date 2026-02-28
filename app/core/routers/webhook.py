@@ -14,7 +14,6 @@ from app.core.exceptions.types import BadRequestException
 from app.core.services.payment.stripe.main import Stripe
 from app.core.services.event_publisher import get_publisher
 
-
 router = APIRouter(prefix="/webhooks")
 
 

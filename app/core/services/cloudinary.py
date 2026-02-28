@@ -340,4 +340,3 @@ class CloudinaryService:
                 message=f"Please, try again. Files deletion failed on Cloudinary: {str(e)}",
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             ) from e
-

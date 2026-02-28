@@ -51,7 +51,6 @@ from app.apps.cubex_api.schemas import (
 )
 from app.apps.cubex_api.services import (
     workspace_service,
-    subscription_service,
     quota_service,
     WorkspaceNotFoundException,
     WorkspaceFrozenException,
@@ -74,7 +73,6 @@ from app.apps.cubex_api.db.models import (
 )
 from app.core.db.models import Subscription
 from app.core.db.models.subscription_context import APISubscriptionContext
-
 
 router = APIRouter(prefix="/workspaces")
 
@@ -739,6 +737,7 @@ async def update_member_status(
             member = await workspace_member_db.get_member(
                 session, workspace_id, member_user_id
             )
+            assert member is not None  # guaranteed by service call above
             return _build_member_response(member)
     except PermissionDeniedException as e:
         raise ForbiddenException(str(e.message)) from e
@@ -838,6 +837,7 @@ async def update_member_role(
             member = await workspace_member_db.get_member(
                 session, workspace_id, member_user_id
             )
+            assert member is not None  # guaranteed by service call above
             return _build_member_response(member)
     except PermissionDeniedException as e:
         raise ForbiddenException(str(e.message)) from e
@@ -1512,6 +1512,7 @@ async def accept_invitation(
             member = await workspace_member_db.get_member(
                 session, member.workspace_id, member.user_id
             )
+            assert member is not None  # guaranteed by service call above
             return _build_member_response(member)
     except InvitationNotFoundException as e:
         raise NotFoundException(str(e.message)) from e

@@ -7,6 +7,12 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Register ALL ORM models before any CRUD/dependency import can trigger
+# SQLAlchemy mapper configuration (selectinload, relationship resolution, etc.)
+import app.core.db.models  # noqa: F401
+import app.apps.cubex_api.db.models  # noqa: F401
+import app.apps.cubex_career.db.models  # noqa: F401
+
 from app.core.dependencies import get_async_session
 from app.core.config import settings, app_logger
 from app.core.exceptions.handlers import (

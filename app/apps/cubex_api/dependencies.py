@@ -34,17 +34,16 @@ Example usage:
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, Header, Path
+from fastapi import Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apps.cubex_api.db.crud import workspace_member_db, workspace_db
 from app.apps.cubex_api.db.models import Workspace, WorkspaceMember
 from app.core.dependencies import get_async_session, get_current_active_user
-from app.core.config import request_logger, settings
+from app.core.config import request_logger
 from app.core.db.models import User
 from app.core.enums import WorkspaceStatus
 from app.core.exceptions.types import (
-    AuthenticationException,
     ForbiddenException,
     NotFoundException,
 )
@@ -338,4 +337,3 @@ __all__ = [
     "OwnerPermissionRequiredException",
     "WorkspaceFrozenException",
 ]
-

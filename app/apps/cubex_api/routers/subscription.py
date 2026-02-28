@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentActiveUser, get_async_session
@@ -43,7 +43,6 @@ from app.apps.cubex_api.services import (
 )
 from app.core.db.models import Plan, Subscription
 from app.core.db.crud import api_subscription_context_db
-
 
 router = APIRouter(prefix="/subscriptions")
 
@@ -819,25 +818,26 @@ The preview shows:
 """,
     responses={
         400: {
-            "description": "Downgrade not allowed",
+            "description": "Downgrade not allowed / Invalid seat count",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Cannot downgrade from basic to free. "
-                        "Please cancel and resubscribe to a different plan"
+                    "examples": {
+                        "downgrade_not_allowed": {
+                            "summary": "Downgrade not allowed",
+                            "value": {
+                                "detail": "Cannot downgrade from basic to free. "
+                                "Please cancel and resubscribe to a different plan"
+                            },
+                        },
+                        "invalid_seat_count": {
+                            "summary": "Invalid seat count",
+                            "value": {
+                                "detail": "Current seat count (5) exceeds target plan's maximum (3). "
+                                "Reduce seats before upgrading."
+                            },
+                        },
                     }
                 }
-            },
-        },
-        400: {
-            "description": "Invalid seat count",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Current seat count (5) exceeds target plan's maximum (3). "
-                        "Reduce seats before upgrading."
-                    }
-                },
             },
         },
         403: {
@@ -967,25 +967,26 @@ Returns the updated subscription with the new plan details.
 """,
     responses={
         400: {
-            "description": "Downgrade not allowed",
+            "description": "Downgrade not allowed / Invalid seat count",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Cannot downgrade from basic to free. "
-                        "Please cancel and resubscribe to a different plan"
+                    "examples": {
+                        "downgrade_not_allowed": {
+                            "summary": "Downgrade not allowed",
+                            "value": {
+                                "detail": "Cannot downgrade from basic to free. "
+                                "Please cancel and resubscribe to a different plan"
+                            },
+                        },
+                        "invalid_seat_count": {
+                            "summary": "Invalid seat count",
+                            "value": {
+                                "detail": "Current seat count (5) exceeds target plan's maximum (3). "
+                                "Reduce seats before upgrading."
+                            },
+                        },
                     }
                 }
-            },
-        },
-        400: {
-            "description": "Invalid seat count",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Current seat count (5) exceeds target plan's maximum (3). "
-                        "Reduce seats before upgrading."
-                    }
-                },
             },
         },
         403: {

@@ -40,7 +40,6 @@ from app.core.dependencies import (
     InternalAPIKeyDep,
 )
 
-
 router = APIRouter(prefix="/internal", tags=["Career - Internal API"])
 
 

@@ -1916,4 +1916,3 @@ class Stripe:
 
         body = await cls._request("POST", endpoint, data=payload)
         return BillingPortalSession.model_validate(body)
-

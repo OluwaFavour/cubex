@@ -105,4 +105,3 @@ class TestGetConnection:
 
             # Check it's a RobustConnection (or mock thereof)
             assert hasattr(result, "is_closed")
-
