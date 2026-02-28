@@ -24,7 +24,6 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
-    async_sessionmaker,
     create_async_engine,
 )
 from sqlalchemy import select
@@ -479,7 +478,6 @@ async def basic_api_plan_pricing_rule(db_session: AsyncSession, basic_api_plan):
 
     This ensures quota and rate limit tests have proper pricing rules.
     """
-    from decimal import Decimal
 
     from app.core.db.models import PlanPricingRule
 
@@ -508,7 +506,6 @@ async def basic_feature_cost_config(db_session: AsyncSession, basic_api_plan):
 
     This ensures quota validation tests have a feature cost row.
     """
-    from decimal import Decimal
 
     from app.core.db.models import FeatureCostConfig
     from app.core.enums import FeatureKey, ProductType
@@ -540,7 +537,6 @@ async def career_feature_cost_config(db_session: AsyncSession):
 
     This ensures Career quota validation tests have a feature cost row.
     """
-    from decimal import Decimal
 
     from app.core.db.models import FeatureCostConfig
     from app.core.enums import FeatureKey, ProductType
@@ -576,7 +572,6 @@ async def benchmark_plan_pricing_rule(
     reliably update the QuotaCacheService. Tests needing high rate limits
     should mock get_plan_rate_limit directly.
     """
-    from decimal import Decimal
 
     from app.apps.cubex_api.db.models import PlanPricingRule
 

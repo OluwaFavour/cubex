@@ -10,7 +10,6 @@ Run with coverage:
 
 from uuid import uuid4
 
-import pytest
 
 # Import workspace models first to avoid mapper configuration issues
 from app.apps.cubex_api.db.models.workspace import Workspace  # noqa: F401

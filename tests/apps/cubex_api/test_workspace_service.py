@@ -14,9 +14,6 @@ Run with coverage:
     pytest tests/apps/cubex_api/test_workspace_service.py --cov=app.apps.cubex_api.services.workspace --cov-report=term-missing -v
 """
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 import pytest
 
@@ -25,7 +22,6 @@ from app.core.enums import (
     MemberStatus,
     WorkspaceStatus,
     InvitationStatus,
-    PlanType,
 )
 
 
