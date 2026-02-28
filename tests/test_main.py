@@ -54,7 +54,9 @@ class TestAppConfiguration:
         assert app.version == "1.0.0"
 
     def test_app_debug_mode(self):
-        assert app.debug is False
+        from app.core.config import settings
+
+        assert app.debug is settings.DEBUG
 
     def test_app_openapi_url(self):
         assert app.openapi_url == "/openapi.json"
@@ -80,28 +82,29 @@ class TestAppConfiguration:
 
 class TestLifespanEvents:
 
-    @pytest.mark.asyncio
-    async def test_lifespan_startup_starts_scheduler(self):
-        with patch("app.main.scheduler") as mock_scheduler, patch(
-            "app.main.CloudinaryService"
-        ), patch("app.main.BrevoService") as mock_brevo, patch(
-            "app.main.start_consumers", new_callable=AsyncMock
-        ) as mock_consumers, patch(
-            "app.main.Renderer"
-        ), patch(
-            "app.main.generate_openapi_json"
-        ) as mock_openapi, patch(
-            "app.main.write_to_file_async", new_callable=AsyncMock
-        ), patch(
-            "app.main.RedisService"
-        ) as mock_redis, patch(
-            "app.main.GoogleOAuthService"
-        ) as mock_google, patch(
-            "app.main.GitHubOAuthService"
-        ) as mock_github:
+    @pytest.fixture(autouse=True)
+    def lifespan_mocks(self):
+        """Provide common mocks for all lifespan tests."""
+        with patch("app.main.scheduler") as mock_scheduler, \
+             patch("app.main.initialize_scheduler") as mock_init_sched, \
+             patch("app.main.start_consumers", new_callable=AsyncMock, return_value=None) as mock_start, \
+             patch("app.main.register_publisher"), \
+             patch("app.main.register_post_signup_hook"), \
+             patch("app.main.AsyncSessionLocal") as mock_session_local, \
+             patch("app.main.QuotaCacheService") as mock_quota, \
+             patch("app.main.AuthService"), \
+             patch("app.main.CloudinaryService") as mock_cloudinary, \
+             patch("app.main.BrevoService") as mock_brevo, \
+             patch("app.main.Renderer") as mock_renderer, \
+             patch("app.main.generate_openapi_json") as mock_openapi, \
+             patch("app.main.write_to_file_async", new_callable=AsyncMock) as mock_write, \
+             patch("app.main.RedisService") as mock_redis, \
+             patch("app.main.GoogleOAuthService") as mock_google, \
+             patch("app.main.GitHubOAuthService") as mock_github:
 
+            mock_session_local.return_value = AsyncMock()
+            mock_quota.init = AsyncMock()
             mock_brevo.init = AsyncMock()
-            mock_consumers.return_value = None
             mock_openapi.return_value = "{}"
             mock_redis.init = AsyncMock()
             mock_redis.aclose = AsyncMock()
@@ -110,328 +113,84 @@ class TestLifespanEvents:
             mock_github.init = AsyncMock()
             mock_github.aclose = AsyncMock()
 
-            async with lifespan(app):
-                pass
+            self.mocks = {
+                "scheduler": mock_scheduler,
+                "initialize_scheduler": mock_init_sched,
+                "start_consumers": mock_start,
+                "cloudinary": mock_cloudinary,
+                "brevo": mock_brevo,
+                "renderer": mock_renderer,
+                "openapi": mock_openapi,
+                "write": mock_write,
+                "redis": mock_redis,
+            }
+            yield
 
-            mock_scheduler.start.assert_called_once()
+    @pytest.mark.asyncio
+    async def test_lifespan_startup_starts_scheduler(self):
+        async with lifespan(app):
+            pass
+        self.mocks["scheduler"].start.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_lifespan_startup_configures_cloudinary(self):
-        with patch("app.main.scheduler"), patch(
-            "app.main.CloudinaryService"
-        ) as mock_cloudinary, patch("app.main.BrevoService") as mock_brevo, patch(
-            "app.main.start_consumers", new_callable=AsyncMock
-        ) as mock_consumers, patch(
-            "app.main.Renderer"
-        ), patch(
-            "app.main.generate_openapi_json"
-        ) as mock_openapi, patch(
-            "app.main.write_to_file_async", new_callable=AsyncMock
-        ), patch(
-            "app.main.RedisService"
-        ) as mock_redis, patch(
-            "app.main.GoogleOAuthService"
-        ) as mock_google, patch(
-            "app.main.GitHubOAuthService"
-        ) as mock_github:
-
-            mock_brevo.init = AsyncMock()
-            mock_consumers.return_value = None
-            mock_openapi.return_value = "{}"
-            mock_redis.init = AsyncMock()
-            mock_redis.aclose = AsyncMock()
-            mock_google.init = AsyncMock()
-            mock_google.aclose = AsyncMock()
-            mock_github.init = AsyncMock()
-            mock_github.aclose = AsyncMock()
-
-            async with lifespan(app):
-                pass
-
-            mock_cloudinary.init.assert_called_once()
+        async with lifespan(app):
+            pass
+        self.mocks["cloudinary"].init.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_lifespan_startup_initializes_brevo(self):
-        with patch("app.main.scheduler"), patch("app.main.CloudinaryService"), patch(
-            "app.main.BrevoService"
-        ) as mock_brevo, patch(
-            "app.main.start_consumers", new_callable=AsyncMock
-        ) as mock_consumers, patch(
-            "app.main.Renderer"
-        ), patch(
-            "app.main.generate_openapi_json"
-        ) as mock_openapi, patch(
-            "app.main.write_to_file_async", new_callable=AsyncMock
-        ), patch(
-            "app.main.RedisService"
-        ) as mock_redis, patch(
-            "app.main.GoogleOAuthService"
-        ) as mock_google, patch(
-            "app.main.GitHubOAuthService"
-        ) as mock_github:
-
-            mock_consumers.return_value = None
-            mock_openapi.return_value = "{}"
-            mock_brevo.init = AsyncMock()
-            mock_redis.init = AsyncMock()
-            mock_redis.aclose = AsyncMock()
-            mock_google.init = AsyncMock()
-            mock_google.aclose = AsyncMock()
-            mock_github.init = AsyncMock()
-            mock_github.aclose = AsyncMock()
-
-            async with lifespan(app):
-                pass
-
-            mock_brevo.init.assert_called_once()
+        async with lifespan(app):
+            pass
+        self.mocks["brevo"].init.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_lifespan_startup_starts_message_consumers(self):
-        with patch("app.main.scheduler"), patch("app.main.CloudinaryService"), patch(
-            "app.main.BrevoService"
-        ) as mock_brevo, patch(
-            "app.main.start_consumers", new_callable=AsyncMock
-        ) as mock_consumers, patch(
-            "app.main.Renderer"
-        ), patch(
-            "app.main.generate_openapi_json"
-        ) as mock_openapi, patch(
-            "app.main.write_to_file_async", new_callable=AsyncMock
-        ), patch(
-            "app.main.RedisService"
-        ) as mock_redis, patch(
-            "app.main.GoogleOAuthService"
-        ) as mock_google, patch(
-            "app.main.GitHubOAuthService"
-        ) as mock_github:
-
-            mock_brevo.init = AsyncMock()
-            mock_consumers.return_value = None
-            mock_openapi.return_value = "{}"
-            mock_redis.init = AsyncMock()
-            mock_redis.aclose = AsyncMock()
-            mock_google.init = AsyncMock()
-            mock_google.aclose = AsyncMock()
-            mock_github.init = AsyncMock()
-            mock_github.aclose = AsyncMock()
-
-            async with lifespan(app):
-                pass
-
-            mock_consumers.assert_called_once_with(keep_alive=False)
+        async with lifespan(app):
+            pass
+        self.mocks["start_consumers"].assert_called_once_with(keep_alive=False)
 
     @pytest.mark.asyncio
     async def test_lifespan_startup_initializes_renderer(self):
-        with patch("app.main.scheduler"), patch("app.main.CloudinaryService"), patch(
-            "app.main.BrevoService"
-        ) as mock_brevo, patch(
-            "app.main.start_consumers", new_callable=AsyncMock
-        ) as mock_consumers, patch(
-            "app.main.Renderer"
-        ) as mock_renderer, patch(
-            "app.main.generate_openapi_json"
-        ) as mock_openapi, patch(
-            "app.main.write_to_file_async", new_callable=AsyncMock
-        ), patch(
-            "app.main.RedisService"
-        ) as mock_redis, patch(
-            "app.main.GoogleOAuthService"
-        ) as mock_google, patch(
-            "app.main.GitHubOAuthService"
-        ) as mock_github:
-
-            mock_brevo.init = AsyncMock()
-            mock_consumers.return_value = None
-            mock_openapi.return_value = "{}"
-            mock_redis.init = AsyncMock()
-            mock_redis.aclose = AsyncMock()
-            mock_google.init = AsyncMock()
-            mock_google.aclose = AsyncMock()
-            mock_github.init = AsyncMock()
-            mock_github.aclose = AsyncMock()
-
-            async with lifespan(app):
-                pass
-
-            mock_renderer.initialize.assert_called_once_with("app/templates")
+        async with lifespan(app):
+            pass
+        self.mocks["renderer"].initialize.assert_called_once_with("app/templates")
 
     @pytest.mark.asyncio
     async def test_lifespan_startup_generates_openapi_schema(self):
-        with patch("app.main.scheduler"), patch("app.main.CloudinaryService"), patch(
-            "app.main.BrevoService"
-        ) as mock_brevo, patch(
-            "app.main.start_consumers", new_callable=AsyncMock
-        ) as mock_consumers, patch(
-            "app.main.Renderer"
-        ), patch(
-            "app.main.generate_openapi_json"
-        ) as mock_openapi, patch(
-            "app.main.write_to_file_async", new_callable=AsyncMock
-        ) as mock_write, patch(
-            "app.main.RedisService"
-        ) as mock_redis, patch(
-            "app.main.GoogleOAuthService"
-        ) as mock_google, patch(
-            "app.main.GitHubOAuthService"
-        ) as mock_github:
-
-            mock_brevo.init = AsyncMock()
-            mock_consumers.return_value = None
-            mock_openapi.return_value = '{"openapi": "3.0.0"}'
-            mock_redis.init = AsyncMock()
-            mock_redis.aclose = AsyncMock()
-            mock_google.init = AsyncMock()
-            mock_google.aclose = AsyncMock()
-            mock_github.init = AsyncMock()
-            mock_github.aclose = AsyncMock()
-
-            async with lifespan(app):
-                pass
-
-            mock_openapi.assert_called_once_with(app)
-            mock_write.assert_called_once_with("openapi.json", '{"openapi": "3.0.0"}')
+        self.mocks["openapi"].return_value = '{"openapi": "3.0.0"}'
+        async with lifespan(app):
+            pass
+        self.mocks["openapi"].assert_called_once_with(app)
+        self.mocks["write"].assert_called_once_with(
+            "openapi.json", '{"openapi": "3.0.0"}'
+        )
 
     @pytest.mark.asyncio
     async def test_lifespan_shutdown_closes_consumer_connection(self):
         mock_connection = AsyncMock()
-
-        with patch("app.main.scheduler"), patch("app.main.CloudinaryService"), patch(
-            "app.main.BrevoService"
-        ) as mock_brevo, patch(
-            "app.main.start_consumers", new_callable=AsyncMock
-        ) as mock_consumers, patch(
-            "app.main.Renderer"
-        ), patch(
-            "app.main.generate_openapi_json"
-        ) as mock_openapi, patch(
-            "app.main.write_to_file_async", new_callable=AsyncMock
-        ), patch(
-            "app.main.RedisService"
-        ) as mock_redis, patch(
-            "app.main.GoogleOAuthService"
-        ) as mock_google, patch(
-            "app.main.GitHubOAuthService"
-        ) as mock_github:
-
-            mock_brevo.init = AsyncMock()
-            mock_consumers.return_value = mock_connection
-            mock_openapi.return_value = "{}"
-            mock_redis.init = AsyncMock()
-            mock_redis.aclose = AsyncMock()
-            mock_google.init = AsyncMock()
-            mock_google.aclose = AsyncMock()
-            mock_github.init = AsyncMock()
-            mock_github.aclose = AsyncMock()
-
-            async with lifespan(app):
-                pass
-
-            mock_connection.close.assert_called_once()
+        self.mocks["start_consumers"].return_value = mock_connection
+        async with lifespan(app):
+            pass
+        mock_connection.close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_lifespan_shutdown_no_connection_to_close(self):
-        with patch("app.main.scheduler") as mock_scheduler, patch(
-            "app.main.CloudinaryService"
-        ), patch("app.main.BrevoService") as mock_brevo, patch(
-            "app.main.start_consumers", new_callable=AsyncMock
-        ) as mock_consumers, patch(
-            "app.main.Renderer"
-        ), patch(
-            "app.main.generate_openapi_json"
-        ) as mock_openapi, patch(
-            "app.main.write_to_file_async", new_callable=AsyncMock
-        ), patch(
-            "app.main.RedisService"
-        ) as mock_redis, patch(
-            "app.main.GoogleOAuthService"
-        ) as mock_google, patch(
-            "app.main.GitHubOAuthService"
-        ) as mock_github:
-
-            mock_brevo.init = AsyncMock()
-            mock_consumers.return_value = None  # No connection
-            mock_openapi.return_value = "{}"
-            mock_redis.init = AsyncMock()
-            mock_redis.aclose = AsyncMock()
-            mock_google.init = AsyncMock()
-            mock_google.aclose = AsyncMock()
-            mock_github.init = AsyncMock()
-            mock_github.aclose = AsyncMock()
-
-            async with lifespan(app):
-                pass
-
-            mock_scheduler.shutdown.assert_called_once()
+        async with lifespan(app):
+            pass
+        self.mocks["scheduler"].shutdown.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_lifespan_shutdown_stops_scheduler(self):
-        with patch("app.main.scheduler") as mock_scheduler, patch(
-            "app.main.CloudinaryService"
-        ), patch("app.main.BrevoService") as mock_brevo, patch(
-            "app.main.start_consumers", new_callable=AsyncMock
-        ) as mock_consumers, patch(
-            "app.main.Renderer"
-        ), patch(
-            "app.main.generate_openapi_json"
-        ) as mock_openapi, patch(
-            "app.main.write_to_file_async", new_callable=AsyncMock
-        ), patch(
-            "app.main.RedisService"
-        ) as mock_redis, patch(
-            "app.main.GoogleOAuthService"
-        ) as mock_google, patch(
-            "app.main.GitHubOAuthService"
-        ) as mock_github:
-
-            mock_brevo.init = AsyncMock()
-            mock_consumers.return_value = None
-            mock_openapi.return_value = "{}"
-            mock_redis.init = AsyncMock()
-            mock_redis.aclose = AsyncMock()
-            mock_google.init = AsyncMock()
-            mock_google.aclose = AsyncMock()
-            mock_github.init = AsyncMock()
-            mock_github.aclose = AsyncMock()
-
-            async with lifespan(app):
-                pass
-
-            mock_scheduler.shutdown.assert_called_once()
+        async with lifespan(app):
+            pass
+        self.mocks["scheduler"].shutdown.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_lifespan_shutdown_closes_redis(self):
-        with patch("app.main.scheduler"), patch("app.main.CloudinaryService"), patch(
-            "app.main.BrevoService"
-        ) as mock_brevo, patch(
-            "app.main.start_consumers", new_callable=AsyncMock
-        ) as mock_consumers, patch(
-            "app.main.Renderer"
-        ), patch(
-            "app.main.generate_openapi_json"
-        ) as mock_openapi, patch(
-            "app.main.write_to_file_async", new_callable=AsyncMock
-        ), patch(
-            "app.main.RedisService"
-        ) as mock_redis, patch(
-            "app.main.GoogleOAuthService"
-        ) as mock_google, patch(
-            "app.main.GitHubOAuthService"
-        ) as mock_github:
-
-            mock_brevo.init = AsyncMock()
-            mock_consumers.return_value = None
-            mock_openapi.return_value = "{}"
-            mock_redis.init = AsyncMock()
-            mock_redis.aclose = AsyncMock()
-            mock_google.init = AsyncMock()
-            mock_google.aclose = AsyncMock()
-            mock_github.init = AsyncMock()
-            mock_github.aclose = AsyncMock()
-
-            async with lifespan(app):
-                pass
-
-            mock_redis.aclose.assert_called_once()
+        async with lifespan(app):
+            pass
+        self.mocks["redis"].aclose.assert_called_once()
 
 
 class TestRootEndpoint:

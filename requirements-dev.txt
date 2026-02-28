@@ -11,6 +11,7 @@ pytest-mock==3.15.1
 black==26.1.0
 ruff==0.14.14
 mypy==1.19.1
+import-linter==2.4
 
 # For factories (if needed in future)
 factory-boy==3.3.3

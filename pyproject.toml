@@ -29,6 +29,11 @@ markers = [
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
+# Warning filters
+filterwarnings = [
+    "ignore:coroutine 'Connection._cancel' was never awaited:RuntimeWarning",
+]
+
 # Coverage options
 [tool.coverage.run]
 source = ["app"]
@@ -49,3 +54,22 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "@abstractmethod",
 ]
+
+# ── Import-linter ─────────────────────────────────────────────────────────
+
+[tool.importlinter]
+root_packages = ["app"]
+
+[[tool.importlinter.contracts]]
+name = "Core must not import from apps"
+type = "forbidden"
+source_modules = ["app.core"]
+forbidden_modules = ["app.apps"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Core must not import from infrastructure"
+type = "forbidden"
+source_modules = ["app.core"]
+forbidden_modules = ["app.infrastructure"]
+allow_indirect_imports = true

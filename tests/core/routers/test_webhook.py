@@ -125,13 +125,14 @@ class TestStripeWebhookEndpoint:
             },
         }
 
+        mock_publisher = AsyncMock()
         with patch(
             "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.core.routers.webhook.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+            "app.core.routers.webhook.get_publisher",
+            return_value=mock_publisher,
+        ):
             response = await client.post(
                 "/webhooks/stripe",
                 content=json.dumps({}),
@@ -144,8 +145,8 @@ class TestStripeWebhookEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "received"
 
-        mock_publish.assert_called_once()
-        call_args = mock_publish.call_args
+        mock_publisher.assert_called_once()
+        call_args = mock_publisher.call_args
         assert call_args[0][0] == "stripe_checkout_completed"
         message = call_args[0][1]
         assert message["event_id"] == "evt_checkout_123"
@@ -167,13 +168,14 @@ class TestStripeWebhookEndpoint:
             },
         }
 
+        mock_publisher = AsyncMock()
         with patch(
             "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.core.routers.webhook.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+            "app.core.routers.webhook.get_publisher",
+            return_value=mock_publisher,
+        ):
             response = await client.post(
                 "/webhooks/stripe",
                 content=json.dumps({}),
@@ -186,8 +188,8 @@ class TestStripeWebhookEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "received"
 
-        mock_publish.assert_called_once()
-        call_args = mock_publish.call_args
+        mock_publisher.assert_called_once()
+        call_args = mock_publisher.call_args
         assert call_args[0][0] == "stripe_subscription_updated"
         message = call_args[0][1]
         assert message["event_id"] == "evt_sub_created_123"
@@ -205,13 +207,14 @@ class TestStripeWebhookEndpoint:
             },
         }
 
+        mock_publisher = AsyncMock()
         with patch(
             "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.core.routers.webhook.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+            "app.core.routers.webhook.get_publisher",
+            return_value=mock_publisher,
+        ):
             response = await client.post(
                 "/webhooks/stripe",
                 content=json.dumps({}),
@@ -224,8 +227,8 @@ class TestStripeWebhookEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "received"
 
-        mock_publish.assert_called_once()
-        call_args = mock_publish.call_args
+        mock_publisher.assert_called_once()
+        call_args = mock_publisher.call_args
         assert call_args[0][0] == "stripe_subscription_updated"
         message = call_args[0][1]
         assert message["event_id"] == "evt_sub_updated_123"
@@ -243,13 +246,14 @@ class TestStripeWebhookEndpoint:
             },
         }
 
+        mock_publisher = AsyncMock()
         with patch(
             "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.core.routers.webhook.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+            "app.core.routers.webhook.get_publisher",
+            return_value=mock_publisher,
+        ):
             response = await client.post(
                 "/webhooks/stripe",
                 content=json.dumps({}),
@@ -262,8 +266,8 @@ class TestStripeWebhookEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "received"
 
-        mock_publish.assert_called_once()
-        call_args = mock_publish.call_args
+        mock_publisher.assert_called_once()
+        call_args = mock_publisher.call_args
         assert call_args[0][0] == "stripe_subscription_deleted"
         message = call_args[0][1]
         assert message["event_id"] == "evt_sub_deleted_123"
@@ -281,13 +285,14 @@ class TestStripeWebhookEndpoint:
             },
         }
 
+        mock_publisher = AsyncMock()
         with patch(
             "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.core.routers.webhook.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+            "app.core.routers.webhook.get_publisher",
+            return_value=mock_publisher,
+        ):
             response = await client.post(
                 "/webhooks/stripe",
                 content=json.dumps({}),
@@ -300,8 +305,8 @@ class TestStripeWebhookEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "received"
 
-        mock_publish.assert_called_once()
-        call_args = mock_publish.call_args
+        mock_publisher.assert_called_once()
+        call_args = mock_publisher.call_args
         assert call_args[0][0] == "stripe_subscription_updated"
         message = call_args[0][1]
         assert message["event_id"] == "evt_invoice_paid_123"
@@ -321,13 +326,14 @@ class TestStripeWebhookEndpoint:
             },
         }
 
+        mock_publisher = AsyncMock()
         with patch(
             "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.core.routers.webhook.publish_event",
-            new_callable=AsyncMock,
-        ) as mock_publish:
+            "app.core.routers.webhook.get_publisher",
+            return_value=mock_publisher,
+        ):
             response = await client.post(
                 "/webhooks/stripe",
                 content=json.dumps({}),
@@ -340,8 +346,8 @@ class TestStripeWebhookEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "received"
 
-        mock_publish.assert_called_once()
-        call_args = mock_publish.call_args
+        mock_publisher.assert_called_once()
+        call_args = mock_publisher.call_args
         assert call_args[0][0] == "stripe_payment_failed"
         message = call_args[0][1]
         assert message["event_id"] == "evt_payment_failed_123"
@@ -363,12 +369,13 @@ class TestStripeWebhookEndpoint:
             },
         }
 
+        mock_publisher = AsyncMock(side_effect=Exception("Queue connection failed"))
         with patch(
             "app.core.routers.webhook.Stripe.verify_webhook_signature",
             return_value=event_data,
         ), patch(
-            "app.core.routers.webhook.publish_event",
-            side_effect=Exception("Queue connection failed"),
+            "app.core.routers.webhook.get_publisher",
+            return_value=mock_publisher,
         ):
             response = await client.post(
                 "/webhooks/stripe",

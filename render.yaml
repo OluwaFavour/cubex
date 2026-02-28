@@ -51,6 +51,10 @@ services:
         generateValue: true
       - key: REDIS_URL
         sync: false  # Set manually in dashboard
+      - key: QUOTA_CACHE_BACKEND
+        value: redis
+      - key: RATE_LIMIT_BACKEND
+        value: redis
       - key: RABBITMQ_URL
         sync: false  # Set manually in dashboard
       - key: SENTRY_DSN

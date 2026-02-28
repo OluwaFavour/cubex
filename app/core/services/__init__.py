@@ -1,4 +1,5 @@
 from app.core.services.auth import AuthService
+from app.core.services.base import SingletonService
 from app.core.services.brevo import BrevoService
 from app.core.services.cloudinary import CloudinaryService
 from app.core.services.email_manager import EmailManagerService

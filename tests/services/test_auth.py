@@ -169,12 +169,11 @@ class TestSendOTP:
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.publish_event"
-        ) as mock_publish, patch("app.core.services.auth.hmac_hash_otp") as mock_hash:
+            "app.core.services.auth.get_publisher", return_value=AsyncMock()
+        ), patch("app.core.services.auth.hmac_hash_otp") as mock_hash:
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=0)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
 
-            mock_publish.return_value = None
             mock_hash.return_value = "hashed_otp"
 
             result = await AuthService.send_otp(
@@ -192,12 +191,10 @@ class TestSendOTP:
         from app.core.services.auth import AuthService
 
         with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.publish_event"
-        ) as mock_publish, patch("app.core.services.auth.hmac_hash_otp"):
+            "app.core.services.auth.get_publisher", return_value=AsyncMock()
+        ), patch("app.core.services.auth.hmac_hash_otp"):
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=2)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
-
-            mock_publish.return_value = None
 
             await AuthService.send_otp(
                 session=mock_session,
@@ -216,13 +213,12 @@ class TestSendOTP:
     async def test_send_otp_publishes_email_event(self, mock_session):
         from app.core.services.auth import AuthService
 
+        mock_publisher = AsyncMock()
         with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.publish_event"
-        ) as mock_publish, patch("app.core.services.auth.hmac_hash_otp"):
+            "app.core.services.auth.get_publisher", return_value=mock_publisher
+        ), patch("app.core.services.auth.hmac_hash_otp"):
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=0)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
-
-            mock_publish.return_value = None
 
             await AuthService.send_otp(
                 session=mock_session,
@@ -231,8 +227,8 @@ class TestSendOTP:
                 user_name="John",
             )
 
-            mock_publish.assert_called_once()
-            call_kwargs = mock_publish.call_args[1]
+            mock_publisher.assert_called_once()
+            call_kwargs = mock_publisher.call_args[1]
             assert call_kwargs["queue_name"] == "otp_emails"
             assert call_kwargs["event"]["email"] == "user@example.com"
             assert call_kwargs["event"]["purpose"] == OTPPurpose.PASSWORD_RESET.value
@@ -246,12 +242,10 @@ class TestSendOTP:
         user_id = uuid4()
 
         with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.publish_event"
-        ) as mock_publish, patch("app.core.services.auth.hmac_hash_otp"):
+            "app.core.services.auth.get_publisher", return_value=AsyncMock()
+        ), patch("app.core.services.auth.hmac_hash_otp"):
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=0)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
-
-            mock_publish.return_value = None
 
             await AuthService.send_otp(
                 session=mock_session,
@@ -768,15 +762,16 @@ class TestPasswordReset:
 
         with patch("app.core.services.auth.user_db") as mock_user_db, patch(
             "app.core.services.auth.AuthService.hash_password"
-        ) as mock_hash, patch("app.core.services.auth.publish_event") as mock_publish:
+        ) as mock_hash, patch("app.core.services.auth.get_publisher") as mock_get_pub:
             mock_hash.return_value = "new_hashed_password"
+
+            mock_publish = AsyncMock(return_value=None)
+            mock_get_pub.return_value = mock_publish
 
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=valid_user)
             mock_user_db.update = AsyncMock(return_value=valid_user)
-
-            mock_publish.return_value = None
 
             result = await AuthService.reset_password(
                 session=mock_session,
@@ -795,13 +790,14 @@ class TestPasswordReset:
 
         with patch("app.core.services.auth.user_db") as mock_user_db, patch(
             "app.core.services.auth.AuthService.hash_password"
-        ), patch("app.core.services.auth.publish_event") as mock_publish:
+        ), patch("app.core.services.auth.get_publisher") as mock_get_pub:
+            mock_publish = AsyncMock(return_value=None)
+            mock_get_pub.return_value = mock_publish
+
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=valid_user)
             mock_user_db.update = AsyncMock(return_value=valid_user)
-
-            mock_publish.return_value = None
 
             await AuthService.reset_password(
                 session=mock_session,
@@ -838,4 +834,3 @@ class TestModuleExports:
 
         assert hasattr(auth, "__all__")
         assert "AuthService" in auth.__all__
-

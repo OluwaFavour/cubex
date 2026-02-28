@@ -470,6 +470,8 @@ async def workspace_with_subscription(db_session, test_user, free_api_plan):
     from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
+    )
+    from app.apps.cubex_api.db.models.workspace import (
         Workspace,
         WorkspaceMember,
     )
@@ -826,6 +828,8 @@ class TestRateLimitingEndToEnd:
         from app.core.db.models import (
             APISubscriptionContext,
             Subscription,
+        )
+        from app.apps.cubex_api.db.models.workspace import (
             Workspace,
             WorkspaceMember,
         )

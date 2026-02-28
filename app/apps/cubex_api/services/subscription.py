@@ -40,7 +40,7 @@ from app.core.exceptions.types import (
     NotFoundException,
 )
 from app.core.services.payment.stripe.main import Stripe
-from app.infrastructure.messaging.publisher import publish_event
+from app.core.services.event_publisher import get_publisher
 from app.core.services.payment.stripe.types import (
     CheckoutSession,
     Invoice,
@@ -425,7 +425,7 @@ class SubscriptionService:
             owner = await user_db.get_by_id(session, workspace.owner_id)
             plan = await plan_db.get_by_id(session, plan_id)
             if owner and plan:
-                await publish_event(
+                await get_publisher()(
                     "subscription_activated_emails",
                     {
                         "email": owner.email,
@@ -1297,7 +1297,7 @@ class SubscriptionService:
             session, workspace_id, options=[selectinload(Workspace.owner)]
         )
         if workspace and workspace.owner:
-            await publish_event(
+            await get_publisher()(
                 "subscription_activated_emails",
                 {
                     "email": workspace.owner.email,

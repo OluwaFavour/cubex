@@ -5,6 +5,13 @@ Provides fixtures for integration tests using real test database with per-test r
 All fixtures are function-scoped for complete test isolation.
 """
 
+# Ensure ALL SQLAlchemy models are registered before any mapper configuration.
+# This mirrors what migrations/env.py does — importing app models triggers
+# class creation against Base.metadata so relationships can be resolved.
+import app.core.db.models  # noqa: F401  — core models
+import app.apps.cubex_api.db.models  # noqa: F401  — API app models
+import app.apps.cubex_career.db.models  # noqa: F401  — Career app models
+
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -50,6 +57,41 @@ def pytest_configure(config):
         "markers",
         "integration: marks tests as integration tests (require real database)",
     )
+
+
+@pytest.fixture(autouse=True)
+def _reset_singletons():
+    """Reset all singleton service state after each test for full isolation."""
+    yield
+    # AuthService
+    from app.core.services.auth import AuthService
+
+    AuthService._reset()
+
+    # EmailManagerService
+    from app.core.services.email_manager import EmailManagerService
+
+    EmailManagerService._reset()
+
+    # QuotaCacheService (also resets _backend and _events_registered)
+    from app.core.services.quota_cache import QuotaCacheService
+
+    QuotaCacheService._reset()
+
+    # Sentry logger module-level flag
+    from app.core import logger as logger_module
+
+    logger_module._sentry_initialized = False
+
+    # Event publisher registry
+    from app.core.services.event_publisher import reset_publisher
+
+    reset_publisher()
+
+    # Post-signup hook registry
+    from app.core.services.lifecycle import reset_hooks
+
+    reset_hooks()
 
 
 @pytest.fixture(scope="session")
@@ -300,40 +342,33 @@ def mock_email_service():
     """Auto-mock email/messaging services to prevent real sends and async issues.
 
     This fixture mocks:
-    1. The message queue publisher to prevent RabbitMQ connections
-    2. Avoid async event loop cleanup issues
+    1. The event publisher abstraction (used by core/app code via get_publisher())
+    2. The raw infrastructure publisher (used by messaging handlers internally)
 
-    Note: We must patch publish_event in each module that imports it,
-    because Python binds the import to the module's namespace.
+    By registering a mock publisher, all code paths that call
+    ``get_publisher()()`` will use the mock instead of a real RabbitMQ
+    connection.
     """
+    from app.core.services.event_publisher import register_publisher, reset_publisher
 
     async def mock_publish_event(*args, **kwargs):
         """Mock publish_event that doesn't use RabbitMQ."""
         return None
 
+    # Register mock as the event publisher so get_publisher() returns it
+    register_publisher(mock_publish_event)
+
     with patch(
         "app.infrastructure.messaging.publisher.publish_event",
-        side_effect=mock_publish_event,
-    ), patch(
-        "app.core.services.auth.publish_event",
-        side_effect=mock_publish_event,
-    ), patch(
-        "app.apps.cubex_api.services.workspace.publish_event",
-        side_effect=mock_publish_event,
-    ), patch(
-        "app.apps.cubex_api.services.subscription.publish_event",
-        side_effect=mock_publish_event,
-    ), patch(
-        "app.apps.cubex_career.services.subscription.publish_event",
-        side_effect=mock_publish_event,
-    ), patch(
-        "app.core.routers.webhook.publish_event",
         side_effect=mock_publish_event,
     ), patch(
         "app.infrastructure.messaging.handlers.stripe.publish_event",
         side_effect=mock_publish_event,
     ):
         yield
+
+    # Clean up (also done by _reset_singletons, but be explicit)
+    reset_publisher()
 
 
 @pytest.fixture
@@ -651,7 +686,7 @@ async def pro_career_plan(db_session: AsyncSession):
 
 @pytest.fixture
 async def test_workspace(db_session: AsyncSession, test_user):
-    from app.core.db.models import Workspace, WorkspaceMember
+    from app.apps.cubex_api.db.models.workspace import Workspace, WorkspaceMember
     from app.core.enums import MemberRole, MemberStatus, WorkspaceStatus
 
     workspace = Workspace(
@@ -685,6 +720,8 @@ async def personal_workspace(db_session: AsyncSession, test_user, free_api_plan)
     from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
+    )
+    from app.apps.cubex_api.db.models.workspace import (
         Workspace,
         WorkspaceMember,
     )
@@ -741,7 +778,8 @@ async def personal_workspace(db_session: AsyncSession, test_user, free_api_plan)
 
 @pytest.fixture
 async def test_workspace_member(db_session: AsyncSession, test_workspace):
-    from app.core.db.models import User, WorkspaceMember
+    from app.core.db.models import User
+    from app.apps.cubex_api.db.models.workspace import WorkspaceMember
     from app.core.enums import MemberRole, MemberStatus
 
     user = User(
@@ -771,7 +809,8 @@ async def test_workspace_member(db_session: AsyncSession, test_workspace):
 
 @pytest.fixture
 async def test_workspace_admin(db_session: AsyncSession, test_workspace):
-    from app.core.db.models import User, WorkspaceMember
+    from app.core.db.models import User
+    from app.apps.cubex_api.db.models.workspace import WorkspaceMember
     from app.core.enums import MemberRole, MemberStatus
 
     user = User(
@@ -901,7 +940,7 @@ async def test_invitation(db_session: AsyncSession, test_workspace, test_user):
     import secrets
 
     from app.core.config import settings
-    from app.core.db.models import WorkspaceInvitation
+    from app.apps.cubex_api.db.models.workspace import WorkspaceInvitation
     from app.core.enums import InvitationStatus, MemberRole
     from app.core.utils import hmac_hash_otp
 
@@ -935,7 +974,7 @@ async def expired_invitation(db_session: AsyncSession, test_workspace, test_user
     import secrets
 
     from app.core.config import settings
-    from app.core.db.models import WorkspaceInvitation
+    from app.apps.cubex_api.db.models.workspace import WorkspaceInvitation
     from app.core.enums import InvitationStatus, MemberRole
     from app.core.utils import hmac_hash_otp
 
@@ -1156,6 +1195,8 @@ async def other_workspace(db_session: AsyncSession, test_user, basic_api_plan):
     from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
+    )
+    from app.apps.cubex_api.db.models.workspace import (
         Workspace,
         WorkspaceMember,
     )
@@ -1231,6 +1272,8 @@ async def workspace_quota_exhausted(
     from app.core.db.models import (
         APISubscriptionContext,
         Subscription,
+    )
+    from app.apps.cubex_api.db.models.workspace import (
         Workspace,
         WorkspaceMember,
     )

@@ -15,8 +15,27 @@ class Settings(BaseSettings):
     APP_NAME: str = "CueBX"
     APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = """
-    CueBX
-    """
+CueBX is a multi-product SaaS platform that provides AI-powered developer tools and career services through a unified API.
+
+## Products
+
+- **CueBX API** — Workspace-based developer tooling with team collaboration, role-based access, and per-seat billing.
+- **CueBX Career** — Individual subscription service for AI-assisted career development.
+
+## Key Capabilities
+
+| Area | Description |
+|------|-------------|
+| **Authentication** | Email/password signup with OTP verification, OAuth (Google & GitHub), JWT access/refresh tokens, and session management. |
+| **Workspaces** | Create and manage team workspaces with member invitations, role assignments (owner/admin/member), ownership transfer, and API key provisioning. |
+| **Subscriptions** | Stripe-powered billing with plan browsing, checkout sessions, seat management, plan upgrades with proration previews, and cancellation/reactivation. |
+| **Usage Tracking** | Metered usage validation and commitment via internal API, with quota enforcement and rate limiting per plan tier. |
+| **Webhooks** | Stripe event ingestion for real-time subscription lifecycle sync (checkout completed, subscription updated/deleted, payment failed). |
+
+## Authentication
+
+Most endpoints require a **Bearer JWT** obtained via `/auth/signin` or `/auth/oauth/{provider}/callback`. Internal service-to-service endpoints use an **API key** header (`X-Internal-API-Key`).
+"""
     DEBUG: bool = False
     ROOT_PATH: str = "/v1"
 
@@ -108,6 +127,7 @@ class Settings(BaseSettings):
     # Admin settings
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin_password_change_in_production"
+    ADMIN_TOKEN_VERSION: int = 0  # Increment to invalidate all admin sessions
     ADMIN_ALERT_EMAIL: str | None = (
         None  # Email for system alerts (DLQ, validation errors)
     )
@@ -144,6 +164,19 @@ class Settings(BaseSettings):
                 f"ENVIRONMENT is 'production' but the following secrets still "
                 f"have their insecure default values: {', '.join(still_default)}. "
                 f"Set them via environment variables or .env file."
+            )
+
+        # Ensure production uses Redis-backed backends (not in-memory)
+        memory_backends = [
+            name
+            for name in ("QUOTA_CACHE_BACKEND", "RATE_LIMIT_BACKEND")
+            if getattr(self, name) == "memory"
+        ]
+        if memory_backends:
+            raise ValueError(
+                f"ENVIRONMENT is 'production' but the following backends are "
+                f"set to 'memory': {', '.join(memory_backends)}. "
+                f"Set them to 'redis' for multi-replica safety."
             )
 
         return self

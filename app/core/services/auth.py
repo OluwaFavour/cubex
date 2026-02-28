@@ -61,7 +61,8 @@ from app.core.exceptions.types import (
     OTPInvalidException,
     TooManyAttemptsException,
 )
-from app.infrastructure.messaging import publish_event
+from app.core.services.event_publisher import get_publisher
+from app.core.services.base import SingletonService
 from app.core.services.oauth import (
     GitHubOAuthService,
     GoogleOAuthService,
@@ -95,7 +96,7 @@ class TokenPair:
     expires_in: int = 900  # 15 minutes in seconds
 
 
-class AuthService:
+class AuthService(SingletonService):
     """
     Centralized authentication service.
 
@@ -118,8 +119,6 @@ class AuthService:
         ... )
     """
 
-    _initialized: bool = False
-
     # Token expiration settings
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -138,16 +137,6 @@ class AuthService:
         """
         cls._initialized = True
         auth_logger.info("AuthService initialized")
-
-    @classmethod
-    def is_initialized(cls) -> bool:
-        """
-        Check if the service has been initialized.
-
-        Returns:
-            bool: True if initialized, False otherwise.
-        """
-        return cls._initialized
 
     @classmethod
     def hash_password(cls, password: str) -> str:
@@ -287,7 +276,7 @@ class AuthService:
             await session.commit()
 
         # Publish OTP email event to the message queue
-        await publish_event(
+        await get_publisher()(
             queue_name="otp_emails",
             event={
                 "email": email,
@@ -742,7 +731,7 @@ class AuthService:
         )
 
         # Publish password reset confirmation email event
-        await publish_event(
+        await get_publisher()(
             queue_name="password_reset_confirmation_emails",
             event={
                 "email": email,
