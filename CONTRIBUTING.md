@@ -229,7 +229,25 @@ All new code should include type hints. Use `from __future__ import annotations`
 
 ## Pre-commit Checks
 
-Run this sequence before every commit:
+Run the management command before every commit:
+
+```bash
+python manage.py precommit
+```
+
+This runs Black → Ruff → Pyright → Pytest in sequence, stopping on the first failure.
+
+Useful flags:
+
+```bash
+# Auto-fix formatting and safe lint issues
+python manage.py precommit --fix
+
+# Skip tests (e.g. for a docs-only change)
+python manage.py precommit --skip-tests
+```
+
+Or run each step manually:
 
 ```bash
 # 1. Format

@@ -462,6 +462,56 @@ def syncplans(
     asyncio.run(sync_plans_task(dry_run))
 
 
+@app.command()
+def precommit(
+    fix: Annotated[
+        bool,
+        typer.Option("--fix", "-f", help="Auto-fix formatting and safe lint issues"),
+    ] = False,
+    skip_tests: Annotated[
+        bool,
+        typer.Option("--skip-tests", "-s", help="Skip the pytest step"),
+    ] = False,
+):
+    """Run the full pre-commit check sequence.
+
+    Steps: Black → Ruff → Pyright → Pytest.
+    Stops on the first failure.
+
+    Examples:
+        python manage.py precommit
+        python manage.py precommit --fix
+        python manage.py precommit --skip-tests
+    """
+    steps: list[tuple[str, list[str]]] = []
+
+    if fix:
+        steps.append(("Format (Black)", ["black", "app/", "tests/"]))
+        steps.append(
+            ("Lint & fix (Ruff)", ["ruff", "check", "--fix", "app/", "tests/"])
+        )
+    else:
+        steps.append(
+            ("Check formatting (Black)", ["black", "--check", "app/", "tests/"])
+        )
+        steps.append(("Lint (Ruff)", ["ruff", "check", "app/", "tests/"]))
+
+    steps.append(("Type check (Pyright)", ["pyright", "app/"]))
+
+    if not skip_tests:
+        steps.append(("Test (Pytest)", ["pytest", "tests/", "-x", "-q", "--tb=short"]))
+
+    for i, (label, cmd) in enumerate(steps, 1):
+        print(f"\n[bold cyan][{i}/{len(steps)}] {label}[/bold cyan]")
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            print(f"\n[red]✗ Step failed: {label}[/red]")
+            raise typer.Exit(1)
+        print(f"[green]✓ {label} passed[/green]")
+
+    print("\n[bold green]All checks passed — safe to commit.[/bold green]")
+
+
 @app.callback()
 def main(ctx: typer.Context):
     print(f"Executing the command: {ctx.invoked_subcommand}")

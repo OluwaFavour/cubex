@@ -588,7 +588,7 @@ cubex/
 │   └── templates/                      # Jinja2 templates (emails, alerts)
 ├── migrations/                         # Alembic migration versions
 ├── tests/                              # Pytest test suite (1600+ tests)
-├── manage.py                           # Typer CLI (runserver, migrate, syncplans, …)
+├── manage.py                           # Typer CLI (runserver, migrate, precommit, syncplans, …)
 ├── docker-compose.yml                  # Local dev: API + Scheduler + Worker + Postgres + Redis + RabbitMQ
 ├── Dockerfile                          # Multi-stage: api / scheduler / worker targets
 ├── render.yaml                         # Render deployment blueprint
@@ -720,6 +720,7 @@ All commands are run via `python manage.py <command>`.
 | `clearalembic` | Delete all rows from `alembic_version` table |
 | `createextensions <exts>` | Ensure PostgreSQL extensions exist (e.g. `citext`) |
 | `syncplans [--dry-run]` | Upsert subscription plans from `app/core/data/plans.json` |
+| `precommit [--fix] [--skip-tests]` | Run pre-commit checks (Black → Ruff → Pyright → Pytest) |
 | `generateopenapi` | Re-generate `openapi.json` from current app |
 | `runbroker` | Start RabbitMQ via Docker |
 | `startngrok` | Expose localhost:8000 via ngrok tunnel |
@@ -953,7 +954,12 @@ The project deploys to [Render](https://render.com) as three services defined in
 
 ### CI
 
-GitHub Actions runs the full test suite on every push/PR to `main` and `dev`. See `.github/workflows/tests.yml`.
+GitHub Actions runs on every push/PR to `main` and `dev` in two stages:
+
+1. **Lint** — Black (formatting) → Ruff (linting) → Pyright (type checking)
+2. **Test** — Alembic migrations → full pytest suite with coverage
+
+See `.github/workflows/ci.yml`.
 
 ---
 
@@ -967,7 +973,7 @@ Quick start:
 git checkout dev && git pull origin dev
 git checkout -b feature/my-feature
 # ... make changes ...
-pytest tests/ -x -q --tb=short
+python manage.py precommit
 git push origin feature/my-feature
 # Open a PR targeting dev
 ```
