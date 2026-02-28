@@ -126,12 +126,15 @@ class TestStripeWebhookEndpoint:
         }
 
         mock_publisher = AsyncMock()
-        with patch(
-            "app.core.routers.webhook.Stripe.verify_webhook_signature",
-            return_value=event_data,
-        ), patch(
-            "app.core.routers.webhook.get_publisher",
-            return_value=mock_publisher,
+        with (
+            patch(
+                "app.core.routers.webhook.Stripe.verify_webhook_signature",
+                return_value=event_data,
+            ),
+            patch(
+                "app.core.routers.webhook.get_publisher",
+                return_value=mock_publisher,
+            ),
         ):
             response = await client.post(
                 "/webhooks/stripe",
@@ -169,12 +172,15 @@ class TestStripeWebhookEndpoint:
         }
 
         mock_publisher = AsyncMock()
-        with patch(
-            "app.core.routers.webhook.Stripe.verify_webhook_signature",
-            return_value=event_data,
-        ), patch(
-            "app.core.routers.webhook.get_publisher",
-            return_value=mock_publisher,
+        with (
+            patch(
+                "app.core.routers.webhook.Stripe.verify_webhook_signature",
+                return_value=event_data,
+            ),
+            patch(
+                "app.core.routers.webhook.get_publisher",
+                return_value=mock_publisher,
+            ),
         ):
             response = await client.post(
                 "/webhooks/stripe",
@@ -208,12 +214,15 @@ class TestStripeWebhookEndpoint:
         }
 
         mock_publisher = AsyncMock()
-        with patch(
-            "app.core.routers.webhook.Stripe.verify_webhook_signature",
-            return_value=event_data,
-        ), patch(
-            "app.core.routers.webhook.get_publisher",
-            return_value=mock_publisher,
+        with (
+            patch(
+                "app.core.routers.webhook.Stripe.verify_webhook_signature",
+                return_value=event_data,
+            ),
+            patch(
+                "app.core.routers.webhook.get_publisher",
+                return_value=mock_publisher,
+            ),
         ):
             response = await client.post(
                 "/webhooks/stripe",
@@ -247,12 +256,15 @@ class TestStripeWebhookEndpoint:
         }
 
         mock_publisher = AsyncMock()
-        with patch(
-            "app.core.routers.webhook.Stripe.verify_webhook_signature",
-            return_value=event_data,
-        ), patch(
-            "app.core.routers.webhook.get_publisher",
-            return_value=mock_publisher,
+        with (
+            patch(
+                "app.core.routers.webhook.Stripe.verify_webhook_signature",
+                return_value=event_data,
+            ),
+            patch(
+                "app.core.routers.webhook.get_publisher",
+                return_value=mock_publisher,
+            ),
         ):
             response = await client.post(
                 "/webhooks/stripe",
@@ -286,12 +298,15 @@ class TestStripeWebhookEndpoint:
         }
 
         mock_publisher = AsyncMock()
-        with patch(
-            "app.core.routers.webhook.Stripe.verify_webhook_signature",
-            return_value=event_data,
-        ), patch(
-            "app.core.routers.webhook.get_publisher",
-            return_value=mock_publisher,
+        with (
+            patch(
+                "app.core.routers.webhook.Stripe.verify_webhook_signature",
+                return_value=event_data,
+            ),
+            patch(
+                "app.core.routers.webhook.get_publisher",
+                return_value=mock_publisher,
+            ),
         ):
             response = await client.post(
                 "/webhooks/stripe",
@@ -327,12 +342,15 @@ class TestStripeWebhookEndpoint:
         }
 
         mock_publisher = AsyncMock()
-        with patch(
-            "app.core.routers.webhook.Stripe.verify_webhook_signature",
-            return_value=event_data,
-        ), patch(
-            "app.core.routers.webhook.get_publisher",
-            return_value=mock_publisher,
+        with (
+            patch(
+                "app.core.routers.webhook.Stripe.verify_webhook_signature",
+                return_value=event_data,
+            ),
+            patch(
+                "app.core.routers.webhook.get_publisher",
+                return_value=mock_publisher,
+            ),
         ):
             response = await client.post(
                 "/webhooks/stripe",
@@ -370,12 +388,15 @@ class TestStripeWebhookEndpoint:
         }
 
         mock_publisher = AsyncMock(side_effect=Exception("Queue connection failed"))
-        with patch(
-            "app.core.routers.webhook.Stripe.verify_webhook_signature",
-            return_value=event_data,
-        ), patch(
-            "app.core.routers.webhook.get_publisher",
-            return_value=mock_publisher,
+        with (
+            patch(
+                "app.core.routers.webhook.Stripe.verify_webhook_signature",
+                return_value=event_data,
+            ),
+            patch(
+                "app.core.routers.webhook.get_publisher",
+                return_value=mock_publisher,
+            ),
         ):
             response = await client.post(
                 "/webhooks/stripe",

@@ -33,6 +33,11 @@ from app.core.schemas.auth import (
     ActiveSessionResponse,
     ActiveSessionsResponse,
 )
+from app.core.schemas.plan import (
+    FeatureResponse,
+    PlanResponse,
+    PlanListResponse,
+)
 
 __all__ = [
     # Base
@@ -63,4 +68,8 @@ __all__ = [
     # Sessions
     "ActiveSessionResponse",
     "ActiveSessionsResponse",
+    # Plan
+    "FeatureResponse",
+    "PlanResponse",
+    "PlanListResponse",
 ]

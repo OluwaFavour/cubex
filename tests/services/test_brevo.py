@@ -212,9 +212,10 @@ class TestBrevoServiceRequest:
         mock_response.json.return_value = {"messageId": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(BrevoService, "_init_client"), patch.object(
-            BrevoService, "_client"
-        ) as mock_client:
+        with (
+            patch.object(BrevoService, "_init_client"),
+            patch.object(BrevoService, "_client") as mock_client,
+        ):
             mock_client.request = AsyncMock(return_value=mock_response)
 
             result = await BrevoService._request(
@@ -258,9 +259,10 @@ class TestBrevoServiceRequest:
         mock_response.text = "plain text response"
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(BrevoService, "_init_client"), patch.object(
-            BrevoService, "_client"
-        ) as mock_client:
+        with (
+            patch.object(BrevoService, "_init_client"),
+            patch.object(BrevoService, "_client") as mock_client,
+        ):
             mock_client.request = AsyncMock(return_value=mock_response)
 
             result = await BrevoService._request("GET", "/test")
@@ -277,9 +279,11 @@ class TestBrevoServiceRequest:
             "Server error", request=MagicMock(), response=mock_response
         )
 
-        with patch.object(BrevoService, "_init_client"), patch.object(
-            BrevoService, "_client"
-        ) as mock_client, patch("asyncio.sleep", new_callable=AsyncMock):
+        with (
+            patch.object(BrevoService, "_init_client"),
+            patch.object(BrevoService, "_client") as mock_client,
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
             mock_client.request = AsyncMock(side_effect=error)
 
             with pytest.raises(AppException) as exc_info:
@@ -300,9 +304,11 @@ class TestBrevoServiceRequest:
             "Rate limit", request=MagicMock(), response=mock_response
         )
 
-        with patch.object(BrevoService, "_init_client"), patch.object(
-            BrevoService, "_client"
-        ) as mock_client, patch("asyncio.sleep", new_callable=AsyncMock):
+        with (
+            patch.object(BrevoService, "_init_client"),
+            patch.object(BrevoService, "_client") as mock_client,
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
             mock_client.request = AsyncMock(side_effect=error)
 
             with pytest.raises(AppException) as exc_info:
@@ -322,9 +328,10 @@ class TestBrevoServiceRequest:
             "Bad request", request=MagicMock(), response=mock_response
         )
 
-        with patch.object(BrevoService, "_init_client"), patch.object(
-            BrevoService, "_client"
-        ) as mock_client:
+        with (
+            patch.object(BrevoService, "_init_client"),
+            patch.object(BrevoService, "_client") as mock_client,
+        ):
             mock_client.request = AsyncMock(side_effect=error)
 
             with pytest.raises(AppException) as exc_info:
@@ -335,9 +342,11 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_retries_on_timeout(self):
-        with patch.object(BrevoService, "_init_client"), patch.object(
-            BrevoService, "_client"
-        ) as mock_client, patch("asyncio.sleep", new_callable=AsyncMock):
+        with (
+            patch.object(BrevoService, "_init_client"),
+            patch.object(BrevoService, "_client") as mock_client,
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
             mock_client.request = AsyncMock(
                 side_effect=httpx.TimeoutException("Timeout")
             )
@@ -353,9 +362,11 @@ class TestBrevoServiceRequest:
 
     @pytest.mark.asyncio
     async def test_request_retries_on_transport_error(self):
-        with patch.object(BrevoService, "_init_client"), patch.object(
-            BrevoService, "_client"
-        ) as mock_client, patch("asyncio.sleep", new_callable=AsyncMock):
+        with (
+            patch.object(BrevoService, "_init_client"),
+            patch.object(BrevoService, "_client") as mock_client,
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
             mock_client.request = AsyncMock(
                 side_effect=httpx.TransportError("Network error")
             )
@@ -379,9 +390,11 @@ class TestBrevoServiceRequest:
             "Server error", request=MagicMock(), response=mock_response
         )
 
-        with patch.object(BrevoService, "_init_client"), patch.object(
-            BrevoService, "_client"
-        ) as mock_client, patch("asyncio.sleep", new_callable=AsyncMock):
+        with (
+            patch.object(BrevoService, "_init_client"),
+            patch.object(BrevoService, "_client") as mock_client,
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
             mock_client.request = AsyncMock(side_effect=error)
 
             with pytest.raises(AppException):

@@ -26,7 +26,7 @@ from starlette.responses import RedirectResponse
 from app.apps.cubex_api.db.models.workspace import UsageLog, Workspace, WorkspaceMember
 from app.core.db import AsyncSessionLocal
 from app.core.db.crud.dlq_message import dlq_message_db
-from app.infrastructure.messaging.publisher import publish_event
+from app.core.services.event_publisher import get_publisher
 from app.core.db.crud.quota import plan_pricing_rule_db
 from app.core.db.models.dlq_message import DLQMessage
 from app.core.db.models.plan import Plan
@@ -889,7 +889,7 @@ class DLQMessageAdmin(ModelView, model=DLQMessage):
                     except (json.JSONDecodeError, TypeError):
                         payload = {"raw": msg.message_body}
 
-                    await publish_event(original_queue, payload)
+                    await get_publisher()(original_queue, payload)
 
                 msg.status = DLQMessageStatus.RETRIED
             await session.commit()

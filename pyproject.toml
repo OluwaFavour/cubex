@@ -1,3 +1,10 @@
+[project]
+name = "cubex"
+version = "1.0.0"
+description = "CueBX — AI-powered SaaS platform"
+license = "LicenseRef-Proprietary"
+requires-python = ">=3.13"
+
 [tool.pytest.ini_options]
 # Pytest configuration
 
@@ -73,3 +80,43 @@ type = "forbidden"
 source_modules = ["app.core"]
 forbidden_modules = ["app.infrastructure"]
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Apps must not import from infrastructure"
+type = "forbidden"
+source_modules = ["app.apps"]
+forbidden_modules = ["app.infrastructure"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Core must not import from admin"
+type = "forbidden"
+source_modules = ["app.core"]
+forbidden_modules = ["app.admin"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Apps must not import from admin"
+type = "forbidden"
+source_modules = ["app.apps"]
+forbidden_modules = ["app.admin"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Infrastructure must not import from admin"
+type = "forbidden"
+source_modules = ["app.infrastructure"]
+forbidden_modules = ["app.admin"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Admin must not import from infrastructure"
+type = "forbidden"
+source_modules = ["app.admin"]
+forbidden_modules = ["app.infrastructure"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "App products must be independent"
+type = "independence"
+modules = ["app.apps.cubex_api", "app.apps.cubex_career"]

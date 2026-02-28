@@ -475,7 +475,7 @@ def precommit(
 ):
     """Run the full pre-commit check sequence.
 
-    Steps: Black → Ruff → Pyright → Pytest.
+    Steps: Black → Ruff → Pyright → Import Linter → Pytest.
     Stops on the first failure.
 
     Examples:
@@ -497,6 +497,7 @@ def precommit(
         steps.append(("Lint (Ruff)", ["ruff", "check", "app/", "tests/"]))
 
     steps.append(("Type check (Pyright)", ["pyright", "app/"]))
+    steps.append(("Import contracts (lint-imports)", ["lint-imports"]))
 
     if not skip_tests:
         steps.append(("Test (Pytest)", ["pytest", "tests/", "-x", "-q", "--tb=short"]))

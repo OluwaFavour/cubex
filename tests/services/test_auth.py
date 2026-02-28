@@ -168,9 +168,11 @@ class TestSendOTP:
     async def test_send_otp_creates_token(self, mock_session):
         from app.core.services.auth import AuthService
 
-        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.get_publisher", return_value=AsyncMock()
-        ), patch("app.core.services.auth.hmac_hash_otp") as mock_hash:
+        with (
+            patch("app.core.services.auth.otp_token_db") as mock_otp_db,
+            patch("app.core.services.auth.get_publisher", return_value=AsyncMock()),
+            patch("app.core.services.auth.hmac_hash_otp") as mock_hash,
+        ):
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=0)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
 
@@ -190,9 +192,11 @@ class TestSendOTP:
     async def test_send_otp_invalidates_previous_tokens(self, mock_session):
         from app.core.services.auth import AuthService
 
-        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.get_publisher", return_value=AsyncMock()
-        ), patch("app.core.services.auth.hmac_hash_otp"):
+        with (
+            patch("app.core.services.auth.otp_token_db") as mock_otp_db,
+            patch("app.core.services.auth.get_publisher", return_value=AsyncMock()),
+            patch("app.core.services.auth.hmac_hash_otp"),
+        ):
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=2)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
 
@@ -214,9 +218,11 @@ class TestSendOTP:
         from app.core.services.auth import AuthService
 
         mock_publisher = AsyncMock()
-        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.get_publisher", return_value=mock_publisher
-        ), patch("app.core.services.auth.hmac_hash_otp"):
+        with (
+            patch("app.core.services.auth.otp_token_db") as mock_otp_db,
+            patch("app.core.services.auth.get_publisher", return_value=mock_publisher),
+            patch("app.core.services.auth.hmac_hash_otp"),
+        ):
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=0)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
 
@@ -241,9 +247,11 @@ class TestSendOTP:
 
         user_id = uuid4()
 
-        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.get_publisher", return_value=AsyncMock()
-        ), patch("app.core.services.auth.hmac_hash_otp"):
+        with (
+            patch("app.core.services.auth.otp_token_db") as mock_otp_db,
+            patch("app.core.services.auth.get_publisher", return_value=AsyncMock()),
+            patch("app.core.services.auth.hmac_hash_otp"),
+        ):
             mock_otp_db.invalidate_previous_tokens = AsyncMock(return_value=0)
             mock_otp_db.create = AsyncMock(return_value=MagicMock())
 
@@ -282,9 +290,10 @@ class TestVerifyOTP:
     async def test_verify_otp_success(self, mock_session, valid_token):
         from app.core.services.auth import AuthService
 
-        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.hmac_hash_otp"
-        ) as mock_hash:
+        with (
+            patch("app.core.services.auth.otp_token_db") as mock_otp_db,
+            patch("app.core.services.auth.hmac_hash_otp") as mock_hash,
+        ):
             mock_hash.return_value = "hashed_otp"
 
             mock_otp_db.get_valid_token_by_hash = AsyncMock(return_value=valid_token)
@@ -304,9 +313,10 @@ class TestVerifyOTP:
     async def test_verify_otp_invalid_code(self, mock_session):
         from app.core.services.auth import AuthService
 
-        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.hmac_hash_otp"
-        ) as mock_hash:
+        with (
+            patch("app.core.services.auth.otp_token_db") as mock_otp_db,
+            patch("app.core.services.auth.hmac_hash_otp") as mock_hash,
+        ):
             mock_hash.return_value = "hashed_otp"
 
             mock_otp_db.get_valid_token_by_hash = AsyncMock(return_value=None)
@@ -325,9 +335,11 @@ class TestVerifyOTP:
 
         valid_token.attempts = 5  # Max attempts reached
 
-        with patch("app.core.services.auth.otp_token_db") as mock_otp_db, patch(
-            "app.core.services.auth.hmac_hash_otp"
-        ) as mock_hash, patch("app.core.services.auth.settings") as mock_settings:
+        with (
+            patch("app.core.services.auth.otp_token_db") as mock_otp_db,
+            patch("app.core.services.auth.hmac_hash_otp") as mock_hash,
+            patch("app.core.services.auth.settings") as mock_settings,
+        ):
             mock_settings.OTP_MAX_ATTEMPTS = 5
             mock_hash.return_value = "hashed_otp"
 
@@ -358,9 +370,10 @@ class TestEmailSignup:
         new_user.id = uuid4()
         new_user.email = "newuser@example.com"
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.AuthService.hash_password"
-        ) as mock_hash:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.AuthService.hash_password") as mock_hash,
+        ):
             mock_hash.return_value = "hashed_password"
 
             mock_user_db.model = MagicMock()
@@ -406,9 +419,10 @@ class TestEmailSignup:
         new_user = MagicMock()
         new_user.id = uuid4()
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.AuthService.hash_password"
-        ) as mock_hash:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.AuthService.hash_password") as mock_hash,
+        ):
             mock_hash.return_value = "hashed_password_xyz"
 
             mock_user_db.model = MagicMock()
@@ -450,9 +464,10 @@ class TestEmailSignin:
     async def test_email_signin_success(self, mock_session, valid_user):
         from app.core.services.auth import AuthService
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.AuthService.verify_password"
-        ) as mock_verify:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.AuthService.verify_password") as mock_verify,
+        ):
             mock_verify.return_value = True
 
             mock_user_db.model = MagicMock()
@@ -487,9 +502,10 @@ class TestEmailSignin:
     async def test_email_signin_wrong_password(self, mock_session, valid_user):
         from app.core.services.auth import AuthService
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.AuthService.verify_password"
-        ) as mock_verify:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.AuthService.verify_password") as mock_verify,
+        ):
             mock_verify.return_value = False
 
             mock_user_db.model = MagicMock()
@@ -509,9 +525,10 @@ class TestEmailSignin:
 
         valid_user.is_active = False
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.AuthService.verify_password"
-        ) as mock_verify:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.AuthService.verify_password") as mock_verify,
+        ):
             mock_verify.return_value = True
 
             mock_user_db.model = MagicMock()
@@ -578,9 +595,10 @@ class TestOAuthAuthenticate:
         new_user.id = uuid4()
         new_user.email = oauth_user_info.email
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.oauth_account_db"
-        ) as mock_oauth_db:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.oauth_account_db") as mock_oauth_db,
+        ):
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=None)
@@ -615,9 +633,10 @@ class TestOAuthAuthenticate:
         existing_user.avatar_url = "https://example.com/avatar.jpg"
         existing_user.email_verified = True
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.oauth_account_db"
-        ) as mock_oauth_db:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.oauth_account_db") as mock_oauth_db,
+        ):
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=existing_user)
@@ -654,9 +673,10 @@ class TestOAuthAuthenticate:
         existing_oauth.user_id = existing_user.id
         existing_oauth.user = existing_user
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.oauth_account_db"
-        ) as mock_oauth_db:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.oauth_account_db") as mock_oauth_db,
+        ):
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=existing_user)
@@ -692,9 +712,10 @@ class TestOAuthAuthenticate:
         existing_oauth = MagicMock()
         existing_oauth.user = existing_user
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.oauth_account_db"
-        ) as mock_oauth_db:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.oauth_account_db") as mock_oauth_db,
+        ):
             mock_user_db.model = MagicMock()
             mock_user_db.model.email = "email"
             mock_user_db.get_one_by_conditions = AsyncMock(return_value=existing_user)
@@ -760,9 +781,11 @@ class TestPasswordReset:
     async def test_reset_password_success(self, mock_session, valid_user):
         from app.core.services.auth import AuthService
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.AuthService.hash_password"
-        ) as mock_hash, patch("app.core.services.auth.get_publisher") as mock_get_pub:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.AuthService.hash_password") as mock_hash,
+            patch("app.core.services.auth.get_publisher") as mock_get_pub,
+        ):
             mock_hash.return_value = "new_hashed_password"
 
             mock_publish = AsyncMock(return_value=None)
@@ -788,9 +811,11 @@ class TestPasswordReset:
     ):
         from app.core.services.auth import AuthService
 
-        with patch("app.core.services.auth.user_db") as mock_user_db, patch(
-            "app.core.services.auth.AuthService.hash_password"
-        ), patch("app.core.services.auth.get_publisher") as mock_get_pub:
+        with (
+            patch("app.core.services.auth.user_db") as mock_user_db,
+            patch("app.core.services.auth.AuthService.hash_password"),
+            patch("app.core.services.auth.get_publisher") as mock_get_pub,
+        ):
             mock_publish = AsyncMock(return_value=None)
             mock_get_pub.return_value = mock_publish
 

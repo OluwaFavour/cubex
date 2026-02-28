@@ -743,7 +743,7 @@ All commands are run via `python manage.py <command>`.
 | `clearalembic` | Delete all rows from `alembic_version` table |
 | `createextensions <exts>` | Ensure PostgreSQL extensions exist (e.g. `citext`) |
 | `syncplans [--dry-run]` | Upsert subscription plans from `app/core/data/plans.json` |
-| `precommit [--fix] [--skip-tests]` | Run pre-commit checks (Black → Ruff → Pyright → Pytest) |
+| `precommit [--fix] [--skip-tests]` | Run pre-commit checks (Black → Ruff → Pyright → Import Linter → Pytest) |
 | `generateopenapi` | Re-generate `openapi.json` from current app |
 | `runbroker` | Start RabbitMQ via Docker |
 | `startngrok` | Expose localhost:8000 via ngrok tunnel |
@@ -1013,7 +1013,7 @@ See **[SECURITY.md](SECURITY.md)** for the vulnerability reporting policy, scope
 
 ## License
 
-> *(To be added)*
+This project is **proprietary software**. All rights reserved. See **[LICENSE](LICENSE)** for the full terms.
 
 ---
 

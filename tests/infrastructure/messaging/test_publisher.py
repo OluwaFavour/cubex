@@ -86,10 +86,13 @@ class TestPublishEvent:
 
         event_data = {"key": "value"}
 
-        with patch(
-            "app.infrastructure.messaging.publisher.get_connection",
-            new_callable=AsyncMock,
-        ) as mock_get_conn, patch("aio_pika.Message") as mock_message_class:
+        with (
+            patch(
+                "app.infrastructure.messaging.publisher.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch("aio_pika.Message") as mock_message_class,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_message_instance = MagicMock()
             mock_message_class.return_value = mock_message_instance
@@ -115,10 +118,13 @@ class TestPublishEvent:
         mock_channel.declare_queue.return_value = mock_queue
         mock_channel.default_exchange = mock_exchange
 
-        with patch(
-            "app.infrastructure.messaging.publisher.get_connection",
-            new_callable=AsyncMock,
-        ) as mock_get_conn, patch("aio_pika.Message") as mock_message_class:
+        with (
+            patch(
+                "app.infrastructure.messaging.publisher.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch("aio_pika.Message") as mock_message_class,
+        ):
             mock_get_conn.return_value = mock_connection
             mock_message_instance = MagicMock()
             mock_message_class.return_value = mock_message_instance
@@ -173,10 +179,13 @@ class TestPublishEvent:
             "timestamp": "2024-01-01T00:00:00Z",
         }
 
-        with patch(
-            "app.infrastructure.messaging.publisher.get_connection",
-            new_callable=AsyncMock,
-        ) as mock_get_conn, patch("aio_pika.Message") as mock_message_class:
+        with (
+            patch(
+                "app.infrastructure.messaging.publisher.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch("aio_pika.Message") as mock_message_class,
+        ):
             mock_get_conn.return_value = mock_connection
 
             await publish_event("test_queue", complex_event)
@@ -196,10 +205,13 @@ class TestPublishEvent:
         mock_channel.declare_queue.return_value = mock_queue
         mock_channel.default_exchange = mock_exchange
 
-        with patch(
-            "app.infrastructure.messaging.publisher.get_connection",
-            new_callable=AsyncMock,
-        ) as mock_get_conn, patch("aio_pika.Message") as mock_message_class:
+        with (
+            patch(
+                "app.infrastructure.messaging.publisher.get_connection",
+                new_callable=AsyncMock,
+            ) as mock_get_conn,
+            patch("aio_pika.Message") as mock_message_class,
+        ):
             mock_get_conn.return_value = mock_connection
 
             # Call without headers parameter
