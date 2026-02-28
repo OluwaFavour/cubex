@@ -1,7 +1,7 @@
 # ADR-007: Stateless Admin Auth via HMAC Tokens
 
 **Status:** Accepted
-**Date:** 2025-02
+**Date:** 2026-02
 
 ## Context
 

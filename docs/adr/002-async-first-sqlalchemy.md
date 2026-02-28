@@ -1,7 +1,7 @@
 # ADR-002: Async-First SQLAlchemy 2.0
 
 **Status:** Accepted
-**Date:** 2025-01
+**Date:** 2026-02
 
 ## Context
 

@@ -6,14 +6,15 @@ This directory contains Architecture Decision Records (ADRs) that document key t
 
 | # | Title | Status | Date |
 | --- | ------- | -------- | ------ |
-| [001](001-class-based-singleton-services.md) | Class-Based Singleton Services | Accepted | 2025-01 |
-| [002](002-async-first-sqlalchemy.md) | Async-First SQLAlchemy 2.0 | Accepted | 2025-01 |
-| [003](003-rabbitmq-over-celery.md) | RabbitMQ over Celery | Accepted | 2025-01 |
-| [004](004-hmac-otp-hashing.md) | HMAC-Based OTP Hashing | Accepted | 2025-01 |
-| [005](005-multi-target-dockerfile.md) | Multi-Target Dockerfile | Accepted | 2025-02 |
-| [006](006-pluggable-quota-cache.md) | Pluggable Quota Cache with Event-Driven Invalidation | Accepted | 2025-03 |
-| [007](007-stateless-admin-auth.md) | Stateless HMAC Admin Authentication | Accepted | 2025-02 |
-| [008](008-core-apps-infrastructure-split.md) | Core / Apps / Infrastructure Module Split | Accepted | 2025-01 |
+| [001](001-class-based-singleton-services.md) | Class-Based Singleton Services | Accepted | 2026-02 |
+| [002](002-async-first-sqlalchemy.md) | Async-First SQLAlchemy 2.0 | Accepted | 2026-02 |
+| [003](003-rabbitmq-over-celery.md) | RabbitMQ over Celery | Accepted | 2026-02 |
+| [004](004-hmac-otp-hashing.md) | HMAC-Based OTP Hashing | Accepted | 2026-02 |
+| [005](005-multi-target-dockerfile.md) | Multi-Target Dockerfile | Accepted | 2026-02 |
+| [006](006-pluggable-quota-cache.md) | Pluggable Quota Cache with Event-Driven Invalidation | Accepted | 2026-02 |
+| [007](007-stateless-admin-auth.md) | Stateless HMAC Admin Authentication | Accepted | 2026-02 |
+| [008](008-core-apps-infrastructure-split.md) | Core / Apps / Infrastructure Module Split | Accepted | 2026-02 |
+| [009](009-analysis-result-separate-from-usage-log.md) | Separate CareerAnalysisResult Table for History | Accepted | 2026-02 |
 
 ## Format
 

@@ -104,7 +104,7 @@ A multi-product SaaS platform that provides AI-powered developer tools and caree
 
 ## Database Schema
 
-16 models across 18 tables. All models inherit from `BaseModel` which provides `id` (UUID PK), `created_at`, `updated_at`, `is_deleted`, `deleted_at`.
+16 models across 19 tables. All models inherit from `BaseModel` which provides `id` (UUID PK), `created_at`, `updated_at`, `is_deleted`, `deleted_at`.
 
 ```text
 ┌──────────────────────┐
@@ -194,8 +194,20 @@ A multi-product SaaS platform that provides AI-powered developer tools and caree
          │   EXPIRED)          │              │ latency_ms           │
          │ model_used, tokens, │              │ failure_type/reason  │
          │ latency_ms          │              └──────────────────────┘
-         │ failure_type/reason │
-         └─────────────────────┘    ┌──────────────────────┐
+         │ failure_type/reason │                       │
+         └─────────────────────┘                       │ 1:0..1
+                                                       ▼
+                                    ┌───────────────────────────┐
+                                    │   CareerAnalysisResult    │
+                                    │ ───────────────────────── │
+                                    │ usage_log_id (FK, unique) │
+                                    │ user_id (FK)              │
+                                    │ feature_key               │
+                                    │ title                     │
+                                    │ result_data (JSON)        │
+                                    └───────────────────────────┘
+
+                                    ┌──────────────────────┐
                                     │   StripeEventLog     │
          ┌─────────────────────┐    │ ──────────────────── │
          │    SalesRequest     │    │ event_id (unique)    │
@@ -216,6 +228,7 @@ A multi-product SaaS platform that provides AI-powered developer tools and caree
 | Workspace → APISubscriptionContext → Subscription | 1:1:1 | One API subscription per workspace (via context) |
 | Workspace → WorkspaceMember | 1:N | Multiple members per workspace |
 | Workspace → APIKey → UsageLog | 1:N:N | Keys scoped to workspace, logs scoped to key |
+| CareerUsageLog → CareerAnalysisResult | 1:0..1 | Successful analyses with `result_data` produce a history record |
 | Plan → PlanPricingRule | 1:1 | Each plan has one pricing/quota configuration |
 | Subscription → Plan | N:1 | Multiple subscriptions reference the same plan |
 
@@ -729,7 +742,7 @@ All commands are run via `python manage.py <command>`.
 
 ## API Endpoints
 
-The API is organized into 8 route groups with 53 endpoints total:
+The API is organized into 9 route groups with 56 endpoints total:
 
 | Prefix | Tag | Endpoints | Description |
 | -------- | ----- | ----------- | ------------- |
@@ -741,6 +754,7 @@ The API is organized into 8 route groups with 53 endpoints total:
 | `/api` | API - Internal API | 2 | Usage validate + commit (service-to-service) |
 | `/career` | Career - Subscriptions | 8 | Plans, checkout, upgrade, cancel, activate |
 | `/career` | Career - Internal API | 2 | Usage validate + commit (service-to-service) |
+| `/career` | Career - History | 3 | List, get, delete analysis results |
 | `/health` | Health Check | 1 | DB + Redis + RabbitMQ (when enabled) connectivity check |
 
 **Full reference:** Start the server and visit `/docs` (Swagger) or `/redoc`.

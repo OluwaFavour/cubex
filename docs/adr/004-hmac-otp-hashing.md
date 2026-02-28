@@ -1,7 +1,7 @@
 # ADR-004: HMAC-Based OTP Hashing
 
 **Status:** Accepted
-**Date:** 2025-01
+**Date:** 2026-02
 
 ## Context
 

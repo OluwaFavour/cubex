@@ -1,7 +1,7 @@
 # ADR-001: Class-Based Singleton Services
 
 **Status:** Accepted
-**Date:** 2025-01
+**Date:** 2026-02
 
 ## Context
 

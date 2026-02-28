@@ -1,7 +1,7 @@
 # ADR-008: Core / Apps / Infrastructure Split
 
 **Status:** Accepted
-**Date:** 2025-02
+**Date:** 2026-02
 
 ## Context
 
