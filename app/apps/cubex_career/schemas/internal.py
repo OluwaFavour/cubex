@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from pydantic import (
@@ -200,6 +200,16 @@ class UsageCommitRequest(BaseModel):
     failure: Annotated[
         "FailureDetails | None",
         Field(description="Required failure details when success=False"),
+    ] = None
+    result_data: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description=(
+                "Structured JSON output from a successful analysis. "
+                "Stored as analysis history for the user. "
+                "Ignored when success=False."
+            ),
+        ),
     ] = None
 
     @model_validator(mode="after")

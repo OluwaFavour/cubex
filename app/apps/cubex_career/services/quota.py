@@ -31,7 +31,10 @@ from uuid import UUID
 from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.apps.cubex_career.db.crud import career_usage_log_db
+from app.apps.cubex_career.db.crud import (
+    career_analysis_result_db,
+    career_usage_log_db,
+)
 from app.core.config import career_logger
 from app.core.db.crud import career_subscription_context_db
 from app.core.enums import AccessStatus, FeatureKey
@@ -480,6 +483,7 @@ class CareerQuotaService:
         success: bool,
         metrics: dict | None = None,
         failure: dict | None = None,
+        result_data: dict | None = None,
         commit_self: bool = True,
     ) -> tuple[bool, str]:
         """
@@ -497,6 +501,8 @@ class CareerQuotaService:
             metrics: Optional dict with keys: model_used, input_tokens,
                      output_tokens, latency_ms.
             failure: Optional dict with keys: failure_type, reason.
+            result_data: Optional structured JSON analysis output to save
+                         as analysis history (only stored on success).
             commit_self: Whether to commit the transaction.
 
         Returns:
@@ -538,6 +544,17 @@ class CareerQuotaService:
                     await career_subscription_context_db.increment_credits_used(
                         session, context.id, committed_log.credits_charged
                     )
+
+            # Store analysis result if provided and successful
+            if success and result_data and committed_log.feature_key:
+                await career_analysis_result_db.create_from_commit(
+                    session,
+                    usage_log_id=usage_id,
+                    user_id=user_id,
+                    feature_key=committed_log.feature_key,
+                    result_data=result_data,
+                    commit_self=False,
+                )
 
             if commit_self:
                 await session.commit()

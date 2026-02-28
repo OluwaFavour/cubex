@@ -424,6 +424,7 @@ async def commit_usage(
             success=request.success,
             metrics=metrics,
             failure=failure,
+            result_data=request.result_data,
             commit_self=False,
         )
 

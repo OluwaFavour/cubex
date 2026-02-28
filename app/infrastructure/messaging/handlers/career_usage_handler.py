@@ -80,6 +80,7 @@ async def handle_career_usage_commit(event: dict[str, Any]) -> None:
                 success=request.success,
                 metrics=metrics,
                 failure=failure,
+                result_data=request.result_data,
                 commit_self=False,  # Transaction is managed by context manager
             )
 

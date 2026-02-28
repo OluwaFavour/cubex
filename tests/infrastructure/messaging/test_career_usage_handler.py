@@ -207,6 +207,7 @@ class TestCareerUsageHandlerProcessing:
                 success=True,
                 metrics=None,
                 failure=None,
+                result_data=None,
                 commit_self=False,
             )
 

@@ -68,6 +68,7 @@ from app.apps.cubex_api.routers import (
     subscription_router as api_subscription_router,
 )
 from app.apps.cubex_career.routers import (
+    history_router as career_history_router,
     subscription_router as career_subscription_router,
     internal_router as career_internal_router,
 )
@@ -280,6 +281,7 @@ app.include_router(
 app.include_router(
     career_internal_router, prefix="/career", tags=["Career - Internal API"]
 )
+app.include_router(career_history_router, prefix="/career", tags=["Career - History"])
 
 # Mount admin interface
 init_admin(app)
