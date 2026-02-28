@@ -1,4 +1,5 @@
 from app.core.db.crud.base import BaseDB
+from app.core.db.crud.dlq_message import DLQMessageDB, dlq_message_db
 from app.core.db.crud.otp import OTPTokenDB
 from app.core.db.crud.plan import PlanDB
 from app.core.db.crud.quota import (
@@ -31,6 +32,7 @@ __all__ = [
     "APISubscriptionContextDB",
     "BaseDB",
     "CareerSubscriptionContextDB",
+    "DLQMessageDB",
     "OAuthAccountDB",
     "OTPTokenDB",
     "PlanDB",
@@ -44,6 +46,7 @@ __all__ = [
     # Global instances (for actual usage)
     "api_subscription_context_db",
     "career_subscription_context_db",
+    "dlq_message_db",
     "feature_cost_config_db",
     "plan_pricing_rule_db",
     "user_db",

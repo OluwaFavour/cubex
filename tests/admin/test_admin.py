@@ -24,6 +24,7 @@ class TestAdminModuleImports:
 
     def test_admin_views_import(self):
         from app.admin.views import (
+            DLQMessageAdmin,
             FeatureCostConfigAdmin,
             PlanAdmin,
             PlanPricingRuleAdmin,
@@ -40,6 +41,7 @@ class TestAdminModuleImports:
         assert WorkspaceAdmin is not None
         assert WorkspaceMemberAdmin is not None
         assert SubscriptionAdmin is not None
+        assert DLQMessageAdmin is not None
 
     def test_admin_auth_import(self):
         from app.admin.auth import AdminAuth, admin_auth

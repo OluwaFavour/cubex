@@ -10,6 +10,7 @@ from sqladmin import Admin
 
 from app.admin.auth import admin_auth
 from app.admin.views import (
+    DLQMessageAdmin,
     FeatureCostConfigAdmin,
     PlanAdmin,
     PlanPricingRuleAdmin,
@@ -51,6 +52,7 @@ def init_admin(app: FastAPI) -> None:
     admin.add_view(WorkspaceMemberAdmin)
     admin.add_view(SubscriptionAdmin)
     admin.add_view(UsageLogAdmin)
+    admin.add_view(DLQMessageAdmin)
 
 
 __all__ = ["admin", "init_admin"]

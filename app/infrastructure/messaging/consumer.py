@@ -71,6 +71,11 @@ async def process_message(
 
             # Dead-letter logic
             elif dead_letter_queue:
+                headers["x-error-message"] = str(e)
+                # Derive the original main queue from the DLQ name
+                if dead_letter_queue.endswith("_dead"):
+                    headers["x-original-queue"] = dead_letter_queue[: -len("_dead")]
+
                 await channel.default_exchange.publish(
                     aio_pika.Message(body=message.body, headers=headers),
                     routing_key=dead_letter_queue,

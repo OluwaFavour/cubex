@@ -16,6 +16,7 @@ import aio_pika
 
 from app.infrastructure.messaging.connection import get_connection
 from app.infrastructure.messaging.consumer import process_message
+from app.infrastructure.messaging.handlers.dlq_handler import handle_dlq_message
 from app.infrastructure.messaging.queues import get_queue_configs
 from app.core.config import rabbitmq_logger, settings
 from app.core.db import init_db, dispose_db
@@ -79,7 +80,12 @@ async def start_consumers(keep_alive: bool) -> aio_pika.RobustConnection | None:
 
         # Dead-letter queue setup
         if dead := q.dead_letter_queue:
-            await channel.declare_queue(dead, durable=True)
+            dlq = await channel.declare_queue(dead, durable=True)
+            # Attach a consumer that drains DLQ messages into the database
+            await dlq.consume(
+                partial(handle_dlq_message, queue_name=dead),  # type: ignore[arg-type]
+                no_ack=False,
+            )
 
         # Register consumer
         await queue.consume(  # type: ignore[arg-type]
