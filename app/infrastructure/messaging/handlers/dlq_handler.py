@@ -36,6 +36,8 @@ async def handle_dlq_message(
             error_message = headers.get("x-error-message")
             if isinstance(error_message, bytes):
                 error_message = error_message.decode("utf-8", errors="replace")
+            elif error_message is not None and not isinstance(error_message, str):
+                error_message = str(error_message)
 
             # Sanitise header values so they are JSON-serialisable
             safe_headers = _sanitise_headers(headers)

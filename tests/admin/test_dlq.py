@@ -126,6 +126,24 @@ class TestDLQMessageAdminActions:
     def test_has_discard_action(self):
         assert hasattr(DLQMessageAdmin, "action_discard")
 
+    def test_action_retry_signature_takes_request_only(self):
+        """SQLAdmin 0.22.0 calls action(request) — pks come from query params."""
+        import inspect
+
+        sig = inspect.signature(DLQMessageAdmin.action_retry)
+        params = list(sig.parameters.keys())
+        # Should be (self, request) — no 'pks' parameter
+        assert "pks" not in params
+        assert "request" in params
+
+    def test_action_discard_signature_takes_request_only(self):
+        import inspect
+
+        sig = inspect.signature(DLQMessageAdmin.action_discard)
+        params = list(sig.parameters.keys())
+        assert "pks" not in params
+        assert "request" in params
+
 
 # ---------------------------------------------------------------------------
 # _format_json_field helper

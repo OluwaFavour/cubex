@@ -859,7 +859,7 @@ class DLQMessageAdmin(ModelView, model=DLQMessage):
         add_in_detail=True,
         add_in_list=True,
     )
-    async def action_retry(self, request: Request, pks: list[str]) -> RedirectResponse:
+    async def action_retry(self, request: Request) -> RedirectResponse:
         """Re-publish selected DLQ messages to their original queues."""
         import json
         from uuid import UUID
@@ -867,6 +867,9 @@ class DLQMessageAdmin(ModelView, model=DLQMessage):
         from app.core.db import AsyncSessionLocal
         from app.core.db.crud.dlq_message import dlq_message_db
         from app.infrastructure.messaging.publisher import publish_event
+
+        pks = request.query_params.get("pks", "").split(",")
+        pks = [pk for pk in pks if pk]
 
         async with AsyncSessionLocal() as session:
             for pk in pks:
@@ -902,14 +905,15 @@ class DLQMessageAdmin(ModelView, model=DLQMessage):
         add_in_detail=True,
         add_in_list=True,
     )
-    async def action_discard(
-        self, request: Request, pks: list[str]
-    ) -> RedirectResponse:
+    async def action_discard(self, request: Request) -> RedirectResponse:
         """Mark selected DLQ messages as discarded."""
         from uuid import UUID
 
         from app.core.db import AsyncSessionLocal
         from app.core.db.crud.dlq_message import dlq_message_db
+
+        pks = request.query_params.get("pks", "").split(",")
+        pks = [pk for pk in pks if pk]
 
         async with AsyncSessionLocal() as session:
             for pk in pks:

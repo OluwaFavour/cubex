@@ -186,6 +186,17 @@ class TestHandleDLQMessage:
         assert added.error_message == "timeout exceeded"
 
     @pytest.mark.asyncio
+    async def test_extracts_error_message_other_type(self):
+        """Non-bytes, non-str error_message should be cast to str."""
+        patcher, mock_session = self._patch_session()
+        with patcher:
+            msg = self._make_message(headers={"x-error-message": 42})
+            await handle_dlq_message(msg, queue_name="otp_emails_dead")
+
+        added = mock_session.add.call_args[0][0]
+        assert added.error_message == "42"
+
+    @pytest.mark.asyncio
     async def test_missing_retry_attempt_defaults_to_zero(self):
         patcher, mock_session = self._patch_session()
         with patcher:
