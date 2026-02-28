@@ -310,56 +310,148 @@ async def validate_usage(
     status_code=status.HTTP_200_OK,
     summary="Commit a usage log",
     description="""
-    Commit a pending usage log entry (idempotent).
+## Commit Career Usage Log
 
-    This endpoint is called by the AI tool server after a request
-    completes to mark the usage as SUCCESS (counts toward quota) or FAILED
-    (does not count toward quota).
+Finalize a PENDING usage log created by `/usage/validate`. The AI tool
+server calls this endpoint after every analysis request completes —
+whether it succeeded or failed — so that quota and billing are accurate.
 
-    **Async Alternative (RabbitMQ)**: Instead of calling this endpoint
-    synchronously, the caller can publish the same `UsageCommitRequest`
-    payload as a JSON message to the **`career_usage_commits`** RabbitMQ
-    queue. The message will be processed asynchronously by the career
-    usage commit handler.
-    - Retry queue: `career_usage_commits_retry` (30 s TTL, max 3 retries)
-    - Dead-letter queue: `career_usage_commits_dead`
+### Commit Flow
 
-    **Metrics (optional)**: When `success=True`, you can optionally provide
-    metrics about the request:
-    - `model_used`: Model identifier (e.g., "gpt-4o")
-    - `input_tokens`: Actual input tokens used (0-2,000,000)
-    - `output_tokens`: Actual output tokens generated (0-2,000,000)
-    - `latency_ms`: Request latency in milliseconds (0-3,600,000)
+1. AI tool server calls `POST /internal/usage/validate` → receives `usage_id`
+2. AI tool server performs the analysis
+3. AI tool server calls **this endpoint** with the `usage_id` and outcome
+4. On `success=true` with `result_data`, a **CareerAnalysisResult** record
+   is persisted so the user can revisit the output via `GET /career/history`
 
-    **Failure Details (required when success=False)**: When `success=False`,
-    you MUST provide failure details:
-    - `failure_type`: Category of failure (internal_error, timeout,
-      rate_limited, invalid_response, upstream_error, client_error,
-      validation_error)
-    - `reason`: Human-readable description (max 1000 chars)
+### Authorization
 
-    **Idempotent**: Safe to retry. If the usage log is already committed
-    or doesn't exist, success is still returned.
+| Header | Required | Description |
+|--------|----------|-------------|
+| `X-Internal-API-Key` | Yes | Authenticates the AI tool server |
 
-    **Security**: Requires X-Internal-API-Key header. No JWT needed —
-    the `user_id` is passed in the request body and ownership is verified
-    against the usage log record.
-    """,
+No JWT required — `user_id` is passed in the request body and ownership
+is verified against the usage log record.
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `user_id` | UUID | Yes | The user who owns the usage log |
+| `usage_id` | UUID | Yes | The PENDING usage log returned by `/usage/validate` |
+| `success` | boolean | Yes | `true` = analysis succeeded (credits charged), `false` = failed (credits released) |
+| `metrics` | object | No | Performance metrics (only meaningful when `success=true`) |
+| `metrics.model_used` | string | No | Model identifier (e.g. `"gpt-4o"`, max 100 chars) |
+| `metrics.input_tokens` | int | No | Actual input tokens consumed (0–2 000 000) |
+| `metrics.output_tokens` | int | No | Output tokens generated (0–2 000 000) |
+| `metrics.latency_ms` | int | No | End-to-end latency in milliseconds (0–3 600 000) |
+| `failure` | object | Cond. | **Required** when `success=false` |
+| `failure.failure_type` | string | Cond. | Category — see Failure Types below |
+| `failure.reason` | string | Cond. | Human-readable description (max 1 000 chars) |
+| `result_data` | object | No | Structured JSON analysis output from the AI tool — see Analysis History below |
+
+### Failure Types
+
+| Value | When to use |
+|-------|-------------|
+| `internal_error` | Unhandled server-side exception |
+| `timeout` | Upstream model or service timed out |
+| `rate_limited` | Upstream provider returned 429 |
+| `invalid_response` | Model returned unparseable / malformed output |
+| `upstream_error` | Non-timeout error from upstream provider |
+| `client_error` | Bad input from the end user (4xx equivalent) |
+| `validation_error` | Request failed schema validation |
+
+### Analysis History (`result_data`)
+
+When `success=true`, the caller **should** include `result_data` containing
+the structured JSON response that was returned to the user. This data is
+persisted as a **CareerAnalysisResult** row and powers the user-facing
+history endpoints:
+
+- `GET /career/history` — paginated list of past analyses
+- `GET /career/history/{result_id}` — full detail including `result_data`
+- `DELETE /career/history/{result_id}` — soft-delete
+
+The `result_data` object is stored as-is (schemaless JSON). Its shape
+depends on the `feature_key` of the original usage log — for example a
+`career.job_match` commit might include `{"match_score": 0.85, ...}`,
+while `career.career_path` might include `{"paths": [...]}`.
+
+If `result_data` is omitted or `null`, no history record is created and
+the commit still succeeds normally.
+
+When `success=false`, `result_data` is ignored even if provided.
+
+### Async Alternative (RabbitMQ)
+
+Instead of calling this endpoint synchronously, publish the same
+`UsageCommitRequest` payload as a JSON message to the
+**`career_usage_commits`** queue.
+
+| Queue | Purpose |
+|-------|---------|
+| `career_usage_commits` | Primary — processed by career usage handler |
+| `career_usage_commits_retry` | Retry (30 s TTL, max 3 attempts) |
+| `career_usage_commits_dead` | Dead-letter after retry exhaustion |
+
+`result_data` is fully supported via the async path.
+
+### Idempotency
+
+This operation is safe to retry. If the usage log has already been
+committed, or does not exist, the response returns `success=true` with
+an explanatory message. No duplicate side-effects occur (analysis
+history is only created on the first successful commit).
+
+### Response
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | `true` if the operation completed without error |
+| `message` | string | Human-readable outcome description |
+
+### Status Codes
+
+| Code | Reason |
+|------|--------|
+| `200` | Commit accepted (success, idempotent replay, or ownership mismatch) |
+| `401` | Invalid or missing `X-Internal-API-Key` |
+| `422` | Validation error (e.g. `failure` missing when `success=false`) |
+""",
     responses={
         200: {
             "description": "Commit result",
             "content": {
                 "application/json": {
                     "examples": {
-                        "success_with_metrics": {
-                            "summary": "Success with Metrics",
+                        "success_with_result_data": {
+                            "summary": "Success with Analysis History",
+                            "description": (
+                                "Analysis succeeded, metrics and result_data provided. "
+                                "A CareerAnalysisResult record is created for the user's history."
+                            ),
+                            "value": {
+                                "success": True,
+                                "message": "Usage committed as SUCCESS.",
+                            },
+                        },
+                        "success_without_result_data": {
+                            "summary": "Success without Analysis History",
+                            "description": (
+                                "Analysis succeeded but result_data was omitted. "
+                                "No history record is created."
+                            ),
                             "value": {
                                 "success": True,
                                 "message": "Usage committed as SUCCESS.",
                             },
                         },
                         "failed_with_details": {
-                            "summary": "Failed with Details",
+                            "summary": "Failed with Failure Details",
+                            "description": (
+                                "Analysis failed. Credits are released back to the user's quota."
+                            ),
                             "value": {
                                 "success": True,
                                 "message": "Usage committed as FAILED.",
@@ -367,6 +459,10 @@ async def validate_usage(
                         },
                         "already_committed": {
                             "summary": "Already Committed (Idempotent)",
+                            "description": (
+                                "The usage log was already committed or does not exist. "
+                                "Safe to ignore — no duplicate side-effects."
+                            ),
                             "value": {
                                 "success": True,
                                 "message": "Usage log not found, but operation is idempotent.",
@@ -374,6 +470,10 @@ async def validate_usage(
                         },
                         "ownership_mismatch": {
                             "summary": "Ownership Mismatch",
+                            "description": (
+                                "The user_id in the request does not match the user "
+                                "who created the usage log."
+                            ),
                             "value": {
                                 "success": False,
                                 "message": "User does not own this usage log.",
@@ -383,9 +483,9 @@ async def validate_usage(
                 }
             },
         },
-        401: {"description": "Invalid or missing internal API key or JWT"},
+        401: {"description": "Invalid or missing internal API key"},
         422: {
-            "description": "Validation error (e.g., missing failure details when success=False)",
+            "description": "Validation error (e.g. missing failure details when success=false)",
         },
     },
 )

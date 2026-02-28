@@ -257,6 +257,10 @@ class TestListHistory:
         assert item["id"] == str(analysis_result.id)
         assert item["feature_key"] == FeatureKey.CAREER_JOB_MATCH.value
         assert item["title"] == "Job Match Analysis"
+        assert item["result_data"] == {
+            "match_score": 0.85,
+            "strengths": ["Python", "FastAPI"],
+        }
         assert "created_at" in item
 
     @pytest.mark.asyncio
