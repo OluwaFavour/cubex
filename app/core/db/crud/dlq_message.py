@@ -7,8 +7,9 @@ the admin dashboard.
 """
 
 from typing import Any, Sequence
+from uuid import UUID
 
-from sqlalchemy import Row, func
+from sqlalchemy import Row, false, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -41,7 +42,7 @@ class DLQMessageDB(BaseDB[DLQMessage]):
                     DLQMessage.status,
                     func.count().label("count"),
                 )
-                .where(DLQMessage.is_deleted == False)  # noqa: E712
+                .where(DLQMessage.is_deleted.is_(false()))
                 .group_by(DLQMessage.queue_name, DLQMessage.status)
                 .order_by(DLQMessage.queue_name, DLQMessage.status)
             )
@@ -76,6 +77,36 @@ class DLQMessageDB(BaseDB[DLQMessage]):
             by_queue[queue_name][status_val] = count
 
         return {"total": total, "by_status": by_status, "by_queue": by_queue}
+
+    async def bulk_discard(
+        self,
+        session: AsyncSession,
+        ids: list[UUID],
+    ) -> int:
+        """
+        Set status to DISCARDED for all PENDING messages whose id is in *ids*.
+
+        Executes a single UPDATE … WHERE query instead of fetching each row.
+
+        Returns:
+            The number of rows updated.
+        """
+        try:
+            stmt = (
+                update(DLQMessage)
+                .where(
+                    DLQMessage.id.in_(ids),
+                    DLQMessage.status == DLQMessageStatus.PENDING,
+                    DLQMessage.is_deleted.is_(false()),
+                )
+                .values(status=DLQMessageStatus.DISCARDED)
+            )
+            result = await session.execute(stmt)
+            await session.commit()
+            return result.rowcount  # type: ignore[return-value]
+        except Exception as e:
+            await session.rollback()
+            raise DatabaseException(f"Error bulk-discarding DLQ messages: {e}") from e
 
 
 dlq_message_db = DLQMessageDB()

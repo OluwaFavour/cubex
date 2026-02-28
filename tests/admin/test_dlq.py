@@ -144,6 +144,21 @@ class TestDLQMessageAdminActions:
         assert "pks" not in params
         assert "request" in params
 
+    def test_discard_uses_bulk_operation(self):
+        """Discard action should delegate to bulk_discard, not loop per-row."""
+        import ast
+        import inspect
+        import textwrap
+
+        source = inspect.getsource(DLQMessageAdmin.action_discard)
+        source = textwrap.dedent(source)
+        tree = ast.parse(source)
+
+        source_text = ast.dump(tree)
+        assert "bulk_discard" in source_text or "bulk_discard" in source
+        # Should NOT contain a for-loop over pks with get_by_id
+        assert "get_by_id" not in source
+
 
 # ---------------------------------------------------------------------------
 # _format_json_field helper

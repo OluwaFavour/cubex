@@ -8,11 +8,14 @@ Defines admin views for managing application models:
 - UserAdmin: Read-only user view
 - WorkspaceAdmin: Read-only workspace view
 - SubscriptionAdmin: View/edit subscriptions
-- UsageLogAdmin: Read-only usage log view- DLQMessageAdmin: DLQ monitoring with retry/discard actions
+- UsageLogAdmin: Read-only usage log view
+- DLQMessageAdmin: DLQ monitoring with retry/discard actions
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, Tuple
+from uuid import UUID
 
 from sqladmin import ModelView, action
 from sqladmin.filters import BooleanFilter, StaticValuesFilter
@@ -20,11 +23,14 @@ from sqlalchemy.sql.expression import Select
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
+from app.apps.cubex_api.db.models.workspace import UsageLog, Workspace, WorkspaceMember
+from app.core.db import AsyncSessionLocal
+from app.core.db.crud.dlq_message import dlq_message_db
+from app.infrastructure.messaging.publisher import publish_event
 from app.core.db.crud.quota import plan_pricing_rule_db
 from app.core.db.models.dlq_message import DLQMessage
-from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule
-from app.apps.cubex_api.db.models.workspace import UsageLog, Workspace, WorkspaceMember
 from app.core.db.models.plan import Plan
+from app.core.db.models.quota import FeatureCostConfig, PlanPricingRule
 from app.core.db.models.subscription import Subscription
 from app.core.db.models.user import User
 from app.core.enums import (
@@ -861,13 +867,6 @@ class DLQMessageAdmin(ModelView, model=DLQMessage):
     )
     async def action_retry(self, request: Request) -> RedirectResponse:
         """Re-publish selected DLQ messages to their original queues."""
-        import json
-        from uuid import UUID
-
-        from app.core.db import AsyncSessionLocal
-        from app.core.db.crud.dlq_message import dlq_message_db
-        from app.infrastructure.messaging.publisher import publish_event
-
         pks = request.query_params.get("pks", "").split(",")
         pks = [pk for pk in pks if pk]
 
@@ -907,21 +906,12 @@ class DLQMessageAdmin(ModelView, model=DLQMessage):
     )
     async def action_discard(self, request: Request) -> RedirectResponse:
         """Mark selected DLQ messages as discarded."""
-        from uuid import UUID
-
-        from app.core.db import AsyncSessionLocal
-        from app.core.db.crud.dlq_message import dlq_message_db
-
         pks = request.query_params.get("pks", "").split(",")
         pks = [pk for pk in pks if pk]
 
-        async with AsyncSessionLocal() as session:
-            for pk in pks:
-                msg = await dlq_message_db.get_by_id(session, UUID(pk))
-                if not msg or msg.status != DLQMessageStatus.PENDING:
-                    continue
-                msg.status = DLQMessageStatus.DISCARDED
-            await session.commit()
+        if pks:
+            async with AsyncSessionLocal() as session:
+                await dlq_message_db.bulk_discard(session, [UUID(pk) for pk in pks])
 
         referer = request.headers.get("referer", "/admin/dlq-message/list")
         return RedirectResponse(referer, status_code=302)
@@ -929,18 +919,16 @@ class DLQMessageAdmin(ModelView, model=DLQMessage):
 
 def _format_json_field(value: Any) -> str:
     """Pretty-print a JSON-serialisable value for the detail view."""
-    import json as _json
-
     if value is None:
         return "-"
     if isinstance(value, str):
         try:
-            parsed = _json.loads(value)
-            return _json.dumps(parsed, indent=2, ensure_ascii=False)
+            parsed = json.loads(value)
+            return json.dumps(parsed, indent=2, ensure_ascii=False)
         except (ValueError, TypeError):
             return value
     if isinstance(value, dict):
-        return _json.dumps(value, indent=2, ensure_ascii=False)
+        return json.dumps(value, indent=2, ensure_ascii=False)
     return str(value)
 
 
