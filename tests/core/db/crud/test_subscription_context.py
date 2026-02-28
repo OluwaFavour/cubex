@@ -358,4 +358,3 @@ class TestSubscriptionContextDBCreate:
 
             assert result.user_id == user_id
             assert result.subscription_id == subscription_id
-

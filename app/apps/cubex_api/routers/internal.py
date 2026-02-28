@@ -29,7 +29,6 @@ from app.apps.cubex_api.schemas.workspace import (
 from app.apps.cubex_api.services.quota import quota_service
 from app.core.dependencies import get_async_session, InternalAPIKeyDep
 
-
 router = APIRouter(prefix="/internal")
 
 

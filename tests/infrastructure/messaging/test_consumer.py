@@ -342,4 +342,3 @@ class TestProcessMessage:
 
             call_kwargs = mock_message_class.call_args[1]
             assert call_kwargs["delivery_mode"] == aio_pika.DeliveryMode.PERSISTENT
-

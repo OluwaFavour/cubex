@@ -73,4 +73,3 @@ async def expire_pending_career_usage_logs() -> None:
         scheduler_logger.info(
             f"Completed expiration of pending career usage logs. Expired {expired_count} record(s)."
         )
-

@@ -31,7 +31,6 @@ from app.apps.cubex_career.services import (
 )
 from app.infrastructure.messaging.publisher import publish_event
 
-
 # Redis key prefix for Stripe event deduplication
 STRIPE_EVENT_KEY_PREFIX = "stripe_event:"
 # TTL for processed event markers (48 hours)

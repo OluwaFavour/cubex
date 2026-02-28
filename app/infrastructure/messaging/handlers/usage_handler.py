@@ -102,4 +102,3 @@ async def handle_usage_commit(event: dict[str, Any]) -> None:
 
 
 __all__ = ["handle_usage_commit"]
-

@@ -137,4 +137,3 @@ class TestCRUDExportsFromInit:
         )
 
         assert ExportedClass is PlanPricingRuleDB
-

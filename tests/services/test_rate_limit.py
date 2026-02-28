@@ -425,4 +425,3 @@ class TestStackingRateLimiters:
             assert ip_result.allowed is True
             assert endpoint_result.allowed is True
             assert mock_limiter.check.call_count == 2
-

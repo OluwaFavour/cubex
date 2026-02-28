@@ -51,7 +51,6 @@ from app.apps.cubex_api.schemas import (
 )
 from app.apps.cubex_api.services import (
     workspace_service,
-    subscription_service,
     quota_service,
     WorkspaceNotFoundException,
     WorkspaceFrozenException,
@@ -74,7 +73,6 @@ from app.apps.cubex_api.db.models import (
 )
 from app.core.db.models import Subscription
 from app.core.db.models.subscription_context import APISubscriptionContext
-
 
 router = APIRouter(prefix="/workspaces")
 

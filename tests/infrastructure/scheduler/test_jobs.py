@@ -231,4 +231,3 @@ class TestScheduleCleanupSoftDeletedUsersJob:
                 assert "Scheduling" in first_call
                 assert "3:00 AM UTC" in first_call
                 assert "scheduled successfully" in second_call
-

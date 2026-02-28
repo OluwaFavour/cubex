@@ -277,4 +277,3 @@ __all__ = [
     "CareerUsageLogDB",
     "career_usage_log_db",
 ]
-

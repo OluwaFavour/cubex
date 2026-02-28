@@ -846,4 +846,3 @@ class BaseDB(Generic[T]):
             raise DatabaseException(
                 f"Error permanently deleting soft-deleted {self.model.__name__} records: {str(e)}"
             ) from e
-

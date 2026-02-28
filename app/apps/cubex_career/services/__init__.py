@@ -15,4 +15,3 @@ __all__ = [
     "CareerQuotaService",
     "career_quota_service",
 ]
-

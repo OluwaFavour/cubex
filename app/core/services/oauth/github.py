@@ -36,7 +36,6 @@ from app.core.services.oauth.base import (
     OAuthUserInfo,
 )
 
-
 __all__ = ["GitHubOAuthService"]
 
 
@@ -412,4 +411,3 @@ class GitHubOAuthService(BaseOAuthProvider):
         raise OAuthException(
             message="Failed to retrieve GitHub user info: network error"
         ) from last_error
-

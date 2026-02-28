@@ -279,4 +279,3 @@ class TestSetupLogger:
             assert "%(name)s" in format_str
             assert "%(levelname)s" in format_str
             assert "%(message)s" in format_str
-

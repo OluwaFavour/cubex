@@ -20,4 +20,3 @@ async def get_connection() -> aio_pika.RobustConnection:
     if _connection is None or _connection.is_closed:
         _connection = await aio_pika.connect_robust(settings.RABBITMQ_URL)  # type: ignore[assignment]
     return _connection  # type: ignore[return-value]
-

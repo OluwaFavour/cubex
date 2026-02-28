@@ -213,4 +213,3 @@ class TestBaseDBUpsertTimestamps:
 
             assert created is False
             assert plan.updated_at > plan.created_at
-

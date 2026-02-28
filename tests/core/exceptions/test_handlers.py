@@ -90,4 +90,3 @@ class TestExceptionSchema:
         assert "content" in schema_entry
         assert "application/json" in schema_entry["content"]
         assert "example" in schema_entry["content"]["application/json"]
-

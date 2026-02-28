@@ -442,4 +442,3 @@ class TestModuleExports:
         assert callable(get_current_active_user)
         assert callable(get_current_verified_user)
         assert callable(get_optional_user)
-

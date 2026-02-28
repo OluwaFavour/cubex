@@ -763,4 +763,3 @@ class TestCloudinaryServiceGenerateUploadCredentials:
                 CloudinaryService.generate_upload_credentials()
 
             assert exc_info.value.__cause__ is original_error
-

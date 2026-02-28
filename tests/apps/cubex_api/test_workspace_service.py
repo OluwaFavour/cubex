@@ -14,7 +14,6 @@ Run with coverage:
     pytest tests/apps/cubex_api/test_workspace_service.py --cov=app.apps.cubex_api.services.workspace --cov-report=term-missing -v
 """
 
-
 import pytest
 
 from app.core.enums import (
@@ -195,4 +194,3 @@ class TestWorkspaceCRUDIntegration:
         from app.apps.cubex_api.db.crud.workspace import workspace_invitation_db
 
         assert workspace_invitation_db is not None
-

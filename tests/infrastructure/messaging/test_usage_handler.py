@@ -345,4 +345,3 @@ class TestUsageHandlerErrorHandling:
         ):
             with pytest.raises(RuntimeError, match="Cannot connect to DB"):
                 await handle_usage_commit(event)
-

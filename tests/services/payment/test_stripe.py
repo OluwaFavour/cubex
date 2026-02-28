@@ -373,4 +373,3 @@ class TestUpdateSubscriptionWithSeatPriceId:
                 # Should use first item (si_base_item)
                 assert payload.get("items[0][id]") == "si_base_item"
                 assert payload.get("items[0][quantity]") == 10
-

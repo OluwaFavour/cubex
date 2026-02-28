@@ -3341,4 +3341,3 @@ class SubscriptionItemUpdate(BaseModel):
         list[str] | None,
         Field(description="ID of Tax rates applied to this subscription item."),
     ] = None
-

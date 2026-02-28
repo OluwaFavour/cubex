@@ -27,7 +27,6 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from app.core.config import settings
 
-
 __all__ = [
     "BaseOAuthProvider",
     "OAuthTokens",
@@ -360,4 +359,3 @@ class OAuthStateManager:
 
         except Exception:
             return False
-

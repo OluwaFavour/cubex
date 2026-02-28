@@ -206,4 +206,3 @@ class TestMemberRoleUpdate:
         data = MemberRoleUpdate(role="member")
 
         assert data.role == "member"
-

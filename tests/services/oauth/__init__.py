@@ -1,2 +1,1 @@
 """OAuth provider test modules."""
-

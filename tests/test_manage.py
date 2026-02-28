@@ -19,7 +19,6 @@ from typer.testing import CliRunner
 
 from manage import app, sync_plans_task
 
-
 runner = CliRunner()
 
 
@@ -202,4 +201,3 @@ class TestPlansJsonStructure:
                 assert (
                     plan.get("seat_stripe_price_id_env") is None
                 ), f"Career plan '{plan['name']}' should not have seat_stripe_price_id_env"
-

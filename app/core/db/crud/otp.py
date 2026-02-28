@@ -224,4 +224,3 @@ class OTPTokenDB(BaseDB[OTPToken]):
 
 
 __all__ = ["OTPTokenDB"]
-

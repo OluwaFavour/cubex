@@ -24,7 +24,6 @@ from pydantic import (
 
 from app.core.enums import OAuthProviders
 
-
 # Password with validation constraints
 PasswordStr = Annotated[
     str,
@@ -461,4 +460,3 @@ __all__ = [
     "ActiveSessionResponse",
     "ActiveSessionsResponse",
 ]
-

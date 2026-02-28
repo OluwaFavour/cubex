@@ -668,4 +668,3 @@ class TestEmailManagerAllExports:
 
         assert hasattr(email_manager, "__all__")
         assert "EmailManagerService" in email_manager.__all__
-

@@ -94,4 +94,3 @@ class PlanDB(BaseDB[Plan]):
 
 
 __all__ = ["PlanDB"]
-

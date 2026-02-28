@@ -6,4 +6,3 @@ from app.apps.cubex_career.db.crud.usage_log import (
 )
 
 __all__ = ["CareerUsageLogDB", "career_usage_log_db"]
-

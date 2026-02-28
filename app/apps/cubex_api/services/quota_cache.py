@@ -66,4 +66,3 @@ class APIQuotaCacheService(QuotaCacheService):
 
 
 api_quota_cache_service = APIQuotaCacheService()
-

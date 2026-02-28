@@ -732,4 +732,3 @@ class TestModuleExports:
         from app.core.routers import auth_router
 
         assert auth_router is not None
-

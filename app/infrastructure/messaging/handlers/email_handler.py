@@ -317,4 +317,3 @@ async def handle_workspace_invitation_email(event: dict[str, Any]) -> None:
             f"Failed to send workspace invitation email: email={email}, error={e}"
         )
         raise  # Re-raise to trigger retry mechanism
-

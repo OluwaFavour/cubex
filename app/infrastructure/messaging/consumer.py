@@ -91,4 +91,3 @@ async def process_message(
 
             # Reject the message without requeuing
             await message.reject(requeue=False)
-

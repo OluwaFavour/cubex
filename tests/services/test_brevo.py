@@ -239,6 +239,7 @@ class TestBrevoServiceRequest:
             mock_client_instance.request = AsyncMock(return_value=mock_response)
 
             with patch.object(BrevoService, "_init_client") as mock_init:
+
                 def init_side_effect():
                     BrevoService._client = mock_client_instance
 
@@ -674,4 +675,3 @@ class TestBrevoServiceModels:
         )
 
         assert len(list_mv.messageVersions) == 2
-

@@ -150,4 +150,3 @@ class TestCareerPlanName:
         assert CareerPlanName("Free") == CareerPlanName.FREE
         assert CareerPlanName("Plus Plan") == CareerPlanName.PLUS
         assert CareerPlanName("Pro Plan") == CareerPlanName.PRO
-

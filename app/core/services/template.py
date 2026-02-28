@@ -40,4 +40,3 @@ class Renderer:
             raise RuntimeError("Renderer not initialized. Call initialize() first.")
         template = cls._env.get_template(template_name)
         return await template.render_async(**context)
-

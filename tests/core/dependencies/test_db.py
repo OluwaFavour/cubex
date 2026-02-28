@@ -58,4 +58,3 @@ class TestGetAsyncSession:
                 await gen.__anext__()
             except StopAsyncIteration:
                 pass
-

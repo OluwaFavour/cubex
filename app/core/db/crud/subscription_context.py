@@ -238,4 +238,3 @@ class CareerSubscriptionContextDB(BaseDB[CareerSubscriptionContext]):
 
 
 __all__ = ["APISubscriptionContextDB", "CareerSubscriptionContextDB"]
-

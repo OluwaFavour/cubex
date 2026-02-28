@@ -4,4 +4,3 @@ from app.apps.cubex_career.routers.subscription import router as subscription_ro
 from app.apps.cubex_career.routers.internal import router as internal_router
 
 __all__ = ["subscription_router", "internal_router"]
-

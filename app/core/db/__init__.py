@@ -13,4 +13,3 @@ __all__ = [
     "dispose_db",
     "init_db",
 ]
-

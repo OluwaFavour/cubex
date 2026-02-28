@@ -27,7 +27,6 @@ import pytest
 
 from app.core.enums import ProductType
 
-
 HANDLER_MODULE = "app.infrastructure.messaging.handlers.stripe"
 
 
@@ -1409,4 +1408,3 @@ class TestEmailHelpers:
             await _send_subscription_activated_email(mock_session, sub, "Free")
 
             mock_publish.assert_not_called()
-

@@ -87,4 +87,3 @@ class OTPToken(BaseModel):
 
 
 __all__ = ["OTPToken"]
-

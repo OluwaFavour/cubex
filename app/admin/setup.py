@@ -54,4 +54,3 @@ def init_admin(app: FastAPI) -> None:
 
 
 __all__ = ["admin", "init_admin"]
-

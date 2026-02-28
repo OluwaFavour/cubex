@@ -161,14 +161,10 @@ def setup_test_database(event_loop_policy):
 
             async with engine.begin() as conn:
                 # Get all table names (excluding preserved tables)
-                result = await conn.execute(
-                    text(
-                        """
+                result = await conn.execute(text("""
                         SELECT tablename FROM pg_tables
                         WHERE schemaname = 'public'
-                    """
-                    )
-                )
+                    """))
                 all_tables = [row[0] for row in result.fetchall()]
                 tables = [t for t in all_tables if t not in preserved_tables]
 

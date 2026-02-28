@@ -36,4 +36,3 @@ class TestMain:
         with patch.object(scheduler, "shutdown") as mock_shutdown:
             scheduler.shutdown()
             mock_shutdown.assert_called_once()
-

@@ -20,7 +20,6 @@ from apscheduler.triggers.cron import CronTrigger
 from app.core.config import scheduler_logger, settings
 from app.core.services import BrevoService, RedisService, Renderer
 
-
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("apscheduler").setLevel(logging.DEBUG)
 

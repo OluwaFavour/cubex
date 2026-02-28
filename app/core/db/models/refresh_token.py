@@ -93,4 +93,3 @@ class RefreshToken(BaseModel):
         """Check if the token is still valid (not expired and not revoked)."""
         now = datetime.now(timezone.utc)
         return self.revoked_at is None and self.expires_at > now and not self.is_deleted
-

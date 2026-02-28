@@ -473,4 +473,3 @@ class TestCareerUsageHandlerErrorHandling:
                 ),
             ):
                 await handle_career_usage_commit(event)
-

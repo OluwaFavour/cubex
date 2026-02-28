@@ -494,4 +494,3 @@ class TestGitHubModuleExports:
 
         assert hasattr(github, "__all__")
         assert "GitHubOAuthService" in github.__all__
-

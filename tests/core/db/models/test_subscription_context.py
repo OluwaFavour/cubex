@@ -10,7 +10,6 @@ Run with coverage:
 
 from uuid import uuid4
 
-
 # Import workspace models first to avoid mapper configuration issues
 from app.apps.cubex_api.db.models.workspace import Workspace  # noqa: F401
 
@@ -235,4 +234,3 @@ class TestSubscriptionContextAllExport:
         from app.core.db.models import subscription_context
 
         assert "CareerSubscriptionContext" in subscription_context.__all__
-

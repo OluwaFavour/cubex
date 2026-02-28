@@ -377,4 +377,3 @@ class TestAdminSettingsConfiguration:
         assert settings.ADMIN_PASSWORD is not None
         assert len(settings.ADMIN_USERNAME) > 0
         assert len(settings.ADMIN_PASSWORD) > 0
-

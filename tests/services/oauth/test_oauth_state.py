@@ -12,7 +12,6 @@ Run tests:
 from unittest.mock import patch
 
 
-
 class TestOAuthStateData:
 
     def test_oauth_state_data_defaults(self):
@@ -290,4 +289,3 @@ class TestModuleExports:
 
         assert "OAuthStateManager" in oauth.__all__
         assert "OAuthStateData" in oauth.__all__
-
