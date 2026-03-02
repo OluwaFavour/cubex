@@ -57,8 +57,25 @@ class TestDeriveProductType:
         assert config.feature_key == FeatureKey.CAREER_CAREER_PATH
         assert config.product_type == ProductType.CAREER
 
-    def test_invalid_string_raises_value_error(self):
-        with pytest.raises(ValueError):
+    def test_accepts_enum_name_string_for_api(self):
+        """SQLAdmin sends enum names (e.g. 'API_CAREER_PATH') not values."""
+        config = FeatureCostConfig(
+            feature_key="API_CAREER_PATH",
+            internal_cost_credits=Decimal("18.00"),
+        )
+        assert config.feature_key == FeatureKey.API_CAREER_PATH
+        assert config.product_type == ProductType.API
+
+    def test_accepts_enum_name_string_for_career(self):
+        config = FeatureCostConfig(
+            feature_key="CAREER_JOB_MATCH",
+            internal_cost_credits=Decimal("10.00"),
+        )
+        assert config.feature_key == FeatureKey.CAREER_JOB_MATCH
+        assert config.product_type == ProductType.CAREER
+
+    def test_invalid_string_raises_error(self):
+        with pytest.raises((ValueError, KeyError)):
             FeatureCostConfig(
                 feature_key="invalid.key",
                 internal_cost_credits=Decimal("1.00"),

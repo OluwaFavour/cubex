@@ -64,7 +64,11 @@ class FeatureCostConfig(BaseModel):
     def _derive_product_type(self, _key: str, value: FeatureKey | str) -> FeatureKey:
         """Auto-derive product_type from the feature_key prefix."""
         if isinstance(value, str):
-            value = FeatureKey(value)
+            # Try by value first ("api.career_path"), then by name ("API_CAREER_PATH")
+            try:
+                value = FeatureKey(value)
+            except ValueError:
+                value = FeatureKey[value]
         self.product_type = (
             ProductType.API if value.name.startswith("API_") else ProductType.CAREER
         )
