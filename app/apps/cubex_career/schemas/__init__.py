@@ -5,6 +5,9 @@ from app.apps.cubex_career.schemas.history import (
     AnalysisHistoryItem,
     AnalysisHistoryListResponse,
 )
+from app.apps.cubex_career.schemas.profile import (
+    CareerProfileResponse,
+)
 from app.apps.cubex_career.schemas.subscription import (
     CareerCheckoutRequest,
     CareerCheckoutResponse,
@@ -20,6 +23,7 @@ __all__ = [
     "AnalysisHistoryDetail",
     "AnalysisHistoryItem",
     "AnalysisHistoryListResponse",
+    "CareerProfileResponse",
     "CareerCheckoutRequest",
     "CareerCheckoutResponse",
     "CareerSubscriptionResponse",

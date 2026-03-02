@@ -69,6 +69,7 @@ from app.apps.cubex_api.routers import (
 )
 from app.apps.cubex_career.routers import (
     history_router as career_history_router,
+    profile_router as career_profile_router,
     subscription_router as career_subscription_router,
     internal_router as career_internal_router,
 )
@@ -276,6 +277,7 @@ app.include_router(workspace_router, prefix="/api", tags=["API - Workspaces"])
 app.include_router(api_subscription_router, prefix="/api", tags=["API - Subscriptions"])
 app.include_router(support_router, prefix="/api", tags=["API - Support"])
 app.include_router(internal_router, prefix="/api", tags=["API - Internal API"])
+app.include_router(career_profile_router, prefix="/career", tags=["Career - Profile"])
 app.include_router(
     career_subscription_router, prefix="/career", tags=["Career - Subscriptions"]
 )
