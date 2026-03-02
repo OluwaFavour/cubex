@@ -229,6 +229,7 @@ class FeatureCostConfigAdmin(ModelView, model=FeatureCostConfig):
     column_list = [
         FeatureCostConfig.id,
         FeatureCostConfig.feature_key,
+        FeatureCostConfig.product_type,
         FeatureCostConfig.internal_cost_credits,
         FeatureCostConfig.created_at,
         FeatureCostConfig.updated_at,
@@ -250,6 +251,7 @@ class FeatureCostConfigAdmin(ModelView, model=FeatureCostConfig):
     column_labels = {
         FeatureCostConfig.id: "ID",
         FeatureCostConfig.feature_key: "Feature Key",
+        FeatureCostConfig.product_type: "Product Type",
         FeatureCostConfig.internal_cost_credits: "Cost (Credits)",
         FeatureCostConfig.created_at: "Created",
         FeatureCostConfig.updated_at: "Updated",

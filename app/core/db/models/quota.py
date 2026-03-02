@@ -16,7 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.core.db.models.base import BaseModel
 from app.core.enums import FeatureKey, ProductType
@@ -59,6 +59,16 @@ class FeatureCostConfig(BaseModel):
     )
 
     __table_args__ = (Index("ix_feature_cost_configs_feature_lookup", "feature_key"),)
+
+    @validates("feature_key")
+    def _derive_product_type(self, _key: str, value: FeatureKey | str) -> FeatureKey:
+        """Auto-derive product_type from the feature_key prefix."""
+        if isinstance(value, str):
+            value = FeatureKey(value)
+        self.product_type = (
+            ProductType.API if value.name.startswith("API_") else ProductType.CAREER
+        )
+        return value
 
 
 class PlanPricingRule(BaseModel):
