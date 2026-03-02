@@ -421,7 +421,15 @@ async def handle_stripe_subscription_updated(event: dict[str, Any]) -> None:
         )
         return
 
-    stripe_subscription_id = event["stripe_subscription_id"]
+    stripe_subscription_id = event.get("stripe_subscription_id")
+
+    if not stripe_subscription_id:
+        stripe_logger.warning(
+            f"Subscription updated event {event_id} has no stripe_subscription_id, "
+            "skipping (likely a non-subscription invoice)"
+        )
+        await _mark_event_as_processed(event_id)
+        return
 
     try:
         await _process_subscription_update(stripe_subscription_id)
@@ -449,7 +457,15 @@ async def handle_stripe_subscription_deleted(event: dict[str, Any]) -> None:
         )
         return
 
-    stripe_subscription_id = event["stripe_subscription_id"]
+    stripe_subscription_id = event.get("stripe_subscription_id")
+
+    if not stripe_subscription_id:
+        stripe_logger.warning(
+            f"Subscription deleted event {event_id} has no stripe_subscription_id, "
+            "skipping"
+        )
+        await _mark_event_as_processed(event_id)
+        return
 
     try:
         await _process_subscription_deletion(stripe_subscription_id)
